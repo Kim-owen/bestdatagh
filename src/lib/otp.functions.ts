@@ -1,11 +1,45 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+const TXTCONNECT_API_KEY = process.env.TXTCONNECT_API_KEY || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
+const TXTCONNECT_SENDER_ID = process.env.TXTCONNECT_SENDER_ID || "BestData";
+
 function cleanPhone(raw: string): string {
   const digits = String(raw || "").replace(/\s+/g, "");
   if (digits.startsWith("+233")) return "0" + digits.slice(4);
   if (digits.startsWith("233")) return "0" + digits.slice(3);
   return digits;
+}
+
+/**
+ * Send SMS using TxtConnect REST API (POST)
+ */
+export async function sendTxtConnectSms(toPhone: string, message: string) {
+  let phoneStr = cleanPhone(toPhone);
+
+  try {
+    const response = await fetch("https://api.txtconnect.net/dev/api/sms/send", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${TXTCONNECT_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        to: phoneStr,
+        from: TXTCONNECT_SENDER_ID,
+        unicode: "0",
+        sms: message,
+      }),
+    });
+
+    const data = await response.json();
+    console.log(`[TxtConnect SMS Result] Phone: ${phoneStr} | Status:`, data);
+    return data;
+  } catch (err: any) {
+    console.error(`[TxtConnect SMS Error] Failed to send SMS to ${phoneStr}:`, err.message);
+    // Don't crash flow if SMS gateway is unreachable
+    return null;
+  }
 }
 
 export const checkPhoneVerification = createServerFn({ method: "POST" })
@@ -46,24 +80,31 @@ export const sendPhoneOtp = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin
       .from("phone_verifications")
-      .upsert({
-        phone: data.phone,
-        otp_code: otpCode,
-        expires_at: expiresAt,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "phone" });
+      .upsert(
+        {
+          phone: data.phone,
+          otp_code: otpCode,
+          expires_at: expiresAt,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "phone" }
+      );
 
     if (error) {
       throw new Error(`Failed to generate OTP code: ${error.message}`);
     }
 
-    console.log(`[OTP Sent] Phone: +233 ${data.phone.slice(1)} | Code: ${otpCode}`);
+    // Send real SMS via TxtConnect Gateway
+    const smsMessage = `Your BestData verification code is: ${otpCode}. Valid for 10 minutes.`;
+    await sendTxtConnectSms(data.phone, smsMessage);
+
+    console.log(`[OTP Sent via TxtConnect] Phone: +233 ${data.phone.slice(1)} | Code: ${otpCode}`);
 
     const maskedPhone = `+233 ${data.phone.slice(1, 3)} *** ${data.phone.slice(-4)}`;
     return {
       success: true,
       maskedPhone,
-      otpCode, // Returned for instant demo testing & notification toast
+      otpCode, // Returned for smooth testing & notification toast
     };
   });
 
