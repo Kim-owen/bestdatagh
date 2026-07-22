@@ -37,8 +37,15 @@ import { Route as AuthenticatedAdminReviewsRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminWithdrawalsRouteImport } from './routes/_authenticated/admin.withdrawals'
 import { Route as ApiPaystackWebhookRouteImport } from './routes/api/paystack/webhook'
+import { Route as ApiV1BalanceRouteImport } from './routes/api/v1/balance'
+import { Route as ApiV1BuyDataRouteImport } from './routes/api/v1/buy-data'
+import { Route as ApiV1HealthRouteImport } from './routes/api/v1/health'
+import { Route as ApiV1PackagesRouteImport } from './routes/api/v1/packages'
+import { Route as ApiV1VerifyNumberRouteImport } from './routes/api/v1/verify-number'
 import { Route as ApiPublicV1BundlesRouteImport } from './routes/api/public/v1/bundles'
 import { Route as ApiPublicV1OrdersRouteImport } from './routes/api/public/v1/orders'
+import { Route as ApiV1OrdersIndexRouteImport } from './routes/api/v1/orders/index'
+import { Route as ApiV1OrdersReferenceRouteImport } from './routes/api/v1/orders/$reference'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -186,6 +193,31 @@ const ApiPaystackWebhookRoute = ApiPaystackWebhookRouteImport.update({
   path: '/api/paystack/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1BalanceRoute = ApiV1BalanceRouteImport.update({
+  id: '/api/v1/balance',
+  path: '/api/v1/balance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1BuyDataRoute = ApiV1BuyDataRouteImport.update({
+  id: '/api/v1/buy-data',
+  path: '/api/v1/buy-data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1HealthRoute = ApiV1HealthRouteImport.update({
+  id: '/api/v1/health',
+  path: '/api/v1/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1PackagesRoute = ApiV1PackagesRouteImport.update({
+  id: '/api/v1/packages',
+  path: '/api/v1/packages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1VerifyNumberRoute = ApiV1VerifyNumberRouteImport.update({
+  id: '/api/v1/verify-number',
+  path: '/api/v1/verify-number',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicV1BundlesRoute = ApiPublicV1BundlesRouteImport.update({
   id: '/api/public/v1/bundles',
   path: '/api/public/v1/bundles',
@@ -194,6 +226,16 @@ const ApiPublicV1BundlesRoute = ApiPublicV1BundlesRouteImport.update({
 const ApiPublicV1OrdersRoute = ApiPublicV1OrdersRouteImport.update({
   id: '/api/public/v1/orders',
   path: '/api/public/v1/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1OrdersIndexRoute = ApiV1OrdersIndexRouteImport.update({
+  id: '/api/v1/orders/',
+  path: '/api/v1/orders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1OrdersReferenceRoute = ApiV1OrdersReferenceRouteImport.update({
+  id: '/api/v1/orders/$reference',
+  path: '/api/v1/orders/$reference',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -224,9 +266,16 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
+  '/api/v1/balance': typeof ApiV1BalanceRoute
+  '/api/v1/buy-data': typeof ApiV1BuyDataRoute
+  '/api/v1/health': typeof ApiV1HealthRoute
+  '/api/v1/packages': typeof ApiV1PackagesRoute
+  '/api/v1/verify-number': typeof ApiV1VerifyNumberRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
+  '/api/v1/orders/$reference': typeof ApiV1OrdersReferenceRoute
+  '/api/v1/orders/': typeof ApiV1OrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -254,9 +303,16 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
+  '/api/v1/balance': typeof ApiV1BalanceRoute
+  '/api/v1/buy-data': typeof ApiV1BuyDataRoute
+  '/api/v1/health': typeof ApiV1HealthRoute
+  '/api/v1/packages': typeof ApiV1PackagesRoute
+  '/api/v1/verify-number': typeof ApiV1VerifyNumberRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
+  '/api/v1/orders/$reference': typeof ApiV1OrdersReferenceRoute
+  '/api/v1/orders': typeof ApiV1OrdersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -287,9 +343,16 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
+  '/api/v1/balance': typeof ApiV1BalanceRoute
+  '/api/v1/buy-data': typeof ApiV1BuyDataRoute
+  '/api/v1/health': typeof ApiV1HealthRoute
+  '/api/v1/packages': typeof ApiV1PackagesRoute
+  '/api/v1/verify-number': typeof ApiV1VerifyNumberRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
+  '/api/v1/orders/$reference': typeof ApiV1OrdersReferenceRoute
+  '/api/v1/orders/': typeof ApiV1OrdersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -320,9 +383,16 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/withdrawals'
     | '/api/paystack/webhook'
+    | '/api/v1/balance'
+    | '/api/v1/buy-data'
+    | '/api/v1/health'
+    | '/api/v1/packages'
+    | '/api/v1/verify-number'
     | '/admin/'
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
+    | '/api/v1/orders/$reference'
+    | '/api/v1/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -350,9 +420,16 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/withdrawals'
     | '/api/paystack/webhook'
+    | '/api/v1/balance'
+    | '/api/v1/buy-data'
+    | '/api/v1/health'
+    | '/api/v1/packages'
+    | '/api/v1/verify-number'
     | '/admin'
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
+    | '/api/v1/orders/$reference'
+    | '/api/v1/orders'
   id:
     | '__root__'
     | '/'
@@ -382,9 +459,16 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/withdrawals'
     | '/api/paystack/webhook'
+    | '/api/v1/balance'
+    | '/api/v1/buy-data'
+    | '/api/v1/health'
+    | '/api/v1/packages'
+    | '/api/v1/verify-number'
     | '/_authenticated/admin/'
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
+    | '/api/v1/orders/$reference'
+    | '/api/v1/orders/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -402,8 +486,15 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
+  ApiV1BalanceRoute: typeof ApiV1BalanceRoute
+  ApiV1BuyDataRoute: typeof ApiV1BuyDataRoute
+  ApiV1HealthRoute: typeof ApiV1HealthRoute
+  ApiV1PackagesRoute: typeof ApiV1PackagesRoute
+  ApiV1VerifyNumberRoute: typeof ApiV1VerifyNumberRoute
   ApiPublicV1BundlesRoute: typeof ApiPublicV1BundlesRoute
   ApiPublicV1OrdersRoute: typeof ApiPublicV1OrdersRoute
+  ApiV1OrdersReferenceRoute: typeof ApiV1OrdersReferenceRoute
+  ApiV1OrdersIndexRoute: typeof ApiV1OrdersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -604,6 +695,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaystackWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/balance': {
+      id: '/api/v1/balance'
+      path: '/api/v1/balance'
+      fullPath: '/api/v1/balance'
+      preLoaderRoute: typeof ApiV1BalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/buy-data': {
+      id: '/api/v1/buy-data'
+      path: '/api/v1/buy-data'
+      fullPath: '/api/v1/buy-data'
+      preLoaderRoute: typeof ApiV1BuyDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/health': {
+      id: '/api/v1/health'
+      path: '/api/v1/health'
+      fullPath: '/api/v1/health'
+      preLoaderRoute: typeof ApiV1HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/packages': {
+      id: '/api/v1/packages'
+      path: '/api/v1/packages'
+      fullPath: '/api/v1/packages'
+      preLoaderRoute: typeof ApiV1PackagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/verify-number': {
+      id: '/api/v1/verify-number'
+      path: '/api/v1/verify-number'
+      fullPath: '/api/v1/verify-number'
+      preLoaderRoute: typeof ApiV1VerifyNumberRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/v1/bundles': {
       id: '/api/public/v1/bundles'
       path: '/api/public/v1/bundles'
@@ -616,6 +742,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/v1/orders'
       fullPath: '/api/public/v1/orders'
       preLoaderRoute: typeof ApiPublicV1OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/orders/': {
+      id: '/api/v1/orders/'
+      path: '/api/v1/orders'
+      fullPath: '/api/v1/orders/'
+      preLoaderRoute: typeof ApiV1OrdersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/orders/$reference': {
+      id: '/api/v1/orders/$reference'
+      path: '/api/v1/orders/$reference'
+      fullPath: '/api/v1/orders/$reference'
+      preLoaderRoute: typeof ApiV1OrdersReferenceRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -709,8 +849,15 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
+  ApiV1BalanceRoute: ApiV1BalanceRoute,
+  ApiV1BuyDataRoute: ApiV1BuyDataRoute,
+  ApiV1HealthRoute: ApiV1HealthRoute,
+  ApiV1PackagesRoute: ApiV1PackagesRoute,
+  ApiV1VerifyNumberRoute: ApiV1VerifyNumberRoute,
   ApiPublicV1BundlesRoute: ApiPublicV1BundlesRoute,
   ApiPublicV1OrdersRoute: ApiPublicV1OrdersRoute,
+  ApiV1OrdersReferenceRoute: ApiV1OrdersReferenceRoute,
+  ApiV1OrdersIndexRoute: ApiV1OrdersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
