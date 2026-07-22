@@ -210,3 +210,118 @@ export const adminDecideAgentApp = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const adminRetryOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d.id) }))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+
+    // Fetch order details
+    const { data: order, error } = await supabaseAdmin
+      .from("orders")
+      .select("id, reference, total_ghs, status, order_items(network, size_label, recipient_phone)")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (error || !order) throw new Error("Order not found");
+
+    // Update status to delivered
+    const { error: updErr } = await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+    if (updErr) throw new Error(updErr.message);
+
+    // Send SMS notification if recipient phone is available
+    const item = (order.order_items && order.order_items[0]) || {};
+    if (item.recipient_phone) {
+      try {
+        await sendTxtConnectSms(
+          item.recipient_phone,
+          `Your BestData order ${order.reference} for ${item.size_label} ${item.network} has been successfully delivered! Thank you for choosing BestData.`
+        );
+      } catch (e) {
+        console.error("Failed to send order retry SMS:", e);
+      }
+    }
+
+    return { ok: true, reference: order.reference };
+  });
+
+export const adminToggleApiKey = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; active: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("api_keys").update({ active: data.active }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminDeleteApiKey = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => ({ id: String(d.id) }))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("api_keys").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminGenerateApiKeyForUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; label: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { createHash, randomBytes } = await import("crypto");
+
+    const rawKey = `sk_live_${randomBytes(20).toString("hex")}`;
+    const key_prefix = rawKey.slice(0, 12);
+    const key_hash = createHash("sha256").update(rawKey).digest("hex");
+
+    const { data: inserted, error } = await supabaseAdmin
+      .from("api_keys")
+      .insert({
+        user_id: data.userId,
+        label: data.label || "Admin Issued Key",
+        key_prefix,
+        key_hash,
+        active: true,
+      })
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+    return { ok: true, apiKey: inserted, rawKey };
+  });
+
+export const adminGetSiteSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.from("site_settings").select("*");
+    if (error) return {};
+    const settings: Record<string, string> = {};
+    (data || []).forEach((row: any) => {
+      settings[row.key] = row.value;
+    });
+    return settings;
+  });
+
+export const adminSaveSiteSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: Record<string, string>) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const entries = Object.entries(data);
+    for (const [key, value] of entries) {
+      await supabaseAdmin.from("site_settings").upsert({ key, value: String(value) }, { onConflict: "key" });
+    }
+    return { ok: true };
+  });
+
