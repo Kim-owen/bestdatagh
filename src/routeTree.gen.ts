@@ -26,6 +26,7 @@ import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAgentRouteImport } from './routes/_authenticated/agent'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
+import { Route as CheckoutVerifyRouteImport } from './routes/checkout.verify'
 import { Route as AuthenticatedAccountApiKeysRouteImport } from './routes/_authenticated/account.api-keys'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin.agents'
@@ -35,6 +36,7 @@ import { Route as AuthenticatedAdminOrdersRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminReviewsRouteImport } from './routes/_authenticated/admin.reviews'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminWithdrawalsRouteImport } from './routes/_authenticated/admin.withdrawals'
+import { Route as ApiPaystackWebhookRouteImport } from './routes/api/paystack/webhook'
 import { Route as ApiPublicV1BundlesRouteImport } from './routes/api/public/v1/bundles'
 import { Route as ApiPublicV1OrdersRouteImport } from './routes/api/public/v1/orders'
 
@@ -122,6 +124,11 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => BlogRoute,
 } as any)
+const CheckoutVerifyRoute = CheckoutVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => CheckoutRoute,
+} as any)
 const AuthenticatedAccountApiKeysRoute =
   AuthenticatedAccountApiKeysRouteImport.update({
     id: '/api-keys',
@@ -174,6 +181,11 @@ const AuthenticatedAdminWithdrawalsRoute =
     path: '/withdrawals',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const ApiPaystackWebhookRoute = ApiPaystackWebhookRouteImport.update({
+  id: '/api/paystack/webhook',
+  path: '/api/paystack/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicV1BundlesRoute = ApiPublicV1BundlesRouteImport.update({
   id: '/api/public/v1/bundles',
   path: '/api/public/v1/bundles',
@@ -192,7 +204,7 @@ export interface FileRoutesByFullPath {
   '/blog': typeof BlogRouteWithChildren
   '/bulk': typeof BulkRoute
   '/buy-data': typeof BuyDataRoute
-  '/checkout': typeof CheckoutRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
   '/reviews': typeof ReviewsRoute
@@ -202,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/checkout/verify': typeof CheckoutVerifyRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
@@ -210,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
+  '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
@@ -221,7 +235,7 @@ export interface FileRoutesByTo {
   '/blog': typeof BlogRouteWithChildren
   '/bulk': typeof BulkRoute
   '/buy-data': typeof BuyDataRoute
-  '/checkout': typeof CheckoutRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
   '/reviews': typeof ReviewsRoute
@@ -230,6 +244,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRouteWithChildren
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/checkout/verify': typeof CheckoutVerifyRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
@@ -238,6 +253,7 @@ export interface FileRoutesByTo {
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
+  '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
@@ -251,7 +267,7 @@ export interface FileRoutesById {
   '/blog': typeof BlogRouteWithChildren
   '/bulk': typeof BulkRoute
   '/buy-data': typeof BuyDataRoute
-  '/checkout': typeof CheckoutRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
   '/reviews': typeof ReviewsRoute
@@ -261,6 +277,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/checkout/verify': typeof CheckoutVerifyRoute
   '/_authenticated/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
@@ -269,6 +286,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
+  '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
@@ -292,6 +310,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/agent'
     | '/blog/$slug'
+    | '/checkout/verify'
     | '/account/api-keys'
     | '/admin/agents'
     | '/admin/api-keys'
@@ -300,6 +319,7 @@ export interface FileRouteTypes {
     | '/admin/reviews'
     | '/admin/users'
     | '/admin/withdrawals'
+    | '/api/paystack/webhook'
     | '/admin/'
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
@@ -320,6 +340,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/agent'
     | '/blog/$slug'
+    | '/checkout/verify'
     | '/account/api-keys'
     | '/admin/agents'
     | '/admin/api-keys'
@@ -328,6 +349,7 @@ export interface FileRouteTypes {
     | '/admin/reviews'
     | '/admin/users'
     | '/admin/withdrawals'
+    | '/api/paystack/webhook'
     | '/admin'
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
@@ -350,6 +372,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/agent'
     | '/blog/$slug'
+    | '/checkout/verify'
     | '/_authenticated/account/api-keys'
     | '/_authenticated/admin/agents'
     | '/_authenticated/admin/api-keys'
@@ -358,6 +381,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/reviews'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/withdrawals'
+    | '/api/paystack/webhook'
     | '/_authenticated/admin/'
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
@@ -371,12 +395,13 @@ export interface RootRouteChildren {
   BlogRoute: typeof BlogRouteWithChildren
   BulkRoute: typeof BulkRoute
   BuyDataRoute: typeof BuyDataRoute
-  CheckoutRoute: typeof CheckoutRoute
+  CheckoutRoute: typeof CheckoutRouteWithChildren
   DevelopersRoute: typeof DevelopersRoute
   FaqRoute: typeof FaqRoute
   ReviewsRoute: typeof ReviewsRoute
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
+  ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
   ApiPublicV1BundlesRoute: typeof ApiPublicV1BundlesRoute
   ApiPublicV1OrdersRoute: typeof ApiPublicV1OrdersRoute
 }
@@ -502,6 +527,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof BlogRoute
     }
+    '/checkout/verify': {
+      id: '/checkout/verify'
+      path: '/verify'
+      fullPath: '/checkout/verify'
+      preLoaderRoute: typeof CheckoutVerifyRouteImport
+      parentRoute: typeof CheckoutRoute
+    }
     '/_authenticated/account/api-keys': {
       id: '/_authenticated/account/api-keys'
       path: '/api-keys'
@@ -564,6 +596,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/withdrawals'
       preLoaderRoute: typeof AuthenticatedAdminWithdrawalsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/paystack/webhook': {
+      id: '/api/paystack/webhook'
+      path: '/api/paystack/webhook'
+      fullPath: '/api/paystack/webhook'
+      preLoaderRoute: typeof ApiPaystackWebhookRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/v1/bundles': {
       id: '/api/public/v1/bundles'
@@ -643,6 +682,18 @@ const BlogRouteChildren: BlogRouteChildren = {
 
 const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
 
+interface CheckoutRouteChildren {
+  CheckoutVerifyRoute: typeof CheckoutVerifyRoute
+}
+
+const CheckoutRouteChildren: CheckoutRouteChildren = {
+  CheckoutVerifyRoute: CheckoutVerifyRoute,
+}
+
+const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
+  CheckoutRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
@@ -651,12 +702,13 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRoute: BlogRouteWithChildren,
   BulkRoute: BulkRoute,
   BuyDataRoute: BuyDataRoute,
-  CheckoutRoute: CheckoutRoute,
+  CheckoutRoute: CheckoutRouteWithChildren,
   DevelopersRoute: DevelopersRoute,
   FaqRoute: FaqRoute,
   ReviewsRoute: ReviewsRoute,
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,
+  ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
   ApiPublicV1BundlesRoute: ApiPublicV1BundlesRoute,
   ApiPublicV1OrdersRoute: ApiPublicV1OrdersRoute,
 }

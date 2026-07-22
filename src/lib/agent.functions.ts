@@ -92,9 +92,9 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter a valid amount");
     if (amount < 10) throw new Error("Minimum withdrawal is GH₵ 10");
     const method = String(d.method || "").trim();
-    const destination = String(d.destination || "").trim();
+    const destination = String(d.destination || "").replace(/\s+/g, "");
     if (!method) throw new Error("Choose a payout method");
-    if (destination.length < 6) throw new Error("Enter a valid destination (phone / account)");
+    if (!/^\d{9,10}$/.test(destination)) throw new Error("Enter a valid mobile money number (e.g. 0241234567)");
     return { amount_ghs: Number(amount.toFixed(2)), method, destination, notes: (d.notes || "").slice(0, 500) };
   })
   .handler(async ({ data, context }) => {
@@ -110,9 +110,33 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
     const available = earned - requested;
     if (data.amount_ghs > available + 0.001) throw new Error(`You can withdraw up to GH₵ ${available.toFixed(2)}`);
 
+    let recipientCode = "";
+    // Optionally create Paystack transfer recipient for Mobile Money
+    if (process.env.PAYSTACK_SECRET_KEY) {
+      try {
+        const { createPaystackTransferRecipient } = await import("./paystack");
+        const recipient = await createPaystackTransferRecipient({
+          name: `Agent-${context.userId.slice(0, 8)}`,
+          phone: data.destination,
+          bankCode: data.method,
+        });
+        recipientCode = recipient.recipient_code;
+      } catch (err: any) {
+        console.warn("Paystack transfer recipient warning:", err.message);
+      }
+    }
+
+    const notesCombined = [data.notes, recipientCode ? `RecipientCode:${recipientCode}` : ""].filter(Boolean).join(" | ");
+
     const { data: row, error } = await context.supabase
       .from("withdrawals")
-      .insert({ user_id: context.userId, amount_ghs: data.amount_ghs, method: data.method, destination: data.destination, notes: data.notes || null })
+      .insert({
+        user_id: context.userId,
+        amount_ghs: data.amount_ghs,
+        method: data.method,
+        destination: data.destination,
+        notes: notesCombined || null,
+      })
       .select().single();
     if (error) throw new Error(error.message);
     return row;
@@ -144,10 +168,48 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
     const { data: role } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId).eq("role","admin").maybeSingle();
     if (!role) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Fetch withdrawal record
+    const { data: withdrawal } = await supabaseAdmin.from("withdrawals").select("*").eq("id", data.id).single();
+    if (!withdrawal) throw new Error("Withdrawal not found");
+
     const patch: any = { status: data.status, admin_note: data.admin_note || null };
     if (data.status === "paid" || data.status === "rejected") patch.processed_at = new Date().toISOString();
+
+    // Trigger automated Paystack transfer if approving/paying out with valid secret key
+    if ((data.status === "approved" || data.status === "paid") && process.env.PAYSTACK_SECRET_KEY) {
+      const match = withdrawal.notes?.match(/RecipientCode:([A-Za-z0-9_]+)/);
+      const recipientCode = match ? match[1] : "";
+
+      if (recipientCode) {
+        try {
+          const { initiatePaystackTransfer } = await import("./paystack");
+          const transferRes = await initiatePaystackTransfer({
+            amountGhs: Number(withdrawal.amount_ghs),
+            recipientCode,
+            reference: withdrawal.id,
+            reason: `Agent Commission Payout - ${withdrawal.id}`,
+          });
+
+          patch.admin_note = [data.admin_note, `Paystack Transfer Code: ${transferRes.transfer_code}`].filter(Boolean).join(" | ");
+        } catch (err: any) {
+          console.error("Automated Paystack transfer failed:", err.message);
+          patch.admin_note = [data.admin_note, `Paystack Payout Warning: ${err.message}`].filter(Boolean).join(" | ");
+        }
+      }
+    }
+
     const { error } = await supabaseAdmin.from("withdrawals").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // Record audit log event
+    await supabaseAdmin.from("withdrawal_events").insert({
+      withdrawal_id: data.id,
+      event_type: `admin_${data.status}`,
+      actor_user_id: context.userId,
+      notes: patch.admin_note || `Status set to ${data.status} by admin.`,
+    });
+
     return { ok: true };
   });
 

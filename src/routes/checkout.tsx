@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Check, Loader2, ShoppingBag } from "lucide-react";
+import { Check, Loader2, ShoppingBag, AlertCircle } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useCart } from "@/lib/cart";
+import { createCheckoutOrder } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -22,22 +23,46 @@ export const Route = createFileRoute("/checkout")({
 function Checkout() {
   const { items, subtotal, clear, setQty, removeItem } = useCart();
   const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState<"idle" | "processing" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
   const [orderId, setOrderId] = useState("");
   const navigate = useNavigate();
 
   const validPhone = /^\d{9,10}$/.test(phone.replace(/\s+/g, ""));
 
-  const pay = (e: React.FormEvent) => {
+  const pay = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validPhone || items.length === 0) return;
     setStatus("processing");
-    window.setTimeout(() => {
-      setOrderId("BD" + Math.random().toString(36).slice(2, 8).toUpperCase());
-      setStatus("done");
-      clear();
-    }, 1600);
+    setErrorMsg("");
+
+    try {
+      const res = await createCheckoutOrder({
+        data: {
+          items: items.map((it) => ({
+            id: it.id,
+            network: it.network,
+            size: it.size,
+            price: it.price,
+            qty: it.qty,
+          })),
+          recipientPhone: phone,
+        },
+      });
+
+      if (res?.authorizationUrl) {
+        // Redirect user to Paystack payment gateway
+        window.location.href = res.authorizationUrl;
+      } else {
+        throw new Error("Paystack did not return a valid checkout URL.");
+      }
+    } catch (err: any) {
+      console.error("Checkout payment error:", err);
+      setStatus("error");
+      setErrorMsg(err.message || "Failed to initialize Paystack payment.");
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -142,12 +167,19 @@ function Checkout() {
                 </div>
               </div>
 
+              {status === "error" && (
+                <div className="p-3 bg-destructive/15 border border-destructive/30 rounded-xl text-xs font-bold text-destructive flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={!validPhone || status === "processing"}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
               >
-                {status === "processing" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Processing Payment…</>) : (<>Pay GH₵ {subtotal.toFixed(2)} via Paystack</>)}
+                {status === "processing" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Redirecting to Paystack…</>) : (<>Pay GH₵ {subtotal.toFixed(2)} via Paystack</>)}
               </button>
               <p className="text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 🔒 256-Bit Encrypted Payment Gateway
