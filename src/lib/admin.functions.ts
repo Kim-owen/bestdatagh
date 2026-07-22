@@ -12,22 +12,55 @@ export const adminStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [orders, users, reviews, bundles, revenue, keys] = await Promise.all([
+    const [orders, users, reviews, bundles, paidOrders, keys, pendingWs, pendingApps, recent] = await Promise.all([
       supabaseAdmin.from("orders").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("reviews").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("bundles").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("orders").select("total_ghs").eq("status", "delivered"),
+      supabaseAdmin.from("orders").select("id, total_ghs, status, created_at, order_items(network, size_label)").in("status", ["paid", "delivered"]),
       supabaseAdmin.from("api_keys").select("id", { count: "exact", head: true }).eq("active", true),
+      supabaseAdmin.from("withdrawals").select("id, amount_ghs").eq("status", "pending"),
+      supabaseAdmin.from("agent_applications").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabaseAdmin.from("orders").select("id, reference, total_ghs, status, source, created_at, order_items(network, size_label, recipient_phone)").order("created_at", { ascending: false }).limit(10),
     ]);
-    const totalRevenue = (revenue.data ?? []).reduce((s: number, r: any) => s + Number(r.total_ghs || 0), 0);
+
+    const paidList = paidOrders.data ?? [];
+    const totalRevenue = paidList.reduce((s: number, r: any) => s + Number(r.total_ghs || 0), 0);
+
+    const pendingWithdrawalCount = pendingWs.data?.length ?? 0;
+    const pendingWithdrawalGhs = (pendingWs.data ?? []).reduce((s: number, w: any) => s + Number(w.amount_ghs || 0), 0);
+
+    // Compute sales breakdown by network
+    const networkBreakdown = { mtn: 0, telecel: 0, airteltigo: 0 };
+    for (const o of paidList) {
+      const item = (o.order_items && o.order_items[0]) || {};
+      const netLower = (item.network || "").toLowerCase();
+      const val = Number(o.total_ghs || 0);
+      if (netLower.includes("telecel") || netLower.includes("vodafone")) {
+        networkBreakdown.telecel += val;
+      } else if (netLower.includes("airtel") || netLower.includes("ishare") || netLower.includes("bigtime")) {
+        networkBreakdown.airteltigo += val;
+      } else {
+        networkBreakdown.mtn += val;
+      }
+    }
+
     return {
       orders: orders.count ?? 0,
       users: users.count ?? 0,
       reviews: reviews.count ?? 0,
       bundles: bundles.count ?? 0,
       apiKeys: keys.count ?? 0,
-      revenue: totalRevenue,
+      revenue: Number(totalRevenue.toFixed(2)),
+      pendingWithdrawalsCount: pendingWithdrawalCount,
+      pendingWithdrawalsGhs: Number(pendingWithdrawalGhs.toFixed(2)),
+      pendingAgentAppsCount: pendingApps.count ?? 0,
+      networkBreakdown: {
+        mtn: Number(networkBreakdown.mtn.toFixed(2)),
+        telecel: Number(networkBreakdown.telecel.toFixed(2)),
+        airteltigo: Number(networkBreakdown.airteltigo.toFixed(2)),
+      },
+      recentOrders: recent.data ?? [],
     };
   });
 
