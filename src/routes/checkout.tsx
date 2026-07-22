@@ -1,16 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Check, Loader2, ShoppingBag, AlertCircle } from "lucide-react";
+import { Check, Loader2, ShoppingBag, AlertCircle, ShieldCheck, Zap, Lock } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useCart } from "@/lib/cart";
-import { createCheckoutOrder } from "@/lib/orders.functions";
+import { createCheckoutOrder, verifyOrderPayment } from "@/lib/orders.functions";
+import { checkPhoneVerification } from "@/lib/otp.functions";
+import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
+import { OtpVerificationModal } from "@/components/site/OtpVerificationModal";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
     meta: [
       { title: "Checkout — Bestdata" },
-      { name: "description", content: "Review your data bundles and pay securely with Mobile Money, Visa or Mastercard via Paystack." },
+      { name: "description", content: "Review your data bundles and pay securely with Mobile Money, Visa or Mastercard in-line via Paystack." },
       { property: "og:title", content: "Checkout — Bestdata" },
       { property: "og:description", content: "Review and pay for your Ghana data bundles securely on Bestdata." },
       { property: "og:type", content: "website" },
@@ -23,21 +26,21 @@ export const Route = createFileRoute("/checkout")({
 function Checkout() {
   const { items, subtotal, clear, setQty, removeItem } = useCart();
   const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "verifying_phone" | "processing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const validPhone = /^\d{9,10}$/.test(phone.replace(/\s+/g, ""));
 
-  const pay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validPhone || items.length === 0) return;
+  const initiatePaymentFlow = async () => {
     setStatus("processing");
     setErrorMsg("");
 
     try {
-      const res = await createCheckoutOrder({
+      // 1. Create order and get Paystack transaction details
+      const orderRes = await createCheckoutOrder({
         data: {
           items: items.map((it) => ({
             id: it.id,
@@ -50,27 +53,98 @@ function Checkout() {
         },
       });
 
-      if (res?.authorizationUrl) {
-        // Redirect user to Paystack payment gateway
-        window.location.href = res.authorizationUrl;
+      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_b8e1f57e62d49e75eb82b5b3a4fdf24d3525cb7a";
+
+      if (publicKey) {
+        // 2. Open Paystack Inline Pop-up directly on page
+        try {
+          await openPaystackInlineCheckout({
+            key: publicKey,
+            email: `customer-${phone.replace(/\s+/g, "")}@bestdatagh.com`,
+            amountGhs: subtotal,
+            reference: orderRes.reference,
+            metadata: {
+              order_id: orderRes.orderId,
+              recipient_phone: phone,
+            },
+            onSuccess: async (ref) => {
+              // Automatically verify payment upon inline completion
+              try {
+                const verifyRes = await verifyOrderPayment({ data: { reference: ref } });
+                if (verifyRes.verified) {
+                  setOrderId(orderRes.reference);
+                  setStatus("done");
+                  clear();
+                } else {
+                  throw new Error("Payment verification could not be confirmed.");
+                }
+              } catch (err: any) {
+                setErrorMsg(err.message || "Payment verification failed.");
+                setStatus("error");
+              }
+            },
+            onClose: () => {
+              setStatus("idle");
+            },
+          });
+          return;
+        } catch (inlineErr: any) {
+          console.warn("Paystack Inline popup fallback to redirect:", inlineErr.message);
+        }
+      }
+
+      // Fallback redirect if inline SDK cannot be initialized
+      if (orderRes?.authorizationUrl) {
+        window.location.href = orderRes.authorizationUrl;
       } else {
-        throw new Error("Paystack did not return a valid checkout URL.");
+        throw new Error("Paystack checkout URL not available.");
       }
     } catch (err: any) {
       console.error("Checkout payment error:", err);
       setStatus("error");
-      setErrorMsg(err.message || "Failed to initialize Paystack payment.");
+      setErrorMsg(err.message || "Failed to initialize payment checkout.");
     }
   };
 
+  const handlePayClick = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validPhone || items.length === 0) return;
+    setStatus("verifying_phone");
+    setErrorMsg("");
+
+    try {
+      // Check if phone number is a first-time buyer
+      const checkRes = await checkPhoneVerification({ data: { phone } });
+
+      if (checkRes.isVerified) {
+        // Returning verified buyer -> proceed directly to Paystack In-line payment
+        await initiatePaymentFlow();
+      } else {
+        // First-time buyer -> open OTP verification modal
+        setStatus("idle");
+        setOtpModalOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Phone verification check error:", err);
+      // Fallback: proceed to payment flow
+      await initiatePaymentFlow();
+    }
+  };
+
+  const handleOtpVerified = async () => {
+    setOtpModalOpen(false);
+    await initiatePaymentFlow();
+  };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between">
       <Header />
-      <main className="mx-auto max-w-[1100px] px-4 sm:px-6 py-10 md:py-14">
-        <div className="eyebrow mb-2">Checkout</div>
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Review & pay</h1>
-        <p className="mt-2 text-muted-foreground">Confirm your bundles and complete payment securely.</p>
+      <main className="mx-auto max-w-[1100px] w-full px-4 sm:px-6 py-10 md:py-14">
+        <div className="eyebrow mb-2">In-Line Paystack Checkout</div>
+        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Review & Pay</h1>
+        <p className="mt-2 text-muted-foreground text-sm">
+          Confirm your data bundles and complete payment seamlessly without leaving the page.
+        </p>
 
         {status === "done" ? (
           <div className="mt-10 rounded-3xl border border-border/80 bg-card p-8 md:p-12 text-center shadow-2xl max-w-lg mx-auto backdrop-blur-xl">
@@ -81,8 +155,8 @@ function Checkout() {
             <p className="mt-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Order Reference <span className="font-mono font-black text-primary">{orderId}</span>
             </p>
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-              Your data bundle order has been submitted for instant automated delivery to <span className="font-bold text-foreground">+233 {phone}</span>.
+            <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+              Your transaction has been verified in real-time. Your data bundle order is submitted for instant automated delivery to <span className="font-bold text-foreground">+233 {phone}</span>.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <button
@@ -91,26 +165,38 @@ function Checkout() {
               >
                 Track Order Status
               </button>
-              <Link to="/buy-data" search={{ network: "MTN" }} className="rounded-xl border border-border px-5 py-3 text-xs font-bold hover:bg-muted active:scale-95 transition-all">
+              <Link
+                to="/buy-data"
+                search={{ network: "MTN" }}
+                className="rounded-xl border border-border px-5 py-3 text-xs font-bold hover:bg-muted active:scale-95 transition-all"
+              >
                 Purchase More Data
               </Link>
             </div>
           </div>
         ) : items.length === 0 ? (
-          <div className="mt-10 rounded-3xl border border-border/80 bg-card p-12 text-center max-w-lg mx-auto">
+          <div className="mt-10 rounded-3xl border border-border/80 bg-card p-12 text-center max-w-lg mx-auto shadow-sm">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-muted/60 text-muted-foreground">
               <ShoppingBag className="h-8 w-8" />
             </div>
             <h2 className="mt-5 text-lg font-extrabold font-display">Your Cart is Currently Empty</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Select a data bundle from our live marketplace to get started.</p>
-            <Link to="/buy-data" search={{ network: "MTN" }} className="mt-6 inline-flex rounded-xl gold-gradient px-6 py-3 text-xs font-extrabold text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all">
+            <p className="mt-1 text-xs text-muted-foreground">Select a data bundle package from our live marketplace to get started.</p>
+            <Link
+              to="/buy-data"
+              search={{ network: "MTN" }}
+              className="mt-6 inline-flex rounded-xl gold-gradient px-6 py-3 text-xs font-extrabold text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all"
+            >
               Browse Packages
             </Link>
           </div>
         ) : (
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px]">
+          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px]">
+            {/* Selected Cart Items */}
             <div className="rounded-3xl border border-border/80 bg-card p-6 md:p-8 shadow-sm">
-              <h2 className="text-xs font-black uppercase tracking-widest text-primary">Selected Items ({items.length})</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-black uppercase tracking-widest text-primary">Selected Items ({items.length})</h2>
+                <span className="text-xs font-bold text-muted-foreground">Instant Delivery</span>
+              </div>
               <div className="mt-6 divide-y divide-border/50">
                 {items.map((it) => (
                   <div key={it.id} className="flex items-center gap-4 py-4">
@@ -135,8 +221,17 @@ function Checkout() {
               </div>
             </div>
 
-            <form onSubmit={pay} className="h-fit rounded-3xl border border-border/80 bg-card p-6 md:p-8 space-y-5 shadow-lg backdrop-blur-xl">
-              <h2 className="text-xs font-black uppercase tracking-widest text-primary">Payment & Delivery</h2>
+            {/* Payment & Phone Verification Form */}
+            <form onSubmit={handlePayClick} className="h-fit rounded-3xl border border-border/80 bg-card p-6 md:p-8 space-y-5 shadow-xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-border/50 pb-4">
+                <h2 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+                  <Zap className="h-4 w-4" /> In-Line Payment
+                </h2>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                  <Lock className="h-3 w-3" /> Paystack Secured
+                </span>
+              </div>
+
               <div>
                 <label htmlFor="co-phone" className="text-xs font-bold text-foreground">Recipient Mobile Number</label>
                 <div className="mt-2 flex items-center rounded-2xl border border-border bg-background focus-within:ring-2 focus-within:ring-primary/50 transition-all">
@@ -150,6 +245,10 @@ function Checkout() {
                     className="flex-1 bg-transparent py-3 pr-4 text-xs font-bold outline-none"
                   />
                 </div>
+                <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                  First-time buyers will complete a quick 6-digit OTP verification.
+                </p>
               </div>
 
               <div className="rounded-2xl bg-background/80 border border-border/60 p-4 space-y-2">
@@ -176,20 +275,34 @@ function Checkout() {
 
               <button
                 type="submit"
-                disabled={!validPhone || status === "processing"}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+                disabled={!validPhone || status === "processing" || status === "verifying_phone"}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-4 text-xs font-extrabold text-primary-foreground shadow-[0_4px_20px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
               >
-                {status === "processing" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Redirecting to Paystack…</>) : (<>Pay GH₵ {subtotal.toFixed(2)} via Paystack</>)}
+                {status === "verifying_phone" ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Verifying Buyer Security…</>
+                ) : status === "processing" ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Opening Paystack Popup…</>
+                ) : (
+                  <>Pay GH₵ {subtotal.toFixed(2)} with Paystack</>
+                )}
               </button>
               <p className="text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                🔒 256-Bit Encrypted Payment Gateway
+                💳 Mobile Money (MTN, Telecel, AirtelTigo) & Cards
               </p>
             </form>
           </div>
         )}
       </main>
+
+      {/* First-Time Buyer OTP Verification Modal */}
+      <OtpVerificationModal
+        open={otpModalOpen}
+        phone={phone}
+        onOpenChange={setOtpModalOpen}
+        onVerified={handleOtpVerified}
+      />
+
       <Footer />
     </div>
   );
 }
-
