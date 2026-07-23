@@ -570,5 +570,85 @@ export const adminGetReportData = createServerFn({ method: "GET" })
     };
   });
 
+/* ============ 8. WALLET MANAGEMENT ============ */
+export const adminListWallets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: wallets }, { data: transactions }, { data: profiles }] = await Promise.all([
+      supabaseAdmin.from("wallets").select("*").order("updated_at", { ascending: false }).limit(100),
+      supabaseAdmin.from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(100),
+      supabaseAdmin.from("profiles").select("id, display_name, phone"),
+    ]);
+
+    const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+    const enrichedWallets = (wallets || []).map((w) => {
+      const p = profileMap.get(w.user_id);
+      return {
+        ...w,
+        displayName: p?.display_name || "User",
+        phone: p?.phone || "N/A",
+      };
+    });
+
+    const totalBalance = (wallets || []).reduce((acc, curr) => acc + Number(curr.balance_ghs || 0), 0);
+
+    return {
+      wallets: enrichedWallets,
+      transactions: transactions || [],
+      totalBalance,
+    };
+  });
+
+export const adminAdjustUserWallet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; amountGhs: number; type: "credit" | "debit"; reason: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: curWallet } = await supabaseAdmin
+      .from("wallets")
+      .select("balance_ghs")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+
+    const currentBal = Number(curWallet?.balance_ghs || 0);
+    const adjustment = data.type === "credit" ? Math.abs(data.amountGhs) : -Math.abs(data.amountGhs);
+    const newBal = currentBal + adjustment;
+
+    if (newBal < 0) throw new Error("Wallet balance cannot go below GH₵ 0.00");
+
+    await supabaseAdmin
+      .from("wallets")
+      .upsert({ user_id: data.userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+
+    const ref = `ADM-ADJ-${Date.now()}`;
+    await supabaseAdmin.from("wallet_transactions").insert({
+      user_id: data.userId,
+      amount_ghs: adjustment,
+      type: data.type === "credit" ? "deposit" : "refund",
+      reference: ref,
+      status: "completed",
+      description: `Admin Manual ${data.type.toUpperCase()}: ${data.reason}`,
+    });
+
+    // Audit log
+    await supabaseAdmin.from("admin_audit_logs").insert({
+      admin_id: context.user.id,
+      admin_email: context.user.email,
+      action: `WALLET_${data.type.toUpperCase()}`,
+      target_type: "user_wallet",
+      target_id: data.userId,
+      details: { amount: data.amountGhs, newBal, reason: data.reason },
+    });
+
+    return { ok: true, newBalance: newBal };
+  });
+
+
 
 

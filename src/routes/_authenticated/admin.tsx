@@ -29,7 +29,8 @@ import {
   Banknote,
   TrendingUp,
   LifeBuoy,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Wallet,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -135,6 +136,7 @@ function AdminShell() {
     {
       group: "Finance & Reports",
       items: [
+        { to: "/admin/wallets", label: "User Wallets & Deposits", icon: Wallet },
         { to: "/admin/reconcile", label: "Paystack Ledger", icon: Banknote },
         { to: "/admin/analytics", label: "Profit Analytics", icon: TrendingUp },
         { to: "/admin/reports", label: "CSV Export Reports", icon: FileSpreadsheet },
