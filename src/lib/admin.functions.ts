@@ -673,6 +673,122 @@ export const adminAdjustUserWallet = createServerFn({ method: "POST" })
     return { ok: true, newBalance: newBal };
   });
 
+export const adminGetProviderPackages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { getSwiftDataPackages, getSwiftDataBalance, getSwiftDataHealth } = await import("@/lib/swiftdata");
+
+    let balanceGhs = 0;
+    let isHealthy = false;
+    let rawPackages: any[] = [];
+    let networks: any[] = [];
+
+    try {
+      const pRes = await getSwiftDataPackages();
+      if (pRes && pRes.packages) {
+        rawPackages = pRes.packages;
+        networks = pRes.networks || [];
+      }
+    } catch (e: any) {
+      console.warn("Failed to fetch SwiftData packages:", e.message);
+    }
+
+    try {
+      const bRes = await getSwiftDataBalance();
+      if (bRes && typeof bRes.balance === "number") {
+        balanceGhs = bRes.balance;
+      }
+    } catch (e: any) {
+      console.warn("Failed to fetch SwiftData balance:", e.message);
+    }
+
+    try {
+      const hRes = await getSwiftDataHealth();
+      if (hRes && (hRes.success || hRes.status === "operational")) {
+        isHealthy = true;
+      }
+    } catch (e: any) {
+      console.warn("Failed to fetch SwiftData health:", e.message);
+    }
+
+    return {
+      balanceGhs,
+      isHealthy,
+      networks,
+      packages: rawPackages,
+    };
+  });
+
+export const adminSyncProviderPackages = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getSwiftDataPackages } = await import("@/lib/swiftdata");
+
+    const pRes = await getSwiftDataPackages();
+    if (!pRes || !pRes.packages || !Array.isArray(pRes.packages)) {
+      throw new Error("No packages returned from provider API");
+    }
+
+    let syncedCount = 0;
+    for (const pkg of pRes.packages) {
+      let netName = "MTN";
+      if (pkg.network === "telecel") netName = "Telecel";
+      else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
+
+      const sizeGb = pkg.size_gb || 1;
+      const sizeLabel = pkg.size_label || `${sizeGb}GB`;
+      const sizeMb = Math.round(sizeGb * 1024);
+      const priceGhs = Number(pkg.price_ghs || 0);
+
+      const { data: existing } = await supabaseAdmin
+        .from("bundles")
+        .select("id")
+        .eq("network", netName)
+        .eq("size_label", sizeLabel)
+        .maybeSingle();
+
+      if (existing) {
+        await supabaseAdmin
+          .from("bundles")
+          .update({
+            size_mb: sizeMb,
+            price_ghs: priceGhs,
+            validity: pkg.validity || "Non-Expiry",
+            active: true,
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabaseAdmin
+          .from("bundles")
+          .insert({
+            network: netName,
+            size_label: sizeLabel,
+            size_mb: sizeMb,
+            price_ghs: priceGhs,
+            validity: pkg.validity || "Non-Expiry",
+            popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
+            active: true,
+            sort_order: sizeMb,
+          });
+      }
+      syncedCount++;
+    }
+
+    await supabaseAdmin.from("admin_audit_logs").insert({
+      admin_id: context.user.id,
+      admin_email: context.user.email,
+      action: "SYNC_PROVIDER_PACKAGES",
+      target_type: "bundles",
+      details: { syncedCount },
+    });
+
+    return { ok: true, syncedCount };
+  });
+
+
 
 
 
