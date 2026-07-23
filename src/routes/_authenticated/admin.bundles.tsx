@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin.functions";
 import { useState } from "react";
 import { Plus, Trash2, RefreshCw, Zap, CheckCircle2, ShieldCheck, Database, Layers, ArrowUpRight, Search } from "lucide-react";
+import { TableRowSkeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/bundles")({ component: BundlesPage });
 
@@ -332,9 +333,13 @@ function BundlesPage() {
               </thead>
               <tbody className="divide-y divide-white/5 font-mono">
                 {loadingStore && (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-400">Loading store bundles...</td>
-                  </tr>
+                  <>
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                  </>
                 )}
                 {filteredStoreBundles.length === 0 && !loadingStore && (
                   <tr>
@@ -422,9 +427,13 @@ function BundlesPage() {
               </thead>
               <tbody className="divide-y divide-white/5 font-mono">
                 {loadingProvider && (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-400">Fetching live packages from SwiftData API...</td>
-                  </tr>
+                  <>
+                    <TableRowSkeleton columns={5} />
+                    <TableRowSkeleton columns={5} />
+                    <TableRowSkeleton columns={5} />
+                    <TableRowSkeleton columns={5} />
+                    <TableRowSkeleton columns={5} />
+                  </>
                 )}
                 {filteredProviderPackages.length === 0 && !loadingProvider && (
                   <tr>

@@ -23,6 +23,8 @@ import {
   Filter,
 } from "lucide-react";
 
+import { TableRowSkeleton, StatCardSkeleton } from "@/components/ui/skeleton";
+
 export const Route = createFileRoute("/_authenticated/admin/orders")({ component: OrdersPage });
 
 const STATUSES = ["pending", "paid", "processing", "delivered", "failed", "refunded"] as const;
@@ -293,9 +295,13 @@ function OrdersPage() {
             </thead>
             <tbody className="divide-y divide-white/5 font-mono">
               {isLoading && (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400">Loading order history...</td>
-                </tr>
+                <>
+                  <TableRowSkeleton columns={5} />
+                  <TableRowSkeleton columns={5} />
+                  <TableRowSkeleton columns={5} />
+                  <TableRowSkeleton columns={5} />
+                  <TableRowSkeleton columns={5} />
+                </>
               )}
               {!isLoading && filteredOrders.length === 0 && (
                 <tr>

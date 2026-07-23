@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Loader2
 } from "lucide-react";
+import { StatCardSkeleton, TableRowSkeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: ProDashboard,
@@ -98,41 +99,52 @@ function ProDashboard() {
 
       {/* KPI Stat Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {kpis.map((k) => {
-          const Icon = k.icon;
-          return (
-            <div
-              key={k.label}
-              className={`rounded-3xl border p-5 shadow-sm transition-all relative overflow-hidden ${
-                k.highlight
-                  ? "border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card"
-                  : k.alert
-                  ? "border-amber-500/40 bg-amber-500/5"
-                  : "border-border/80 bg-card"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-                  {k.label}
-                </span>
-                <div className={`grid h-9 w-9 place-items-center rounded-xl ${k.highlight ? "gold-gradient text-primary-foreground shadow-md" : "bg-muted/80 text-muted-foreground"}`}>
-                  <Icon className="h-4.5 w-4.5" />
+        {isLoading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          kpis.map((k) => {
+            const Icon = k.icon;
+            return (
+              <div
+                key={k.label}
+                className={`rounded-3xl border p-5 shadow-sm transition-all relative overflow-hidden ${
+                  k.highlight
+                    ? "border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card"
+                    : k.alert
+                    ? "border-amber-500/40 bg-amber-500/5"
+                    : "border-border/80 bg-card"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                    {k.label}
+                  </span>
+                  <div className={`grid h-9 w-9 place-items-center rounded-xl ${k.highlight ? "gold-gradient text-primary-foreground shadow-md" : "bg-muted/80 text-muted-foreground"}`}>
+                    <Icon className="h-4.5 w-4.5" />
+                  </div>
+                </div>
+                <div className="mt-3 text-3xl font-black tracking-tight font-display">
+                  {k.value}
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground text-[11px] font-semibold">{k.sub}</span>
+                  {k.link && (
+                    <Link to={k.link as any} className="font-bold text-primary hover:underline flex items-center gap-0.5">
+                      View <ArrowUpRight className="h-3 w-3" />
+                    </Link>
+                  )}
                 </div>
               </div>
-              <div className="mt-3 text-3xl font-black tracking-tight font-display">
-                {k.value}
-              </div>
-              <div className="mt-1.5 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground text-[11px] font-semibold">{k.sub}</span>
-                {k.link && (
-                  <Link to={k.link as any} className="font-bold text-primary hover:underline flex items-center gap-0.5">
-                    View <ArrowUpRight className="h-3 w-3" />
-                  </Link>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Middle Grid: Network Sales Distribution + Gateway Health Status */}
@@ -229,23 +241,32 @@ function ProDashboard() {
           </Link>
         </div>
 
-        {stats.recentOrders.length === 0 ? (
-          <div className="py-12 text-center text-xs text-muted-foreground">No orders recorded yet.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] font-black tracking-wider">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] font-black tracking-wider">
+              <tr>
+                <th className="px-4 py-3">Reference</th>
+                <th className="px-4 py-3">Recipient / Package</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Quick Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {isLoading ? (
+                <>
+                  <TableRowSkeleton columns={6} />
+                  <TableRowSkeleton columns={6} />
+                  <TableRowSkeleton columns={6} />
+                  <TableRowSkeleton columns={6} />
+                </>
+              ) : stats.recentOrders.length === 0 ? (
                 <tr>
-                  <th className="px-4 py-3">Reference</th>
-                  <th className="px-4 py-3">Recipient / Package</th>
-                  <th className="px-4 py-3">Amount</th>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Quick Action</th>
+                  <td colSpan={6} className="py-8 text-center text-xs text-muted-foreground">No orders recorded yet.</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {stats.recentOrders.map((o: any) => {
+              ) : (
+                stats.recentOrders.map((o: any) => {
                   const item = (o.order_items && o.order_items[0]) || {};
                   return (
                     <tr key={o.id} className="hover:bg-muted/40 transition-colors">
@@ -285,11 +306,11 @@ function ProDashboard() {
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
