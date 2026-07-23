@@ -276,48 +276,160 @@ function UnifiedPaymentPage() {
           {/* MAIN PAYMENT HUB CARD */}
           <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
 
-            {/* 1. DELIVERED STATE 🎉 */}
-            {currentStatus === "delivered" ? (
-              <div className="space-y-8 text-center animate-in zoom-in-95">
-                <div className="relative mx-auto h-24 w-24 grid place-items-center">
-                  <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-pulse" />
-                  <div className="relative grid h-20 w-20 place-items-center rounded-full bg-emerald-500 text-slate-950 shadow-2xl">
+            {/* 1. VERIFIED / PROCESSING / DELIVERED STATE (Matching Modern Stepper & Receipt UI) */}
+            {currentStatus === "delivered" || currentStatus === "paid" || currentStatus === "processing" ? (
+              <div className="space-y-8 animate-in fade-in">
+                {/* Top Success Icon */}
+                <div className="text-center space-y-3">
+                  <div className="mx-auto h-20 w-20 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10 animate-bounce">
                     <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h2 className="text-3xl font-black text-white font-display">Data Delivered Successfully! 🎉</h2>
+                  <h2 className="text-3xl font-black text-white font-display">
+                    {currentStatus === "delivered" ? "Payment & Delivery Complete! 🎉" : "Payment Successful!"}
+                  </h2>
                   <p className="text-sm text-slate-300 max-w-md mx-auto">
-                    Your <span className="text-amber-400 font-bold">{sizeLabel} ({networkName})</span> bundle has been credited directly to <span className="text-white font-extrabold">{recipientPhone}</span>.
+                    {currentStatus === "delivered" 
+                      ? `Your ${sizeLabel} (${networkName}) bundle has been credited to ${recipientPhone}.`
+                      : "Payment confirmed. Your bundle is on its way."}
                   </p>
                 </div>
 
-                {/* Receipt Card */}
-                <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-left space-y-3 text-xs font-mono">
-                  <div className="flex justify-between border-b border-emerald-500/20 pb-2">
-                    <span className="text-emerald-300 font-bold uppercase">Transaction Status:</span>
-                    <span className="text-emerald-400 font-black uppercase bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30">✓ DELIVERED</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-300">Order Reference:</span>
-                    <span className="text-white font-bold">{reference}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-300">Recipient Phone:</span>
-                    <span className="text-white font-bold">{recipientPhone}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-300">Bundle Package:</span>
-                    <span className="text-white font-bold">{networkName} · {sizeLabel}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-emerald-500/20 pt-2 text-sm font-sans font-bold">
-                    <span className="text-white">Total Paid:</span>
-                    <span className="text-emerald-400 font-mono font-black text-base">GH₵ {totalGhs.toFixed(2)}</span>
+                {/* Progress Stepper Bar (1 - 2 - 3) */}
+                <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-6">
+                  <div className="relative flex items-center justify-between">
+                    {/* Connecting Track Line */}
+                    <div className="absolute top-1/2 left-8 right-8 h-1 bg-slate-800 -translate-y-1/2 -z-0">
+                      <div
+                        className="h-full bg-emerald-400 transition-all duration-700"
+                        style={{
+                          width: currentStatus === "delivered" ? "100%" : "50%",
+                        }}
+                      />
+                    </div>
+
+                    {/* Step 1: Payment Verified */}
+                    <div className="relative z-10 flex flex-col items-center gap-2 text-center">
+                      <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                        <Check className="h-5 w-5 stroke-[3]" />
+                      </div>
+                      <span className="text-[11px] font-bold text-emerald-400">Payment Verified</span>
+                    </div>
+
+                    {/* Step 2: Order Processing */}
+                    <div className="relative z-10 flex flex-col items-center gap-2 text-center">
+                      {currentStatus === "delivered" ? (
+                        <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                          <Check className="h-5 w-5 stroke-[3]" />
+                        </div>
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30 animate-pulse">
+                          <Check className="h-5 w-5 stroke-[3]" />
+                        </div>
+                      )}
+                      <span className="text-[11px] font-bold text-emerald-400">Order Processing</span>
+                    </div>
+
+                    {/* Step 3: Delivery Confirmation */}
+                    <div className="relative z-10 flex flex-col items-center gap-2 text-center">
+                      {currentStatus === "delivered" ? (
+                        <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                          <Check className="h-5 w-5 stroke-[3]" />
+                        </div>
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-slate-800 text-slate-400 border border-white/10 flex items-center justify-center font-bold text-xs">
+                          3
+                        </div>
+                      )}
+                      <span className={`text-[11px] font-bold ${currentStatus === "delivered" ? "text-emerald-400" : "text-slate-500"}`}>
+                        Delivery Confirmation
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Action CTA Buttons */}
+                {/* Order Receipt Card */}
+                <div className="rounded-3xl border border-white/15 bg-slate-900/90 p-6 space-y-4 text-xs font-mono shadow-xl">
+                  {/* Top Order ID Row */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <div>
+                      <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">ORDER ID</div>
+                      <div className="text-lg font-black text-white font-mono flex items-center gap-2 mt-0.5">
+                        <span>{reference}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={copyRef}
+                      className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all flex items-center gap-1.5 text-xs font-sans"
+                    >
+                      {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4 text-slate-400" />}
+                      <span className="text-[11px]">{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
+
+                  {/* Receipt Rows */}
+                  <div className="space-y-3 pt-1">
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Payment Method</span>
+                      <span className="font-bold text-white font-sans flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5 text-amber-400" /> Paystack
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Recipient Phone</span>
+                      <span className="font-bold text-white">{recipientPhone}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Bundle Package</span>
+                      <span className="font-bold text-amber-400 font-sans">{networkName} · {sizeLabel}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Date & Time</span>
+                      <span className="font-bold text-slate-200">
+                        {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })},{" "}
+                        {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                      <span className="text-slate-400">Status</span>
+                      {currentStatus === "delivered" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+                          ✓ Delivered
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-sky-500/20 border border-sky-500/40 text-sky-400 animate-pulse">
+                          • Processing
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Floating Toast Notification Box */}
+                <div
+                  onClick={copyRef}
+                  className="cursor-pointer rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3 hover:bg-emerald-500/15 transition-all"
+                >
+                  <div className="h-6 w-6 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                    ✓
+                  </div>
+                  <div className="space-y-0.5 text-xs text-left">
+                    <div className="font-black text-white">
+                      {currentStatus === "delivered"
+                        ? "Data bundle delivered! Check your line SMS for confirmation."
+                        : "Payment confirmed! Order is processing."}
+                    </div>
+                    <div className="text-slate-300 text-[11px]">
+                      Keep your Order ID (<span className="font-mono text-amber-400 font-bold">{reference}</span>) safely so you can track your order later. Tap to copy.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <Link
                     to="/buy-data"
@@ -333,48 +445,6 @@ function UnifiedPaymentPage() {
                   >
                     <span>Track All Orders</span>
                   </Link>
-                </div>
-              </div>
-            ) : currentStatus === "paid" || currentStatus === "processing" ? (
-
-              /* 2. PAID & PROCESSING STATE ⚡ */
-              <div className="space-y-8 text-center animate-in fade-in py-4">
-                <div className="relative mx-auto h-24 w-24 grid place-items-center">
-                  <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-ping" />
-                  <div className="relative grid h-20 w-20 place-items-center rounded-full bg-amber-500 text-slate-950 shadow-2xl">
-                    <Zap className="h-10 w-10 fill-slate-950 animate-bounce" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1 text-[11px] font-black text-emerald-400 uppercase tracking-widest">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Payment Received
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-white font-display">Dispatching Data Bundle…</h2>
-                  <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto">
-                    Sending <span className="text-amber-400 font-bold">{sizeLabel} ({networkName})</span> to <span className="text-white font-extrabold">{recipientPhone}</span>. Please wait a few seconds.
-                  </p>
-                </div>
-
-                {/* Progress Steps Card */}
-                <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 text-left space-y-4 text-xs font-mono">
-                  <div className="flex items-center gap-3 text-emerald-400 font-bold">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                    <span>Payment Received & Verified (Paystack)</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-amber-300 font-bold animate-pulse">
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-400" />
-                    <span>Connecting to Network Core Gateway ({networkName})</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-slate-400">
-                    <div className="h-2 w-2 rounded-full bg-slate-600 ml-1 mr-1" />
-                    <span>Crediting Data Bundle to Subscriber Line</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                  <span>Checking fulfillment status automatically…</span>
                 </div>
               </div>
             ) : currentStatus === "failed" ? (
