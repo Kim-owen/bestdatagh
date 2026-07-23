@@ -266,14 +266,12 @@ function UnifiedPaymentPage() {
           </div>
 
           {/* MAIN PAYMENT HUB CARD */}
-          <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
-
-            {/* 1. VERIFIED / PROCESSING / DELIVERED STATE (Matching Modern Stepper & Receipt UI) */}
+          <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">            {/* 1. VERIFIED / PROCESSING / DELIVERED STATE (Seamless Provider API Integration) */}
             {currentStatus === "delivered" || currentStatus === "paid" || currentStatus === "processing" ? (
               <div className="space-y-8 animate-in fade-in">
                 {/* Top Success Icon */}
                 <div className="text-center space-y-3">
-                  <div className="mx-auto h-20 w-20 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10 animate-bounce">
+                  <div className="relative mx-auto h-20 w-20 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10 animate-bounce">
                     <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
                   </div>
                   <h2 className="text-3xl font-black text-white font-display">
@@ -292,9 +290,9 @@ function UnifiedPaymentPage() {
                     {/* Connecting Track Line */}
                     <div className="absolute top-1/2 left-8 right-8 h-1 bg-slate-800 -translate-y-1/2 -z-0">
                       <div
-                        className="h-full bg-emerald-400 transition-all duration-700"
+                        className="h-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-all duration-700 rounded-full shadow-[0_0_12px_rgba(52,211,153,0.5)]"
                         style={{
-                          width: currentStatus === "delivered" ? "100%" : "50%",
+                          width: currentStatus === "delivered" ? "100%" : currentStatus === "processing" ? "66%" : "33%",
                         }}
                       />
                     </div>
@@ -314,11 +312,13 @@ function UnifiedPaymentPage() {
                           <Check className="h-5 w-5 stroke-[3]" />
                         </div>
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30 animate-pulse">
-                          <Check className="h-5 w-5 stroke-[3]" />
+                        <div className="h-10 w-10 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-400/30 animate-pulse">
+                          <Loader2 className="h-5 w-5 animate-spin" />
                         </div>
                       )}
-                      <span className="text-[11px] font-bold text-emerald-400">Order Processing</span>
+                      <span className={`text-[11px] font-bold ${currentStatus === "delivered" ? "text-emerald-400" : "text-amber-400"}`}>
+                        Order Processing
+                      </span>
                     </div>
 
                     {/* Step 3: Delivery Confirmation */}
@@ -389,15 +389,44 @@ function UnifiedPaymentPage() {
                     <div className="flex justify-between items-center border-t border-white/10 pt-3">
                       <span className="text-slate-400">Status</span>
                       {currentStatus === "delivered" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.3)]">
                           ✓ Delivered
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-sky-500/20 border border-sky-500/40 text-sky-400 animate-pulse">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-sky-500/20 border border-sky-500/40 text-sky-400 animate-pulse shadow-[0_0_10px_rgba(56,189,248,0.3)]">
                           • Processing
                         </span>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* Provider API Live Gateway Sync Box */}
+                <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-2 text-xs font-mono">
+                  <div className="flex items-center justify-between text-slate-400 border-b border-white/5 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Zap className="h-3 w-3" /> Live Provider API Gateway Sync
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" /> Realtime
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 pt-1 text-[11px]">
+                    <div className="text-emerald-400 flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 shrink-0" />
+                      <span>[Paystack]: Payment verified & order queued</span>
+                    </div>
+                    {currentStatus === "delivered" ? (
+                      <div className="text-emerald-400 flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 shrink-0" />
+                        <span>[Provider API]: {sizeLabel} credited to {recipientPhone}</span>
+                      </div>
+                    ) : (
+                      <div className="text-amber-300 flex items-center gap-2 animate-pulse">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-amber-400" />
+                        <span>[Provider API]: Dispatching {networkName} {sizeLabel} to {recipientPhone}...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
