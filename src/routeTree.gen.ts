@@ -35,6 +35,7 @@ import { Route as AuthenticatedAdminBundlesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminOrdersRouteImport } from './routes/_authenticated/admin.orders'
 import { Route as AuthenticatedAdminReviewsRouteImport } from './routes/_authenticated/admin.reviews'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
+import { Route as AuthenticatedAdminSlideshowRouteImport } from './routes/_authenticated/admin.slideshow'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminWithdrawalsRouteImport } from './routes/_authenticated/admin.withdrawals'
 import { Route as ApiPaystackWebhookRouteImport } from './routes/api/paystack/webhook'
@@ -184,6 +185,12 @@ const AuthenticatedAdminSettingsRoute =
     path: '/settings',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSlideshowRoute =
+  AuthenticatedAdminSlideshowRouteImport.update({
+    id: '/slideshow',
+    path: '/slideshow',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -271,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders': typeof AuthenticatedAdminOrdersRoute
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
+  '/admin/slideshow': typeof AuthenticatedAdminSlideshowRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
@@ -309,6 +317,7 @@ export interface FileRoutesByTo {
   '/admin/orders': typeof AuthenticatedAdminOrdersRoute
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
+  '/admin/slideshow': typeof AuthenticatedAdminSlideshowRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
@@ -350,6 +359,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/orders': typeof AuthenticatedAdminOrdersRoute
   '/_authenticated/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
+  '/_authenticated/admin/slideshow': typeof AuthenticatedAdminSlideshowRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/reviews'
     | '/admin/settings'
+    | '/admin/slideshow'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/api/paystack/webhook'
@@ -429,6 +440,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/reviews'
     | '/admin/settings'
+    | '/admin/slideshow'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/api/paystack/webhook'
@@ -469,6 +481,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/orders'
     | '/_authenticated/admin/reviews'
     | '/_authenticated/admin/settings'
+    | '/_authenticated/admin/slideshow'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/withdrawals'
     | '/api/paystack/webhook'
@@ -694,6 +707,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSettingsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/slideshow': {
+      id: '/_authenticated/admin/slideshow'
+      path: '/slideshow'
+      fullPath: '/admin/slideshow'
+      preLoaderRoute: typeof AuthenticatedAdminSlideshowRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -799,6 +819,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminOrdersRoute: typeof AuthenticatedAdminOrdersRoute
   AuthenticatedAdminReviewsRoute: typeof AuthenticatedAdminReviewsRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
+  AuthenticatedAdminSlideshowRoute: typeof AuthenticatedAdminSlideshowRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminWithdrawalsRoute: typeof AuthenticatedAdminWithdrawalsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -811,6 +832,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminOrdersRoute: AuthenticatedAdminOrdersRoute,
   AuthenticatedAdminReviewsRoute: AuthenticatedAdminReviewsRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
+  AuthenticatedAdminSlideshowRoute: AuthenticatedAdminSlideshowRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWithdrawalsRoute: AuthenticatedAdminWithdrawalsRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,

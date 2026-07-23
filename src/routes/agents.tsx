@@ -148,12 +148,19 @@ function AgentHeroSlideshow() {
   const [current, setCurrent] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
 
-  const slides = [
+  const fetchPublicSlides = useServerFn(getPublicHeroSlides);
+  const { data: remoteSlides } = useQuery({
+    queryKey: ["publicHeroSlides"],
+    queryFn: () => fetchPublicSlides(),
+  });
+
+  const defaultSlides = [
     {
       id: "dashboard",
       title: "Real-Time Agent Analytics",
       subtitle: "Track daily commission earned & instant MoMo cashouts",
       tag: "🔴 LIVE DEMO",
+      mediaType: "custom",
       content: (
         <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
@@ -185,6 +192,7 @@ function AgentHeroSlideshow() {
       title: "Instant Bulk Resell Engine",
       subtitle: "Top-up up to 500 phone numbers in a single click",
       tag: "⚡ HIGH SPEED",
+      mediaType: "custom",
       content: (
         <div className="space-y-3">
           <div className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/15 p-3 text-xs">
@@ -210,45 +218,19 @@ function AgentHeroSlideshow() {
         </div>
       ),
     },
-    {
-      id: "community",
-      title: "Ghana Wholesale Reseller Network",
-      subtitle: "Join 1,200+ shop owners & MoMo vendors across Ghana",
-      tag: "🤝 COMMUNITY",
-      content: (
-        <div className="space-y-3 text-xs">
-          <div className="rounded-2xl bg-emerald-500/15 border border-emerald-500/30 p-3.5 space-y-1">
-            <div className="font-extrabold text-emerald-300">24/7 Priority Agent WhatsApp Support</div>
-            <div className="text-white/70">Direct line to our dispatch team for instant order resolutions.</div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-white/5 border border-white/10 p-2.5">
-              <div className="font-black text-base text-[hsl(48_100%_60%)] font-display">1.2K+</div>
-              <div className="text-[10px] text-white/60">Active Agents</div>
-            </div>
-            <div className="rounded-xl bg-white/5 border border-white/10 p-2.5">
-              <div className="font-black text-base text-emerald-400 font-display">99.9%</div>
-              <div className="text-[10px] text-white/60">Uptime</div>
-            </div>
-            <div className="rounded-xl bg-white/5 border border-white/10 p-2.5">
-              <div className="font-black text-base text-purple-300 font-display">&lt; 2 min</div>
-              <div className="text-[10px] text-white/60">Dispatch</div>
-            </div>
-          </div>
-        </div>
-      ),
-    },
   ];
 
+  const slides = (remoteSlides && remoteSlides.length > 0) ? remoteSlides : defaultSlides;
+
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || slides.length === 0) return;
     const t = setInterval(() => {
       setCurrent((prev) => (prev + 1) % slides.length);
-    }, 4500);
+    }, 5000);
     return () => clearInterval(t);
   }, [isPlaying, slides.length]);
 
-  const active = slides[current];
+  const active: any = slides[current] || slides[0];
 
   return (
     <div className="relative group rounded-3xl border border-white/20 bg-card/40 backdrop-blur-2xl p-6 shadow-2xl overflow-hidden">
@@ -258,10 +240,10 @@ function AgentHeroSlideshow() {
       {/* Header Bar */}
       <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-3 py-1 text-[10px] font-black tracking-wider uppercase text-[hsl(48_100%_60%)]">
-          <Sparkles className="h-3 w-3" /> {active.tag}
+          <Sparkles className="h-3 w-3" /> {active.tag || "FEATURED"}
         </span>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 z-10">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
             className="grid h-7 w-7 place-items-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
@@ -291,16 +273,34 @@ function AgentHeroSlideshow() {
           <p className="text-xs text-white/70 mt-0.5">{active.subtitle}</p>
         </div>
 
-        <div className="min-h-[170px] animate-in fade-in zoom-in-95 duration-300">
-          {active.content}
+        <div className="min-h-[180px] rounded-2xl overflow-hidden bg-black/50 border border-white/10 animate-in fade-in zoom-in-95 duration-300 relative flex items-center justify-center">
+          {active.mediaType === "video" ? (
+            <video
+              key={active.mediaUrl}
+              src={active.mediaUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover rounded-2xl"
+            />
+          ) : active.mediaType === "image" ? (
+            <img
+              src={active.mediaUrl}
+              alt={active.title}
+              className="w-full h-full object-cover rounded-2xl"
+            />
+          ) : (
+            <div className="p-4 w-full">{active.content}</div>
+          )}
         </div>
       </div>
 
       {/* Pagination Dots */}
       <div className="flex items-center justify-center gap-2 mt-5 pt-3 border-t border-white/10">
-        {slides.map((s, idx) => (
+        {slides.map((s: any, idx: number) => (
           <button
-            key={s.id}
+            key={s.id || idx}
             onClick={() => setCurrent(idx)}
             className={`h-2 rounded-full transition-all ${
               current === idx ? "w-7 bg-[hsl(48_100%_60%)]" : "w-2 bg-white/20 hover:bg-white/40"

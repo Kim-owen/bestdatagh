@@ -348,3 +348,55 @@ export const adminSaveSiteSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export interface HeroSlideItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  mediaType: "image" | "video";
+  mediaUrl: string;
+  active: boolean;
+  sortOrder: number;
+}
+
+export const adminGetHeroSlides = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
+
+    if (!data || !data.value) return [];
+    try {
+      return JSON.parse(data.value) as HeroSlideItem[];
+    } catch {
+      return [];
+    }
+  });
+
+export const adminSaveHeroSlides = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: HeroSlideItem[]) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const jsonStr = JSON.stringify(data);
+    await supabaseAdmin.from("site_settings").upsert({ key: "hero_slides", value: jsonStr }, { onConflict: "key" });
+    return { ok: true };
+  });
+
+export const getPublicHeroSlides = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
+
+    if (!data || !data.value) return [];
+    try {
+      const parsed = JSON.parse(data.value) as HeroSlideItem[];
+      return parsed.filter((s) => s.active !== false).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    } catch {
+      return [];
+    }
+  });
+
+

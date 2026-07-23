@@ -21,7 +21,8 @@ import {
   ExternalLink,
   Activity,
   UserCheck,
-  Settings
+  Settings,
+  Film
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -121,6 +122,7 @@ function AdminShell() {
     {
       group: "API & Content",
       items: [
+        { to: "/admin/slideshow", label: "Hero Slideshow", icon: Film },
         { to: "/admin/api-keys", label: "Developer Keys", icon: KeyRound },
         { to: "/admin/reviews", label: "Customer Reviews", icon: Star },
         { to: "/admin/settings", label: "Site Settings", icon: Settings },
