@@ -118,12 +118,15 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+import { GlobalSiteBackground } from "@/components/site/GlobalSiteBackground";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
+          <GlobalSiteBackground />
           <TopProgressBar />
           <Outlet />
           <CartDrawer />
