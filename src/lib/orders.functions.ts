@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { initializePaystackTransaction, verifyPaystackTransaction } from "./paystack";
+import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp } from "./paystack";
 
 export interface CartItemInput {
   id: string;
@@ -198,18 +198,39 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         provider: data.provider,
       });
 
+      const chargeStatus = chargeRes.data?.status || "pending";
+      const requiresOtp = chargeStatus === "send_otp" || Boolean(chargeRes.data?.display_text?.toLowerCase().includes("otp"));
+
       return {
-        status: chargeRes.data?.status || "pending",
+        status: chargeStatus,
+        requiresOtp,
         displayText: chargeRes.data?.display_text || "Please check your phone screen for the MoMo PIN prompt.",
         reference: order.reference,
       };
     } catch (err: any) {
       console.warn("Paystack MoMo Charge info:", err.message);
+      const requiresOtp = Boolean(err.message?.toLowerCase().includes("otp"));
       return {
         status: "pending",
+        requiresOtp,
         displayText: "Please check your phone screen to enter your Mobile Money PIN.",
         reference: order.reference,
       };
+    }
+  });
+
+export const submitPaystackOtpCharge = createServerFn({ method: "POST" })
+  .validator((data: { reference: string; otp: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const res = await submitPaystackOtp({ otp: data.otp, reference: data.reference });
+      return {
+        success: true,
+        status: res.data?.status || "pending",
+        displayText: res.data?.display_text || "OTP verified! Please check your phone screen for PIN prompt.",
+      };
+    } catch (err: any) {
+      throw new Error(err.message || "Failed to verify Paystack OTP. Please check the code.");
     }
   });
 

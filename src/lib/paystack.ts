@@ -141,6 +141,19 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
 }
 
 /**
+ * Submit Paystack OTP for charges requiring authorization
+ */
+export async function submitPaystackOtp(params: { otp: string; reference: string }) {
+  return paystackFetch<any>("/charge/submit_otp", {
+    method: "POST",
+    body: JSON.stringify({
+      otp: params.otp,
+      reference: params.reference,
+    }),
+  });
+}
+
+/**
  * Create a Mobile Money Transfer Recipient for agent payouts
  */
 export async function createPaystackTransferRecipient(params: CreateRecipientParams) {

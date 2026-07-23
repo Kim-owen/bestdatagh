@@ -77,12 +77,17 @@ function PaymentMomoPage() {
     const phoneToProcess = activePhone.replace(/\s+/g, "");
 
     try {
-      // 1. Check if phone is a first-time number on Bestdata
-      const checkRes = await checkPhoneFn({ data: { phone: phoneToProcess } });
+      // Trigger Paystack MoMo charge
+      const chargeRes = await triggerChargeFn({
+        data: {
+          orderId: order.id,
+          phone: phoneToProcess,
+          network: selectedNetwork,
+        },
+      });
 
-      if (!checkRes.isVerified) {
-        // First-time buyer -> Send OTP & Navigate to /verify-otp
-        await sendOtpFn({ data: { phone: phoneToProcess } });
+      if (chargeRes?.requiresOtp) {
+        // Paystack sent an OTP to the phone -> Navigate to /verify-otp
         navigate({
           to: "/verify-otp",
           search: {
@@ -91,15 +96,7 @@ function PaymentMomoPage() {
           },
         });
       } else {
-        // Verified returning buyer -> Trigger MoMo Push Prompt & Navigate to /payment/$reference
-        await triggerChargeFn({
-          data: {
-            orderId: order.id,
-            phone: phoneToProcess,
-            network: selectedNetwork,
-          },
-        });
-
+        // Direct prompt pushed to phone -> Navigate to /payment/$reference
         navigate({
           to: "/payment/$reference",
           params: { reference },
@@ -107,8 +104,11 @@ function PaymentMomoPage() {
       }
     } catch (err: any) {
       console.error("Payment number submit error:", err);
-      setErrorMsg(err.message || "Failed to process payment number.");
-      setLoading(false);
+      // Fallback: proceed to live payment page
+      navigate({
+        to: "/payment/$reference",
+        params: { reference },
+      });
     }
   };
 

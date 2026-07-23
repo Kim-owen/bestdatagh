@@ -4,7 +4,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useServerFn } from "@tanstack/react-start";
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/otp.functions";
-import { initiateMoMoPromptCharge } from "@/lib/orders.functions";
+import { initiateMoMoPromptCharge, submitPaystackOtpCharge } from "@/lib/orders.functions";
 import { ShieldCheck, Lock, ArrowRight, RefreshCw, CheckCircle2, AlertCircle, Phone } from "lucide-react";
 
 export const Route = createFileRoute("/verify-otp")({
@@ -14,8 +14,8 @@ export const Route = createFileRoute("/verify-otp")({
   }),
   head: () => ({
     meta: [
-      { title: "OTP Verification — Bestdata" },
-      { name: "description", content: "Verify your phone number with OTP to complete your data purchase." },
+      { title: "Paystack OTP Verification — Bestdata" },
+      { name: "description", content: "Verify your Paystack Mobile Money OTP code to authorize payment." },
     ],
   }),
   component: VerifyOtpPage,
@@ -27,6 +27,7 @@ function VerifyOtpPage() {
 
   const sendOtpFn = useServerFn(sendPhoneOtp);
   const verifyOtpFn = useServerFn(verifyPhoneOtp);
+  const submitPaystackOtpFn = useServerFn(submitPaystackOtpCharge);
 
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,52 +51,47 @@ function VerifyOtpPage() {
     setErrorMsg("");
     try {
       const res = await sendOtpFn({ data: { phone } });
-      setSuccessMsg(`OTP code sent via SMS to ${res.maskedPhone}`);
+      setSuccessMsg(`OTP code re-requested for ${res.maskedPhone}`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to send OTP code.");
+      setErrorMsg(err.message || "Failed to resend OTP code.");
     } finally {
       setIsSending(false);
     }
   };
 
-  const triggerChargeFn = useServerFn(initiateMoMoPromptCharge);
-
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otpCode || otpCode.length !== 6) {
-      setErrorMsg("Please enter a valid 6-digit verification code");
+    if (!otpCode || otpCode.length < 4) {
+      setErrorMsg("Please enter a valid OTP verification code");
       return;
     }
     setLoading(true);
     setErrorMsg("");
 
     try {
-      await verifyOtpFn({ data: { phone, otpCode } });
-
-      // Trigger MoMo prompt charge for newly verified number
       if (ref) {
-        try {
-          await triggerChargeFn({
-            data: {
-              orderId: ref,
-              phone,
-              network: "MTN",
-            },
-          });
-        } catch {
-          // Continue to payment page
-        }
-
+        // Submit OTP code to Paystack charge session
+        await submitPaystackOtpFn({ data: { reference: ref, otp: otpCode } });
         navigate({
           to: "/payment/$reference",
           params: { reference: ref },
         });
       } else {
+        await verifyOtpFn({ data: { phone, otpCode } });
         navigate({ to: "/buy-data" });
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Invalid or expired OTP code.");
-      setLoading(false);
+      console.warn("OTP verification fallback check:", err.message);
+      // Fallback: proceed to live payment status page
+      if (ref) {
+        navigate({
+          to: "/payment/$reference",
+          params: { reference: ref },
+        });
+      } else {
+        setErrorMsg(err.message || "Invalid or expired OTP code.");
+        setLoading(false);
+      }
     }
   };
 
