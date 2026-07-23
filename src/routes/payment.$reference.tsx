@@ -132,11 +132,11 @@ function UnifiedPaymentPage() {
   }, []);
 
   const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
 
-  // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
-  const handleMoMoSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validPayerPhone || !order) return;
+  // Core MoMo Charge Execution
+  const executeMoMoCharge = async (phoneToCharge: string, netToCharge: string) => {
+    if (!order) return;
 
     setLoading(true);
     setErrorMsg("");
@@ -145,8 +145,8 @@ function UnifiedPaymentPage() {
       const res = await triggerChargeFn({
         data: {
           orderId: order.id,
-          phone: activePayerPhone,
-          network: selectedNetwork,
+          phone: phoneToCharge,
+          network: netToCharge,
         },
       });
 
@@ -183,6 +183,21 @@ function UnifiedPaymentPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Automatically push prompt when purchase is initiated / page loads!
+  useEffect(() => {
+    if (order && currentStatus === "pending" && recipientPhone && !autoTriggered) {
+      setAutoTriggered(true);
+      executeMoMoCharge(recipientPhone, networkName);
+    }
+  }, [order, currentStatus, recipientPhone, networkName, autoTriggered]);
+
+  // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
+  const handleMoMoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validPayerPhone || !order) return;
+    await executeMoMoCharge(activePayerPhone, selectedNetwork);
   };
 
   // Step 2: Submit Paystack OTP
