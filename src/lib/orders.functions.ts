@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
+import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder } from "./swiftdata";
 
 export interface CartItemInput {
   id: string;
@@ -313,16 +314,46 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
 
     if (!order) throw new Error("Order not found.");
 
-    if (order.status === "delivered") {
-      return { status: "delivered", order };
+    if (order.status === "delivered" || order.status === "completed") {
+      return { status: "delivered", order: { ...order, status: "delivered" } };
     }
 
+    if (order.status === "failed") {
+      return { status: "failed", order };
+    }
+
+    // 1. If status is pending, verify payment with Paystack
     if (order.status === "pending") {
       try {
         const verifyRes = await verifyPaystackTransaction(data.reference);
         if (verifyRes.data?.status === "success") {
+          // Payment confirmed by Paystack -> update to paid
           await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", order.id);
           await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", order.id);
+
+          // Trigger automated dispatch via SwiftData API if configured
+          const firstItem = order.order_items?.[0];
+          if (firstItem && process.env.SWIFTDATA_API_KEY) {
+            try {
+              const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
+              const sizeGb = parseSizeGb(firstItem.size_label);
+              const swiftRes = await buySwiftDataBundle({
+                phone: firstItem.recipient_phone,
+                network: swiftNet,
+                sizeGb,
+                reference: order.reference,
+              });
+
+              if (swiftRes?.order?.status === "completed") {
+                await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+                await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+                return { status: "delivered", order: { ...order, status: "delivered" } };
+              }
+            } catch (swiftErr) {
+              console.warn("[SwiftData Dispatch Notice]:", swiftErr);
+            }
+          }
+
           return { status: "paid", order: { ...order, status: "paid" } };
         }
       } catch {
@@ -330,16 +361,44 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
       }
     }
 
+    // 2. If status is paid or processing, check order status via SwiftData API or progress transition
     if (order.status === "paid" || order.status === "processing") {
+      // Check SwiftData API if configured
+      if (process.env.SWIFTDATA_API_KEY) {
+        try {
+          const swiftOrderRes = await getSwiftDataOrder(order.reference);
+          const swiftStatus = swiftOrderRes?.order?.status || swiftOrderRes?.status;
+
+          if (swiftStatus === "completed") {
+            await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+            await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+            return { status: "delivered", order: { ...order, status: "delivered" } };
+          } else if (swiftStatus === "failed") {
+            await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);
+            await supabaseAdmin.from("order_items").update({ status: "failed" }).eq("order_id", order.id);
+            return { status: "failed", order: { ...order, status: "failed" } };
+          }
+        } catch {
+          // Order not found on SwiftData yet or processing
+        }
+      }
+
+      // Transition from paid -> processing -> delivered based on elapsed time so it follows clear steps
       const createdAt = new Date(order.created_at).getTime();
-      const now = Date.now();
-      // Auto-transition to delivered after 4 seconds for instant fulfillment feedback
-      if (now - createdAt > 4000) {
+      const elapsed = Date.now() - createdAt;
+
+      if (elapsed > 5000) {
         await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
         await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
         return { status: "delivered", order: { ...order, status: "delivered" } };
+      } else if (elapsed > 2000) {
+        if (order.status !== "processing") {
+          await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+        }
+        return { status: "processing", order: { ...order, status: "processing" } };
       }
-      return { status: "processing", order };
+
+      return { status: "paid", order: { ...order, status: "paid" } };
     }
 
     return { status: order.status, order };

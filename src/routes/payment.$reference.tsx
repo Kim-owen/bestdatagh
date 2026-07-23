@@ -277,7 +277,7 @@ function UnifiedPaymentPage() {
           <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
 
             {/* 1. DELIVERED STATE 🎉 */}
-            {currentStatus === "delivered" || currentStatus === "paid" ? (
+            {currentStatus === "delivered" ? (
               <div className="space-y-8 text-center animate-in zoom-in-95">
                 <div className="relative mx-auto h-24 w-24 grid place-items-center">
                   <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-pulse" />
@@ -332,6 +332,79 @@ function UnifiedPaymentPage() {
                     className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 py-4 text-xs font-bold text-white hover:bg-white/10 transition-all"
                   >
                     <span>Track All Orders</span>
+                  </Link>
+                </div>
+              </div>
+            ) : currentStatus === "paid" || currentStatus === "processing" ? (
+
+              /* 2. PAID & PROCESSING STATE ⚡ */
+              <div className="space-y-8 text-center animate-in fade-in py-4">
+                <div className="relative mx-auto h-24 w-24 grid place-items-center">
+                  <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-ping" />
+                  <div className="relative grid h-20 w-20 place-items-center rounded-full bg-amber-500 text-slate-950 shadow-2xl">
+                    <Zap className="h-10 w-10 fill-slate-950 animate-bounce" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1 text-[11px] font-black text-emerald-400 uppercase tracking-widest">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Payment Received
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white font-display">Dispatching Data Bundle…</h2>
+                  <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto">
+                    Sending <span className="text-amber-400 font-bold">{sizeLabel} ({networkName})</span> to <span className="text-white font-extrabold">{recipientPhone}</span>. Please wait a few seconds.
+                  </p>
+                </div>
+
+                {/* Progress Steps Card */}
+                <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 text-left space-y-4 text-xs font-mono">
+                  <div className="flex items-center gap-3 text-emerald-400 font-bold">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                    <span>Payment Received & Verified (Paystack)</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-amber-300 font-bold animate-pulse">
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-400" />
+                    <span>Connecting to Network Core Gateway ({networkName})</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <div className="h-2 w-2 rounded-full bg-slate-600 ml-1 mr-1" />
+                    <span>Crediting Data Bundle to Subscriber Line</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-semibold">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                  <span>Checking fulfillment status automatically…</span>
+                </div>
+              </div>
+            ) : currentStatus === "failed" ? (
+
+              /* 3. FAILED STATE ❌ */
+              <div className="space-y-6 text-center animate-in fade-in py-4">
+                <div className="relative mx-auto h-20 w-20 grid place-items-center rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-500">
+                  <AlertCircle className="h-10 w-10" />
+                </div>
+
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black text-white font-display">Payment or Fulfillment Issue</h2>
+                  <p className="text-xs text-slate-300 max-w-md mx-auto">
+                    We were unable to complete this transaction. If your wallet was debited, our automatic refund system will resolve it or contact support.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep("MOMO_INPUT")}
+                    className="w-full sm:w-auto rounded-2xl gold-gradient px-6 py-3.5 text-xs font-black text-primary-foreground shadow-xl"
+                  >
+                    Try Paying Again
+                  </button>
+                  <Link
+                    to="/support"
+                    className="w-full sm:w-auto rounded-2xl border border-white/15 bg-white/5 px-6 py-3.5 text-xs font-bold text-white hover:bg-white/10"
+                  >
+                    Contact Support
                   </Link>
                 </div>
               </div>
