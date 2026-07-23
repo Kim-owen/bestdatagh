@@ -311,6 +311,58 @@ export async function notifyPaystackPaymentRequest(code: string) {
 }
 
 /**
+ * List Paystack Transactions for Admin Reconciliation / Reports
+ */
+export async function listPaystackTransactions(params?: { perPage?: number; page?: number; status?: string; from?: string; to?: string }) {
+  const query = new URLSearchParams();
+  if (params?.perPage) query.set("perPage", String(params.perPage));
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.status) query.set("status", params.status);
+  if (params?.from) query.set("from", params.from);
+  if (params?.to) query.set("to", params.to);
+
+  return paystackFetch<any>(`/transaction?${query.toString()}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Fetch Paystack Transaction Timeline
+ */
+export async function fetchPaystackTransactionTimeline(idOrReference: string) {
+  return paystackFetch<any>(`/transaction/timeline/${encodeURIComponent(idOrReference)}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Fetch Paystack Transaction Totals Metric
+ */
+export async function fetchPaystackTransactionTotals() {
+  return paystackFetch<any>("/transaction/totals", {
+    method: "GET",
+  });
+}
+
+/**
+ * Charge reusable authorization code (Saved Cards / Reusable MoMo)
+ */
+export async function chargePaystackAuthorization(params: { authorizationCode: string; email: string; amountGhs: number; reference: string }) {
+  const amountPesewas = Math.round(params.amountGhs * 100);
+
+  return paystackFetch<any>("/transaction/charge_authorization", {
+    method: "POST",
+    body: JSON.stringify({
+      authorization_code: params.authorizationCode,
+      email: params.email,
+      amount: amountPesewas,
+      currency: "GHS",
+      reference: params.reference,
+    }),
+  });
+}
+
+/**
  * Verify HMAC SHA512 signature for incoming Paystack webhooks
  */
 export function verifyPaystackWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
