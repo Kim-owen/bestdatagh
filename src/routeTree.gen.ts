@@ -22,6 +22,7 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as TrackOrderRouteImport } from './routes/track-order'
+import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAgentRouteImport } from './routes/_authenticated/agent'
@@ -120,6 +121,11 @@ const SupportRoute = SupportRouteImport.update({
 const TrackOrderRoute = TrackOrderRouteImport.update({
   id: '/track-order',
   path: '/track-order',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyOtpRoute = VerifyOtpRouteImport.update({
+  id: '/verify-otp',
+  path: '/verify-otp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
@@ -328,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
+  '/verify-otp': typeof VerifyOtpRoute
   '/account': typeof AuthenticatedAccountRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/agent': typeof AuthenticatedAgentRoute
@@ -377,6 +384,7 @@ export interface FileRoutesByTo {
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
+  '/verify-otp': typeof VerifyOtpRoute
   '/account': typeof AuthenticatedAccountRouteWithChildren
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -427,6 +435,7 @@ export interface FileRoutesById {
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
+  '/verify-otp': typeof VerifyOtpRoute
   '/_authenticated/account': typeof AuthenticatedAccountRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/agent': typeof AuthenticatedAgentRoute
@@ -478,6 +487,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/support'
     | '/track-order'
+    | '/verify-otp'
     | '/account'
     | '/admin'
     | '/agent'
@@ -527,6 +537,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/support'
     | '/track-order'
+    | '/verify-otp'
     | '/account'
     | '/agent'
     | '/blog/$slug'
@@ -576,6 +587,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/support'
     | '/track-order'
+    | '/verify-otp'
     | '/_authenticated/account'
     | '/_authenticated/admin'
     | '/_authenticated/agent'
@@ -627,6 +639,7 @@ export interface RootRouteChildren {
   ReviewsRoute: typeof ReviewsRoute
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
+  VerifyOtpRoute: typeof VerifyOtpRoute
   PaymentReferenceRoute: typeof PaymentReferenceRoute
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
   ApiV1BalanceRoute: typeof ApiV1BalanceRoute
@@ -731,6 +744,13 @@ declare module '@tanstack/react-router' {
       path: '/track-order'
       fullPath: '/track-order'
       preLoaderRoute: typeof TrackOrderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-otp': {
+      id: '/verify-otp'
+      path: '/verify-otp'
+      fullPath: '/verify-otp'
+      preLoaderRoute: typeof VerifyOtpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/account': {
@@ -1088,6 +1108,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewsRoute: ReviewsRoute,
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,
+  VerifyOtpRoute: VerifyOtpRoute,
   PaymentReferenceRoute: PaymentReferenceRoute,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
   ApiV1BalanceRoute: ApiV1BalanceRoute,

@@ -43,19 +43,24 @@ function Checkout() {
 
   const walletBalance = walletData?.balanceGhs || 0;
 
-  const { items, subtotal, clear, setQty, removeItem } = useCart();
-  const [phone, setPhone] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [paymentPhone, setPaymentPhone] = useState("");
+  const [samePhone, setSamePhone] = useState(true);
+
   const [status, setStatus] = useState<"idle" | "verifying_phone" | "processing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [orderId, setOrderId] = useState("");
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  const validPhone = /^\d{9,10}$/.test(phone.replace(/\s+/g, ""));
+  const activePaymentPhone = samePhone ? recipientPhone : paymentPhone;
+  const validRecipientPhone = /^\d{9,10}$/.test(recipientPhone.replace(/\s+/g, ""));
+  const validPaymentPhone = /^\d{9,10}$/.test(activePaymentPhone.replace(/\s+/g, ""));
   const canPayWallet = user && walletBalance >= subtotal && subtotal > 0;
 
+  const sendOtpFn = useServerFn(sendPhoneOtp);
+
   const handleWalletCheckout = async () => {
-    if (!validPhone || items.length === 0) return;
+    if (!validRecipientPhone || items.length === 0) return;
     setStatus("processing");
     setErrorMsg("");
 
@@ -63,15 +68,17 @@ function Checkout() {
       const orderRes = await createCheckoutOrder({
         data: {
           items: items.map((it) => ({ id: it.id, network: it.network, size: it.size, price: it.price, qty: it.qty })),
-          recipientPhone: phone,
+          recipientPhone: recipientPhone,
         },
       });
 
       await payWallet({ data: { orderId: orderRes.orderId, amountGhs: subtotal } });
       queryClient.invalidateQueries({ queryKey: ["myWallet"] });
-      setOrderId(orderRes.reference);
-      setStatus("done");
       clear();
+      navigate({
+        to: "/payment/$reference",
+        params: { reference: orderRes.reference },
+      });
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to process wallet payment");
       setStatus("error");
@@ -93,7 +100,7 @@ function Checkout() {
             price: it.price,
             qty: it.qty,
           })),
-          recipientPhone: phone,
+          recipientPhone: recipientPhone,
         },
       });
 
@@ -112,32 +119,51 @@ function Checkout() {
 
   const handlePayClick = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validPhone || items.length === 0) return;
+    if (!validRecipientPhone || !validPaymentPhone || items.length === 0) return;
     setStatus("verifying_phone");
     setErrorMsg("");
 
+    const phoneToVerify = activePaymentPhone;
+
     try {
       // Check if phone number is a first-time buyer
-      const checkRes = await checkPhoneVerification({ data: { phone } });
+      const checkRes = await checkPhoneVerification({ data: { phone: phoneToVerify } });
 
       if (checkRes.isVerified) {
-        // Returning verified buyer -> proceed directly to Paystack In-line payment
+        // Returning verified buyer -> proceed directly to in-app payment page
         await initiatePaymentFlow();
       } else {
-        // First-time buyer -> open OTP verification modal
+        // First-time buyer -> Create order, send OTP, and navigate to dedicated /verify-otp page!
+        const orderRes = await createCheckoutOrder({
+          data: {
+            items: items.map((it) => ({
+              id: it.id,
+              network: it.network,
+              size: it.size,
+              price: it.price,
+              qty: it.qty,
+            })),
+            recipientPhone: recipientPhone,
+          },
+        });
+
+        await sendOtpFn({ data: { phone: phoneToVerify } });
         setStatus("idle");
-        setOtpModalOpen(true);
+
+        clear();
+        navigate({
+          to: "/verify-otp",
+          search: {
+            phone: phoneToVerify,
+            ref: orderRes.reference,
+          },
+        });
       }
     } catch (err: any) {
       console.error("Phone verification check error:", err);
       // Fallback: proceed to payment flow
       await initiatePaymentFlow();
     }
-  };
-
-  const handleOtpVerified = async () => {
-    setOtpModalOpen(false);
-    await initiatePaymentFlow();
   };
 
   return (
@@ -236,22 +262,54 @@ function Checkout() {
                 </span>
               </div>
 
-              <div>
-                <label htmlFor="co-phone" className="text-xs font-bold text-foreground">Recipient Mobile Number</label>
-                <div className="mt-2 flex items-center rounded-2xl border border-border bg-background focus-within:ring-2 focus-within:ring-primary/50 transition-all">
-                  <span className="pl-4 pr-3 text-xs font-bold text-muted-foreground">🇬🇭 +233</span>
-                  <input
-                    id="co-phone"
-                    inputMode="numeric"
-                    placeholder="24 123 4567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ""))}
-                    className="flex-1 bg-transparent py-3 pr-4 text-xs font-bold outline-none"
-                  />
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="co-rec-phone" className="text-xs font-bold text-foreground">1. Recipient Phone Number (Receives Data)</label>
+                  <div className="mt-1.5 flex items-center rounded-2xl border border-border bg-background focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+                    <span className="pl-4 pr-3 text-xs font-bold text-muted-foreground">🇬🇭 +233</span>
+                    <input
+                      id="co-rec-phone"
+                      inputMode="numeric"
+                      placeholder="024 123 4567"
+                      value={recipientPhone}
+                      onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d\s]/g, ""))}
+                      className="flex-1 bg-transparent py-3 pr-4 text-xs font-bold outline-none"
+                    />
+                  </div>
                 </div>
-                <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center gap-1">
+
+                <div className="pt-2 border-t border-border/50">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={samePhone}
+                      onChange={(e) => setSamePhone(e.target.checked)}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span>MoMo Payment number is same as recipient number</span>
+                  </label>
+                </div>
+
+                {!samePhone && (
+                  <div className="animate-in fade-in">
+                    <label htmlFor="co-pay-phone" className="text-xs font-bold text-foreground">2. MoMo Payment Phone Number (Deduction)</label>
+                    <div className="mt-1.5 flex items-center rounded-2xl border border-border bg-background focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+                      <span className="pl-4 pr-3 text-xs font-bold text-muted-foreground">🇬🇭 +233</span>
+                      <input
+                        id="co-pay-phone"
+                        inputMode="numeric"
+                        placeholder="055 987 6543"
+                        value={paymentPhone}
+                        onChange={(e) => setPaymentPhone(e.target.value.replace(/[^\d\s]/g, ""))}
+                        className="flex-1 bg-transparent py-3 pr-4 text-xs font-bold outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                  First-time buyers will complete a quick 6-digit OTP verification.
+                  First-time numbers will undergo a quick 6-digit OTP verification.
                 </p>
               </div>
 
@@ -281,7 +339,7 @@ function Checkout() {
                 <button
                   type="button"
                   onClick={handleWalletCheckout}
-                  disabled={!validPhone || status === "processing" || status === "verifying_phone"}
+                  disabled={!validRecipientPhone || !validPaymentPhone || status === "processing" || status === "verifying_phone"}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-4 text-xs font-black text-black shadow-md hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
                 >
                   <Wallet className="h-4 w-4" />
@@ -291,7 +349,7 @@ function Checkout() {
 
               <button
                 type="submit"
-                disabled={!validPhone || status === "processing" || status === "verifying_phone"}
+                disabled={!validRecipientPhone || !validPaymentPhone || status === "processing" || status === "verifying_phone"}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-4 text-xs font-extrabold text-primary-foreground shadow-[0_4px_20px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
               >
                 {status === "verifying_phone" ? (
