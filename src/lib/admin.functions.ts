@@ -359,6 +359,29 @@ export interface HeroSlideItem {
   sortOrder: number;
 }
 
+export const DEFAULT_HERO_SLIDES: HeroSlideItem[] = [
+  {
+    id: "mtn-eye-slide",
+    title: "What Are We Doing Today?",
+    subtitle: "Instant MTN Data Bundles at Wholesale Rates",
+    tag: "🟡 MTN GHANA",
+    mediaType: "image",
+    mediaUrl: "/backgrounds/mtn-eye-bg.jpg",
+    active: true,
+    sortOrder: 1,
+  },
+  {
+    id: "mtn-sphere-slide",
+    title: "Bestdata Ghana Hub",
+    subtitle: "Automated MoMo Dispatch & Agent Portal",
+    tag: "⚡ INSTANT DELIVERY",
+    mediaType: "image",
+    mediaUrl: "/backgrounds/mtn-sphere-bg.jpg",
+    active: true,
+    sortOrder: 2,
+  },
+];
+
 export const adminGetHeroSlides = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -366,11 +389,12 @@ export const adminGetHeroSlides = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin.from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
 
-    if (!data || !data.value) return [];
+    if (!data || !data.value) return DEFAULT_HERO_SLIDES;
     try {
-      return JSON.parse(data.value) as HeroSlideItem[];
+      const parsed = JSON.parse(data.value) as HeroSlideItem[];
+      return parsed.length > 0 ? parsed : DEFAULT_HERO_SLIDES;
     } catch {
-      return [];
+      return DEFAULT_HERO_SLIDES;
     }
   });
 
@@ -390,15 +414,15 @@ export const getPublicHeroSlides = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin.from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
 
-    if (!data || !data.value) return [];
+    if (!data || !data.value) return DEFAULT_HERO_SLIDES;
     try {
       const parsed = JSON.parse(data.value) as HeroSlideItem[];
-      return parsed.filter((s) => s.active !== false).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      const activeOnly = parsed.filter((s) => s.active !== false).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      return activeOnly.length > 0 ? activeOnly : DEFAULT_HERO_SLIDES;
     } catch {
-      return [];
+      return DEFAULT_HERO_SLIDES;
     }
   });
-
 /* ============ 1. SECURITY AUDIT LOGS ============ */
 export const adminListAuditLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

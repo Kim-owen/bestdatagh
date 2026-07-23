@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getPublicHeroSlides } from "@/lib/admin.functions";
 import { ArrowRight, ShieldCheck, Zap, Lock, Users, Check, Wifi, Sparkles, Phone, CreditCard } from "lucide-react";
 import { NetworkLogo } from "./NetworkLogos";
 import { type Network } from "@/lib/cart";
@@ -16,6 +19,47 @@ export function Hero() {
   const [serviceType, setServiceType] = useState<"Data" | "Airtime" | "AFA">("Data");
   const [phone, setPhone] = useState("");
   const [selectedBundle, setSelectedBundle] = useState<string>("5 GB");
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  const fetchSlides = useServerFn(getPublicHeroSlides);
+  const { data: slides } = useQuery({
+    queryKey: ["publicHeroSlides"],
+    queryFn: () => fetchSlides(),
+  });
+
+  const activeSlides = slides && slides.length > 0 ? slides : [
+    {
+      id: "mtn-eye-slide",
+      title: "What Are We Doing Today?",
+      subtitle: "Instant MTN Data Bundles at Wholesale Rates",
+      tag: "🟡 MTN GHANA",
+      mediaType: "image" as const,
+      mediaUrl: "/backgrounds/mtn-eye-bg.jpg",
+      active: true,
+      sortOrder: 1,
+    },
+    {
+      id: "mtn-sphere-slide",
+      title: "Bestdata Ghana Hub",
+      subtitle: "Automated MoMo Dispatch & Agent Portal",
+      tag: "⚡ INSTANT DELIVERY",
+      mediaType: "image" as const,
+      mediaUrl: "/backgrounds/mtn-sphere-bg.jpg",
+      active: true,
+      sortOrder: 2,
+    },
+  ];
+
+  // Auto-rotate background slide every 7 seconds
+  useEffect(() => {
+    if (activeSlides.length <= 1) return;
+    const timer = setInterval(() => {
+      setSlideIndex((prev) => (prev + 1) % activeSlides.length);
+    }, 7000);
+    return () => clearInterval(timer);
+  }, [activeSlides.length]);
+
+  const currentSlide = activeSlides[slideIndex % activeSlides.length];
 
   const bundles = [
     { size: "2 GB", validity: "90 days", price: "8.15", tag: null },
@@ -32,16 +76,42 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden bg-[#060612] text-foreground">
+      {/* Dynamic Site Background Image/Video Layer */}
+      {currentSlide?.mediaUrl && (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none transition-all duration-1000 ease-in-out">
+          {currentSlide.mediaType === "video" ? (
+            <video
+              key={currentSlide.mediaUrl}
+              src={currentSlide.mediaUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover opacity-25 scale-105 filter blur-[1px] transition-opacity duration-1000"
+            />
+          ) : (
+            <img
+              key={currentSlide.mediaUrl}
+              src={currentSlide.mediaUrl}
+              alt={currentSlide.title}
+              className="w-full h-full object-cover opacity-35 scale-105 filter contrast-110 transition-opacity duration-1000"
+            />
+          )}
+          {/* Glass Gradient Overlays for High-Contrast Readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#060612]/95 via-[#060612]/80 to-[#060612]/90" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#060612] via-transparent to-[#060612]/70" />
+        </div>
+      )}
+
       {/* Dynamic Multi-layered Ambient Glows */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden z-0">
         <div className="absolute -top-40 -left-40 h-[40rem] w-[40rem] rounded-full bg-indigo-600/15 blur-[140px] animate-pulse" />
         <div className="absolute top-1/3 -right-40 h-[36rem] w-[36rem] rounded-full bg-purple-600/15 blur-[140px]" />
-        <div className="absolute -bottom-40 left-1/3 h-[32rem] w-[32rem] rounded-full bg-emerald-600/10 blur-[140px]" />
-        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
       </div>
 
-      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 py-12 md:py-20 lg:py-28">
+      <div className="relative z-10 mx-auto max-w-[1280px] px-4 sm:px-6 py-12 md:py-20 lg:py-28">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           
           {/* LEFT COLUMN — High Impact Copy & Value Proposition */}
@@ -53,20 +123,20 @@ export function Hero() {
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
               </span>
               <span className="text-primary-foreground text-xs font-black uppercase tracking-widest flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Ghana Data Hub · Instant Delivery
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" /> {currentSlide?.tag || "Ghana Data Hub"}
               </span>
             </div>
 
             {/* Headline */}
             <div className="space-y-4">
-              <h1 className="text-4xl sm:text-5xl lg:text-[62px] font-black leading-[1.08] tracking-tight font-display">
+              <h1 className="text-4xl sm:text-5xl lg:text-[62px] font-black leading-[1.08] tracking-tight font-display text-white">
                 The cheapest data <br />
                 <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-emerald-400 bg-clip-text text-transparent drop-shadow-sm">
                   bundles in Ghana.
                 </span>
               </h1>
               <p className="text-slate-300 text-base sm:text-lg max-w-xl leading-relaxed">
-                Instant MTN, Telecel, and AirtelTigo high-speed data bundles at true wholesale rates. 
+                {currentSlide?.subtitle || "Instant MTN, Telecel, and AirtelTigo high-speed data bundles at true wholesale rates."}
                 <span className="text-white font-semibold"> No hidden fees, instant MoMo dispatch.</span>
               </p>
             </div>
