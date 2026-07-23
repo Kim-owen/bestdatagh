@@ -4,7 +4,7 @@ import {
   Home, Smartphone, Users, Package, Search, Code, Star, HelpCircle, Sparkles, ChevronRight, Zap,
   Wallet, Plus
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
