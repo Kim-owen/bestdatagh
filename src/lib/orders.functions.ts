@@ -344,9 +344,11 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
                 reference: order.reference,
               });
 
-              if (swiftRes?.order?.status === "completed") {
+              if (swiftRes?.order?.status === "completed" || swiftRes?.status === "completed" || swiftRes?.success) {
                 await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
                 await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+                const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+                await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
                 return { status: "delivered", order: { ...order, status: "delivered" } };
               }
             } catch (swiftErr) {
@@ -363,15 +365,18 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
 
     // 2. If status is paid or processing, check order status via SwiftData API or progress transition
     if (order.status === "paid" || order.status === "processing") {
+      const firstItem = (order.order_items && order.order_items[0]) || {};
       // Check SwiftData API if configured
       if (process.env.SWIFTDATA_API_KEY) {
         try {
           const swiftOrderRes = await getSwiftDataOrder(order.reference);
-          const swiftStatus = swiftOrderRes?.order?.status || swiftOrderRes?.status;
+          const swiftStatus = (swiftOrderRes?.order?.status || swiftOrderRes?.status || "").toLowerCase();
 
-          if (swiftStatus === "completed") {
+          if (swiftStatus === "completed" || swiftStatus === "delivered") {
             await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
             await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+            const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+            await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
             return { status: "delivered", order: { ...order, status: "delivered" } };
           } else if (swiftStatus === "failed") {
             await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);

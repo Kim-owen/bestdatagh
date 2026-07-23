@@ -195,3 +195,13 @@ export const verifyPhoneOtp = createServerFn({ method: "POST" })
 
     return { success: true, message: "Phone number successfully verified!" };
   });
+
+/**
+ * Send Order Delivered Success SMS Notification
+ */
+export async function sendOrderDeliveredSms(phone: string, reference: string, sizeLabel: string, network: string) {
+  if (!phone) return null;
+  const message = `🎉 BestData Alert: Your ${sizeLabel || 'Data'} ${network || 'Bundle'} (Ref: ${reference}) has been DELIVERED successfully! Thank you for choosing BestData.`;
+  return sendTxtConnectSms(phone, message);
+}
+

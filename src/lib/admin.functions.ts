@@ -104,6 +104,11 @@ export const adminListOrders = createServerFn({ method: "GET" })
               if (newStatus !== ord.status) {
                 ord.status = newStatus;
                 await supabaseAdmin.from("orders").update({ status: newStatus }).eq("id", ord.id);
+                if (newStatus === "delivered") {
+                  const item = (ord.order_items && ord.order_items[0]) || {};
+                  const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+                  await sendOrderDeliveredSms(item.recipient_phone, ord.reference, item.size_label, item.network).catch(() => {});
+                }
               }
             }
           } catch (err) {
@@ -119,7 +124,7 @@ export const adminListOrders = createServerFn({ method: "GET" })
 export const adminUpdateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string; status: string }) => {
-    if (!["pending","processing","delivered","failed","refunded"].includes(d.status)) throw new Error("Bad status");
+    if (!["pending","paid","processing","delivered","failed","refunded"].includes(d.status)) throw new Error("Bad status");
     return { id: String(d.id), status: d.status };
   })
   .handler(async ({ data, context }) => {
@@ -127,6 +132,20 @@ export const adminUpdateOrderStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("orders").update({ status: data.status }).eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    if (data.status === "delivered") {
+      const { data: ord } = await supabaseAdmin
+        .from("orders")
+        .select("reference, order_items(network, size_label, recipient_phone)")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (ord) {
+        const item = (ord.order_items && ord.order_items[0]) || {};
+        const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+        await sendOrderDeliveredSms(item.recipient_phone, ord.reference, item.size_label, item.network).catch(() => {});
+      }
+    }
+
     return { ok: true };
   });
 
@@ -307,6 +326,10 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
         if (swiftStatus === "completed" || swiftStatus === "delivered") {
           await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
 
+          const item = (order.order_items && order.order_items[0]) || {};
+          const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+          await sendOrderDeliveredSms(item.recipient_phone, order.reference, item.size_label, item.network).catch(() => {});
+
           await supabaseAdmin.from("admin_audit_logs").insert({
             admin_id: context.user.id,
             admin_email: context.user.email,
@@ -361,10 +384,8 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     // Send SMS notification if successful
     if (apiSuccess && item.recipient_phone) {
       try {
-        await sendTxtConnectSms(
-          item.recipient_phone,
-          `Your BestData order ${order.reference} for ${item.size_label} ${item.network} has been successfully delivered! Thank you for choosing BestData.`
-        );
+        const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+        await sendOrderDeliveredSms(item.recipient_phone, order.reference, item.size_label, item.network);
       } catch (e) {
         console.error("Failed to send order retry SMS:", e);
       }
