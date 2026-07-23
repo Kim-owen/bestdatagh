@@ -110,7 +110,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
 
       onClose();
       navigate({
-        to: "/payment-momo/$reference",
+        to: "/payment/$reference",
         params: { reference: orderRes.reference },
       });
     } catch (err: any) {

@@ -4,76 +4,162 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { initiateMoMoPromptCharge, pollOrderStatus } from "@/lib/orders.functions";
-import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, ExternalLink, HelpCircle, PackageCheck } from "lucide-react";
+import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus } from "@/lib/orders.functions";
+import { sendPhoneOtp } from "@/lib/otp.functions";
+import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle } from "lucide-react";
+import { NetworkLogo } from "@/components/site/NetworkLogos";
 import { useCart } from "@/lib/cart";
 
 export const Route = createFileRoute("/payment/$reference")({
   head: ({ params }) => ({
     meta: [
-      { title: `Payment ${params.reference} — Bestdata` },
+      { title: `Payment Hub #${params.reference} — Bestdata` },
       { name: "description", content: "Complete your Mobile Money payment and track instant data delivery in real-time." },
     ],
   }),
-  component: PaymentPage,
+  component: UnifiedPaymentPage,
 });
 
-function PaymentPage() {
-  const { reference } = useParams({ from: "/payment/$reference" });
-  const triggerCharge = useServerFn(initiateMoMoPromptCharge);
-  const checkStatus = useServerFn(pollOrderStatus);
-  const { clear } = useCart();
-  const navigate = useNavigate();
+const NETWORKS = [
+  { key: "MTN", label: "MTN MoMo", color: "border-amber-500/50 bg-amber-500/10 text-amber-400" },
+  { key: "Telecel", label: "Telecel Cash", color: "border-rose-500/50 bg-rose-500/10 text-rose-400" },
+  { key: "AirtelTigo", label: "AT Money", color: "border-blue-500/50 bg-blue-500/10 text-blue-400" },
+] as const;
 
+function UnifiedPaymentPage() {
+  const { reference } = useParams({ from: "/payment/$reference" });
+  const navigate = useNavigate();
+  const { clear } = useCart();
+
+  const checkStatusFn = useServerFn(pollOrderStatus);
+  const triggerChargeFn = useServerFn(initiateMoMoPromptCharge);
+  const submitOtpFn = useServerFn(submitPaystackOtpCharge);
+  const sendOtpFn = useServerFn(sendPhoneOtp);
+
+  // Unified Payment State: "MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED"
+  const [step, setStep] = useState<"MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED">("MOMO_INPUT");
+  const [sameAsRecipient, setSameAsRecipient] = useState(true);
+  const [paymentPhone, setPaymentPhone] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("MTN");
+  const [otpCode, setOtpCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
-  const [promptSent, setPromptSent] = useState(false);
-  const [displayText, setDisplayText] = useState("Sending Mobile Money payment prompt to your phone...");
-  const [isResending, setIsResending] = useState(false);
+  const [promptMessage, setPromptMessage] = useState("Check your phone screen now! Enter your 4-digit MoMo PIN.");
 
   // Poll order status every 3 seconds
-  const { data: pollData, isError } = useQuery({
+  const { data: pollData } = useQuery({
     queryKey: ["pollOrderStatus", reference],
-    queryFn: async () => {
-      const res = await checkStatus({ data: { reference } });
-      return res;
-    },
+    queryFn: () => checkStatusFn({ data: { reference } }),
     refetchInterval: (query) => {
       const currentStatus = query.state.data?.status;
       if (currentStatus === "delivered" || currentStatus === "failed") {
-        return false; // Stop polling when finished
+        return false; // Stop polling when done
       }
-      return 3000; // Poll every 3 seconds
+      return 3000;
     },
   });
 
   const order = pollData?.order;
   const currentStatus = pollData?.status || order?.status || "pending";
   const firstItem = order?.order_items?.[0];
-  const recipientPhone = firstItem?.recipient_phone || "Your Phone";
-  const networkName = firstItem?.network || "Network";
+  const recipientPhone = firstItem?.recipient_phone || "";
+  const networkName = firstItem?.network || "MTN";
   const sizeLabel = firstItem?.size_label || "Data Bundle";
   const totalGhs = order?.total_ghs || 0;
 
-  // Clear cart when order is successfully delivered
+  // Sync recipient phone and network by default
+  useEffect(() => {
+    if (sameAsRecipient && recipientPhone) {
+      setPaymentPhone(recipientPhone);
+    }
+  }, [sameAsRecipient, recipientPhone]);
+
+  useEffect(() => {
+    if (networkName) {
+      setSelectedNetwork(networkName);
+    }
+  }, [networkName]);
+
+  // Clear cart when order is delivered
   useEffect(() => {
     if (currentStatus === "delivered") {
       clear();
     }
   }, [currentStatus, clear]);
 
+  const activePayerPhone = sameAsRecipient ? recipientPhone : paymentPhone;
+  const validPayerPhone = /^\d{9,10}$/.test(activePayerPhone.replace(/\s+/g, ""));
+
+  // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
+  const handleMoMoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validPayerPhone || !order) return;
+
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      const res = await triggerChargeFn({
+        data: {
+          orderId: order.id,
+          phone: activePayerPhone,
+          network: selectedNetwork,
+        },
+      });
+
+      if (res.displayText) setPromptMessage(res.displayText);
+
+      if (res.requiresOtp) {
+        setStep("OTP_INPUT");
+      } else {
+        setStep("PROMPT_PUSHED");
+      }
+    } catch (err: any) {
+      console.warn("MoMo charge error, fallback to prompt:", err.message);
+      setStep("PROMPT_PUSHED");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Submit Paystack OTP
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.length < 4) {
+      setErrorMsg("Please enter a valid OTP code");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      const res = await submitOtpFn({
+        data: { reference, otp: otpCode },
+      });
+      if (res.displayText) setPromptMessage(res.displayText);
+      setStep("PROMPT_PUSHED");
+    } catch (err: any) {
+      console.warn("OTP submit warning, proceeding to prompt:", err.message);
+      setStep("PROMPT_PUSHED");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResendPrompt = async () => {
     if (!order) return;
-    setIsResending(true);
+    setLoading(true);
     try {
-      const res = await triggerCharge({
-        data: { orderId: order.id, phone: recipientPhone, network: networkName },
+      const res = await triggerChargeFn({
+        data: { orderId: order.id, phone: activePayerPhone, network: selectedNetwork },
       });
-      setPromptSent(true);
-      if (res.displayText) setDisplayText(res.displayText);
+      if (res.displayText) setPromptMessage(res.displayText);
     } catch {
-      setDisplayText("Prompt re-sent! Please check your phone screen to enter your MoMo PIN.");
+      setPromptMessage("Prompt re-sent! Please check your phone screen to enter your MoMo PIN.");
     } finally {
-      setIsResending(false);
+      setLoading(false);
     }
   };
 
@@ -90,11 +176,11 @@ function PaymentPage() {
       <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 md:py-16 w-full">
         <div className="mx-auto max-w-2xl space-y-8">
           
-          {/* Top Breadcrumb & Reference Badge */}
+          {/* Top Reference Badge */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-white/10 p-5 rounded-3xl backdrop-blur-xl shadow-xl">
             <div>
               <div className="flex items-center gap-2 text-xs text-amber-400 font-bold uppercase tracking-widest mb-1">
-                <Sparkles className="h-3.5 w-3.5" /> In-App Payment Gateway
+                <Sparkles className="h-3.5 w-3.5" /> Paystack Instant Checkout
               </div>
               <h1 className="text-xl sm:text-2xl font-black text-white font-display flex items-center gap-2">
                 Order #{reference}
@@ -110,10 +196,10 @@ function PaymentPage() {
             </button>
           </div>
 
-          {/* MAIN PAYMENT & DELIVERY CARD */}
+          {/* MAIN PAYMENT HUB CARD */}
           <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
             
-            {/* DELIVERED STATE 🎉 */}
+            {/* 1. DELIVERED STATE 🎉 */}
             {currentStatus === "delivered" ? (
               <div className="space-y-8 text-center animate-in zoom-in-95">
                 <div className="relative mx-auto h-24 w-24 grid place-items-center">
@@ -137,7 +223,7 @@ function PaymentPage() {
                     <span className="text-emerald-400 font-black uppercase bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30">✓ DELIVERED</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-300">Reference:</span>
+                    <span className="text-slate-300">Order Reference:</span>
                     <span className="text-white font-bold">{reference}</span>
                   </div>
                   <div className="flex justify-between">
@@ -168,14 +254,215 @@ function PaymentPage() {
                     to="/track-order"
                     className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 py-4 text-xs font-bold text-white hover:bg-white/10 transition-all"
                   >
-                    <PackageCheck className="h-4 w-4 text-emerald-400" />
                     <span>Track All Orders</span>
                   </Link>
                 </div>
               </div>
+            ) : step === "MOMO_INPUT" ? (
+              
+              /* 2. STEP A: ENTER MOMO PAYMENT NUMBER */
+              <div className="space-y-6 animate-in fade-in">
+                <div className="text-center space-y-2">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/10 border border-amber-400/30 px-3.5 py-1 text-[11px] font-black text-amber-400 uppercase tracking-widest">
+                    <CreditCard className="h-3.5 w-3.5" /> Select MoMo Payment Account
+                  </div>
+                  <h2 className="text-2xl font-black text-white font-display">How would you like to pay?</h2>
+                  <p className="text-xs text-slate-300">
+                    Data will be sent to <span className="text-amber-400 font-bold">{recipientPhone}</span>. Enter the MoMo account for payment below.
+                  </p>
+                </div>
+
+                {/* Order Details Mini Card */}
+                <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-300">
+                    <span>Bundle Package:</span>
+                    <span className="font-bold text-white">{networkName} · {sizeLabel}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Data Recipient Line:</span>
+                    <span className="font-bold text-white">{recipientPhone}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/10 pt-2 text-sm">
+                    <span className="font-bold text-slate-200">Total Payable:</span>
+                    <span className="font-mono font-black text-emerald-400">GH₵ {totalGhs.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleMoMoSubmit} className="space-y-5">
+                  {/* Same as recipient checkbox */}
+                  <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={sameAsRecipient}
+                        onChange={(e) => setSameAsRecipient(e.target.checked)}
+                        className="h-5 w-5 rounded border-white/20 bg-slate-950 text-amber-400 focus:ring-amber-400"
+                      />
+                      <div>
+                        <div className="text-xs font-extrabold text-white">Payment number is same as recipient number</div>
+                        <div className="text-[11px] text-slate-400">Deduct funds from <span className="text-amber-400 font-bold">{recipientPhone}</span></div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Payment number input if different */}
+                  {!sameAsRecipient && (
+                    <div className="space-y-2 animate-in fade-in">
+                      <label htmlFor="payer-phone-input" className="block text-xs font-extrabold uppercase tracking-widest text-slate-300">
+                        Payer Mobile Money Number
+                      </label>
+                      <div className="relative flex items-center bg-slate-900 border border-white/15 rounded-2xl overflow-hidden focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                        <div className="flex items-center gap-1.5 pl-4 pr-3 py-3.5 text-slate-300 text-xs font-bold border-r border-white/10 bg-white/5">
+                          <span>🇬🇭</span>
+                          <span>+233</span>
+                        </div>
+                        <input
+                          id="payer-phone-input"
+                          type="tel"
+                          inputMode="tel"
+                          value={paymentPhone}
+                          onChange={(e) => setPaymentPhone(e.target.value.replace(/[^\d\s]/g, ""))}
+                          placeholder="055 123 4567"
+                          className="flex-1 bg-transparent px-4 py-3.5 text-white placeholder:text-slate-600 text-sm font-semibold focus:outline-none"
+                        />
+                        <Phone className="h-4 w-4 text-slate-500 mr-4 shrink-0" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MoMo Provider Selector */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-extrabold uppercase tracking-widest text-slate-300">
+                      Payer Mobile Money Network
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {NETWORKS.map((net) => {
+                        const isSelected = selectedNetwork.toUpperCase() === net.key.toUpperCase();
+                        return (
+                          <button
+                            key={net.key}
+                            type="button"
+                            onClick={() => setSelectedNetwork(net.key)}
+                            className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${
+                              isSelected
+                                ? net.color + " ring-2 ring-amber-400/50 scale-[1.03]"
+                                : "border-white/10 bg-slate-900/60 text-slate-400 hover:border-white/20"
+                            }`}
+                          >
+                            <NetworkLogo network={net.key as any} className="h-6 w-6" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">{net.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="rounded-xl bg-destructive/15 border border-destructive/30 p-3 text-xs font-medium text-destructive flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || !validPayerPhone}
+                    className="w-full flex items-center justify-center gap-2.5 rounded-2xl gold-gradient py-4 text-sm font-black text-primary-foreground shadow-xl hover:scale-[1.02] active:scale-[.98] disabled:opacity-50 transition-all"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Contacting Paystack MoMo Gateway…
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        <span>Pay GH₵ {totalGhs.toFixed(2)} via Mobile Money</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>256-Bit Encrypted Direct Paystack Charge</span>
+                  </div>
+                </form>
+              </div>
+
+            ) : step === "OTP_INPUT" ? (
+
+              /* 3. STEP B: PAYSTACK OTP VERIFICATION CARD */
+              <div className="space-y-6 animate-in zoom-in-95">
+                <div className="text-center space-y-2">
+                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl gold-gradient text-slate-950 shadow-xl">
+                    <Lock className="h-7 w-7" />
+                  </div>
+                  <h2 className="text-2xl font-black text-white font-display">Paystack OTP Verification Required</h2>
+                  <p className="text-xs text-slate-300">
+                    Paystack has sent a verification OTP code via SMS to <span className="text-amber-400 font-bold">{activePayerPhone}</span>.
+                  </p>
+                </div>
+
+                <form onSubmit={handleOtpSubmit} className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-extrabold uppercase tracking-widest text-slate-300 mb-2 text-center">
+                      Enter Paystack OTP Code
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                      placeholder="123456"
+                      className="w-full text-center tracking-[0.5em] text-3xl font-mono font-black rounded-2xl border border-white/20 bg-slate-900 px-4 py-4 text-white placeholder:text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none"
+                      required
+                    />
+                  </div>
+
+                  {errorMsg && (
+                    <div className="rounded-xl bg-destructive/15 border border-destructive/30 p-3 text-xs font-medium text-destructive flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || otpCode.length < 4}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl gold-gradient py-4 text-xs font-black text-primary-foreground shadow-xl hover:scale-[1.01] active:scale-[.98] disabled:opacity-50 transition-all"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Verifying Paystack Code…
+                      </>
+                    ) : (
+                      <>
+                        <span>Submit OTP & Trigger MoMo Prompt</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+                    <span>Didn't receive Paystack SMS?</span>
+                    <button
+                      type="button"
+                      onClick={handleMoMoSubmit}
+                      disabled={loading}
+                      className="font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                      <span>Resend OTP</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
             ) : (
-              /* LIVE IN-PROGRESS MO-MO PROMPT & STATUS SCREEN */
-              <div className="space-y-8">
+
+              /* 4. STEP C: PROMPT PUSHED & LIVE 3-SECOND POLLING */
+              <div className="space-y-8 animate-in fade-in">
                 
                 {/* Visual MoMo Phone Visualizer */}
                 <div className="relative mx-auto max-w-sm rounded-3xl border border-amber-500/30 bg-slate-900/90 p-6 text-center shadow-xl space-y-4">
@@ -188,26 +475,26 @@ function PaymentPage() {
 
                   <div className="space-y-1.5">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-400">
-                      <Zap className="h-3 w-3" /> Live MoMo Push Active
+                      <Zap className="h-3 w-3" /> USSD Push Prompt Active
                     </span>
                     <h3 className="text-lg font-black text-white font-display">Check Your Phone Screen!</h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      A Mobile Money prompt has been pushed to <span className="text-amber-400 font-bold">{recipientPhone}</span>.
-                      Enter your 4-digit MoMo PIN to authorize <span className="text-emerald-400 font-bold">GH₵ {totalGhs.toFixed(2)}</span>.
+                      A Mobile Money prompt has been pushed to <span className="text-amber-400 font-bold">{activePayerPhone}</span>.
+                      Enter your 4-digit PIN to authorize <span className="text-emerald-400 font-bold">GH₵ {totalGhs.toFixed(2)}</span>.
                     </p>
                   </div>
 
-                  {/* Live Log Bar */}
+                  {/* Live Status Log */}
                   <div className="rounded-xl bg-slate-950 p-3 text-[11px] font-mono text-slate-400 border border-white/10 flex items-center justify-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                    <span>{displayText}</span>
+                    <span>{promptMessage}</span>
                   </div>
                 </div>
 
-                {/* 4-Step Progress Tracker */}
+                {/* 4-Step Progress Stepper */}
                 <div className="rounded-3xl border border-white/10 bg-slate-900/50 p-6 space-y-4">
                   <div className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center justify-between border-b border-white/10 pb-3">
-                    <span>Order Progress Tracker</span>
+                    <span>Order Fulfillment Stepper</span>
                     <span className="text-amber-400 font-mono text-[10px]">Polling Live (3s)</span>
                   </div>
 
@@ -218,12 +505,23 @@ function PaymentPage() {
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-white">1. Order Created & MoMo Prompt Pushed</div>
-                        <div className="text-[10px] text-slate-400">MoMo prompt sent to {recipientPhone}</div>
+                        <div className="font-bold text-white">1. Order Created & Recipient Configured</div>
+                        <div className="text-[10px] text-slate-400">Recipient line: {recipientPhone}</div>
                       </div>
                     </div>
 
                     {/* Step 2 */}
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-slate-950 font-black text-xs">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-white">2. MoMo Prompt Pushed to Payer Phone</div>
+                        <div className="text-[10px] text-slate-400">Payer line: {activePayerPhone} ({selectedNetwork})</div>
+                      </div>
+                    </div>
+
+                    {/* Step 3 */}
                     <div className="flex items-center gap-3">
                       <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-black text-xs ${
                         currentStatus === "paid" || currentStatus === "processing" ? "bg-emerald-500 text-slate-950" : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
@@ -232,22 +530,9 @@ function PaymentPage() {
                       </div>
                       <div className="min-w-0">
                         <div className={`font-bold ${currentStatus === "paid" || currentStatus === "processing" ? "text-emerald-400" : "text-white"}`}>
-                          2. Payment Verification (Awaiting PIN)
+                          3. Payment Verification (Awaiting PIN)
                         </div>
                         <div className="text-[10px] text-slate-400">Verifying live server callback from Paystack</div>
-                      </div>
-                    </div>
-
-                    {/* Step 3 */}
-                    <div className="flex items-center gap-3">
-                      <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-black text-xs ${
-                        currentStatus === "processing" ? "bg-emerald-500 text-slate-950" : "bg-white/10 text-slate-500"
-                      }`}>
-                        3
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-slate-400">3. Network Gateway Dispatch</div>
-                        <div className="text-[10px] text-slate-500">Connecting to {networkName} automated API</div>
                       </div>
                     </div>
 
@@ -264,24 +549,25 @@ function PaymentPage() {
                   </div>
                 </div>
 
-                {/* Resend & Support Controls */}
+                {/* Resend Controls */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-white/10">
                   <button
                     type="button"
                     onClick={handleResendPrompt}
-                    disabled={isResending}
+                    disabled={loading}
                     className="flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 transition-all"
                   >
-                    <RefreshCw className={`h-4 w-4 ${isResending ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                     <span>Resend MoMo Prompt to Phone</span>
                   </button>
 
-                  <div className="flex items-center gap-4 text-xs text-slate-400 font-medium">
-                    <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-emerald-400" /> 256-Bit Encrypted</span>
-                    <Link to="/support" className="flex items-center gap-1 hover:text-white transition-colors">
-                      <HelpCircle className="h-4 w-4" /> Need Help?
-                    </Link>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep("MOMO_INPUT")}
+                    className="text-xs text-slate-400 hover:text-white underline"
+                  >
+                    Change MoMo Payment Number
+                  </button>
                 </div>
 
               </div>

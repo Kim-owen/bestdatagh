@@ -90,7 +90,7 @@ function Checkout() {
     setErrorMsg("");
 
     try {
-      // 1. Create order
+      // 1. Create order with recipient number
       const orderRes = await createCheckoutOrder({
         data: {
           items: items.map((it) => ({
@@ -104,10 +104,10 @@ function Checkout() {
         },
       });
 
-      // 2. Clear cart & Navigate to dedicated MoMo Payment Number Page
+      // 2. Clear cart & Navigate to Unified Payment Hub
       clear();
       navigate({
-        to: "/payment-momo/$reference",
+        to: "/payment/$reference",
         params: { reference: orderRes.reference },
       });
     } catch (err: any) {
