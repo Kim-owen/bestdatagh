@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { adminStats } from "@/lib/admin.functions";
+import { PageLoader } from "@/components/ui/LoadingSpinner";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -71,16 +72,7 @@ function AdminShell() {
   }, [nav]);
 
   if (checking) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Authenticating Admin Portal…
-          </span>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Authenticating Admin Portal…" />;
   }
 
   if (!ok) return null;

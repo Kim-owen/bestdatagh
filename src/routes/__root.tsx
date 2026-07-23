@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { CartProvider } from "@/lib/cart";
 import { AuthProvider } from "@/lib/auth";
 import { CartDrawer, CartToast } from "@/components/site/CartDrawer";
+import { TopProgressBar } from "@/components/ui/LoadingSpinner";
 
 
 function NotFoundComponent() {
@@ -123,6 +124,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CartProvider>
+          <TopProgressBar />
           <Outlet />
           <CartDrawer />
           <CartToast />
