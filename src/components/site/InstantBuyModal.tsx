@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2, X, Lock, ShieldCheck } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import type { Network } from "@/lib/cart";
 import { createCheckoutOrder } from "@/lib/orders.functions";
-import { InAppPaymentModal } from "./InAppPaymentModal";
 
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import { Wallet } from "lucide-react";
 export type InstantBuyItem = { network: Network; size: string; price: number } | null;
 
 export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClose: () => void }) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fetchWallet = useServerFn(getMyWallet);
@@ -107,14 +108,11 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
         },
       });
 
-      setPaymentModalData({
-        orderId: orderRes.orderId,
-        reference: orderRes.reference,
-        phone,
-        network: item.network,
-        totalGhs: item.price,
+      onClose();
+      navigate({
+        to: "/payment/$reference",
+        params: { reference: orderRes.reference },
       });
-      setStatus("idle");
     } catch (err: any) {
       console.error("Paystack instant checkout error:", err);
       setErrorMsg(err.message || "Failed to initialize MoMo payment.");

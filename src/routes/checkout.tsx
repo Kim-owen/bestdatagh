@@ -78,14 +78,6 @@ function Checkout() {
     }
   };
 
-  const [paymentModalData, setPaymentModalData] = useState<{
-    orderId: string;
-    reference: string;
-    phone: string;
-    network: string;
-    totalGhs: number;
-  } | null>(null);
-
   const initiatePaymentFlow = async () => {
     setStatus("processing");
     setErrorMsg("");
@@ -105,15 +97,12 @@ function Checkout() {
         },
       });
 
-      // 2. Open in-app MoMo prompt and live status modal
-      setPaymentModalData({
-        orderId: orderRes.orderId,
-        reference: orderRes.reference,
-        phone,
-        network: items[0]?.network || "MTN",
-        totalGhs: subtotal,
+      // 2. Clear cart & Navigate to dedicated in-app payment & delivery tracking page
+      clear();
+      navigate({
+        to: "/payment/$reference",
+        params: { reference: orderRes.reference },
       });
-      setStatus("idle");
     } catch (err: any) {
       console.error("Checkout payment error:", err);
       setStatus("error");

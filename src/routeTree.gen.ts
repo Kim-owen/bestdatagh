@@ -27,6 +27,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAgentRouteImport } from './routes/_authenticated/agent'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as CheckoutVerifyRouteImport } from './routes/checkout.verify'
+import { Route as PaymentReferenceRouteImport } from './routes/payment.$reference'
 import { Route as AuthenticatedAccountApiKeysRouteImport } from './routes/_authenticated/account.api-keys'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin.agents'
@@ -145,6 +146,11 @@ const CheckoutVerifyRoute = CheckoutVerifyRouteImport.update({
   id: '/verify',
   path: '/verify',
   getParentRoute: () => CheckoutRoute,
+} as any)
+const PaymentReferenceRoute = PaymentReferenceRouteImport.update({
+  id: '/payment/$reference',
+  path: '/payment/$reference',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAccountApiKeysRoute =
   AuthenticatedAccountApiKeysRouteImport.update({
@@ -327,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/checkout/verify': typeof CheckoutVerifyRoute
+  '/payment/$reference': typeof PaymentReferenceRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/checkout/verify': typeof CheckoutVerifyRoute
+  '/payment/$reference': typeof PaymentReferenceRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
@@ -424,6 +432,7 @@ export interface FileRoutesById {
   '/_authenticated/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/checkout/verify': typeof CheckoutVerifyRoute
+  '/payment/$reference': typeof PaymentReferenceRoute
   '/_authenticated/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
@@ -474,6 +483,7 @@ export interface FileRouteTypes {
     | '/agent'
     | '/blog/$slug'
     | '/checkout/verify'
+    | '/payment/$reference'
     | '/account/api-keys'
     | '/admin/agents'
     | '/admin/analytics'
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/agent'
     | '/blog/$slug'
     | '/checkout/verify'
+    | '/payment/$reference'
     | '/account/api-keys'
     | '/admin/agents'
     | '/admin/analytics'
@@ -570,6 +581,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agent'
     | '/blog/$slug'
     | '/checkout/verify'
+    | '/payment/$reference'
     | '/_authenticated/account/api-keys'
     | '/_authenticated/admin/agents'
     | '/_authenticated/admin/analytics'
@@ -615,6 +627,7 @@ export interface RootRouteChildren {
   ReviewsRoute: typeof ReviewsRoute
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
+  PaymentReferenceRoute: typeof PaymentReferenceRoute
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
   ApiV1BalanceRoute: typeof ApiV1BalanceRoute
   ApiV1BuyDataRoute: typeof ApiV1BuyDataRoute
@@ -754,6 +767,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/checkout/verify'
       preLoaderRoute: typeof CheckoutVerifyRouteImport
       parentRoute: typeof CheckoutRoute
+    }
+    '/payment/$reference': {
+      id: '/payment/$reference'
+      path: '/payment/$reference'
+      fullPath: '/payment/$reference'
+      preLoaderRoute: typeof PaymentReferenceRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/account/api-keys': {
       id: '/_authenticated/account/api-keys'
@@ -1068,6 +1088,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewsRoute: ReviewsRoute,
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,
+  PaymentReferenceRoute: PaymentReferenceRoute,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
   ApiV1BalanceRoute: ApiV1BalanceRoute,
   ApiV1BuyDataRoute: ApiV1BuyDataRoute,
