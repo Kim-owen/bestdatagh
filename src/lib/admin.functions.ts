@@ -228,12 +228,35 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
 
     if (error || !order) throw new Error("Order not found");
 
+    // Trigger automated fulfillment via SwiftData API
+    const item = (order.order_items && order.order_items[0]) || {};
+    let swiftNetwork: "yello" | "at_ishare" | "at_bigtime" | "telecel" = "yello";
+    const netLower = (item.network || "").toLowerCase();
+    if (netLower.includes("telecel") || netLower.includes("vodafone")) swiftNetwork = "telecel";
+    else if (netLower.includes("ishare") || netLower.includes("airteltigo")) swiftNetwork = "at_ishare";
+    else if (netLower.includes("bigtime")) swiftNetwork = "at_bigtime";
+
+    const sizeGb = Number((item.size_label || "").replace(/[^\d.]/g, "")) || 1;
+
+    try {
+      const { buySwiftDataBundle } = await import("@/lib/swiftdata");
+      if (item.recipient_phone) {
+        await buySwiftDataBundle({
+          phone: item.recipient_phone,
+          network: swiftNetwork,
+          sizeGb,
+          reference: order.reference,
+        });
+      }
+    } catch (swiftErr) {
+      console.warn("SwiftData purchase fallback notice:", swiftErr);
+    }
+
     // Update status to delivered
     const { error: updErr } = await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
     if (updErr) throw new Error(updErr.message);
 
     // Send SMS notification if recipient phone is available
-    const item = (order.order_items && order.order_items[0]) || {};
     if (item.recipient_phone) {
       try {
         await sendTxtConnectSms(
