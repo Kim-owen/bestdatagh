@@ -152,31 +152,8 @@ export function Header() {
             })}
           </nav>
 
-          {/* Controls & Wallet Pill */}
+          {/* Controls & User Account Menu */}
           <div className="flex items-center gap-2">
-            {/* User Wallet Balance Pill */}
-            {user && (
-              <div className="flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/30 p-1 text-xs font-bold text-emerald-500 shadow-sm backdrop-blur-md">
-                <button
-                  onClick={() => setWalletModalOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-0.5 hover:opacity-80 transition-opacity"
-                  title="View Wallet & Top Up"
-                >
-                  <Wallet className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  <span className="font-black text-emerald-500 dark:text-emerald-400 font-mono text-xs leading-none whitespace-nowrap">
-                    GH₵ {walletBalance.toFixed(2)}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setWalletModalOpen(true)}
-                  className="flex items-center gap-1 rounded-full bg-emerald-500 text-black px-2.5 py-1 text-[10px] font-black hover:bg-emerald-400 transition-all shadow-md active:scale-95 shrink-0"
-                  title="Deposit Funds into Wallet"
-                >
-                  <Plus className="h-3 w-3 stroke-[3]" /> Top Up
-                </button>
-              </div>
-            )}
-
             <button
               onClick={toggle}
               aria-label="Toggle theme"
@@ -212,9 +189,10 @@ export function Header() {
                   <span className="max-w-[120px] truncate">{user.email}</span>
                 </button>
                 {menu && (
-                  <div className="absolute right-0 mt-2 w-60 rounded-3xl border border-border/80 bg-card/95 shadow-2xl py-2.5 z-50 backdrop-blur-2xl animate-in fade-in zoom-in-95">
-                    <div className="px-4 py-2 border-b border-border/50 mb-1">
-                      <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Account Status</div>
+                  <div className="absolute right-0 mt-2 w-64 rounded-3xl border border-border/80 bg-card/95 shadow-2xl py-3 z-50 backdrop-blur-2xl animate-in fade-in zoom-in-95">
+                    {/* User Account Info Header */}
+                    <div className="px-4 py-2 border-b border-border/50 mb-2">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Signed in as</div>
                       <div className="text-xs font-bold truncate mt-0.5">{user.email}</div>
                       <div className="flex gap-1 mt-1.5">
                         {isAdmin && <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary border border-primary/20">Admin</span>}
@@ -222,30 +200,48 @@ export function Header() {
                         {!isAdmin && !isAgent && <span className="rounded-md bg-muted px-2 py-0.5 text-[9px] font-bold text-muted-foreground">Retail User</span>}
                       </div>
                     </div>
+
+                    {/* Integrated Glassmorphic Wallet Card inside User Dropdown */}
+                    <div className="mx-3 mb-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-emerald-500 flex items-center gap-1.5">
+                          <Wallet className="h-4 w-4" /> Wallet Balance
+                        </span>
+                        <span className="font-mono font-black text-emerald-500 text-sm">GH₵ {walletBalance.toFixed(2)}</span>
+                      </div>
+                      <button
+                        onClick={() => { setWalletModalOpen(true); setMenu(false); }}
+                        className="w-full flex items-center justify-center gap-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black py-1.5 text-xs font-black shadow-sm transition-all active:scale-95"
+                      >
+                        <Plus className="h-3.5 w-3.5 stroke-[3]" /> Top Up Deposit
+                      </button>
+                    </div>
+
                     {isAdmin && (
-                      <Link to="/admin" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-muted text-primary transition-colors">
+                      <Link to="/admin" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted text-primary transition-colors">
                         <Shield className="h-4 w-4 text-primary" /> Admin Panel
                       </Link>
                     )}
                     {isAgent && (
-                      <Link to="/agent" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-muted text-emerald-500 transition-colors">
+                      <Link to="/agent" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted text-emerald-500 transition-colors">
                         <Store className="h-4 w-4 text-emerald-500" /> Agent Dashboard
                       </Link>
                     )}
-                    <Link to="/account" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors">
+                    <Link to="/account" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
                       <UserIcon className="h-4 w-4" /> My Profile
                     </Link>
-                    <Link to="/account/api-keys" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors">
+                    <Link to="/account/api-keys" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
                       <KeyRound className="h-4 w-4" /> Developer API Keys
                     </Link>
-                    <Link to="/bulk" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors">
+                    <Link to="/bulk" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
                       <Upload className="h-4 w-4" /> Bulk Order Tool
                     </Link>
-                    <Link to="/track-order" className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors">
+                    <Link to="/track-order" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
                       <ShoppingBag className="h-4 w-4" /> Track My Orders
                     </Link>
+
                     <div className="my-1 border-t border-border/50" />
-                    <button onClick={() => signOut()} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-extrabold hover:bg-muted text-destructive transition-colors">
+                    <button onClick={() => signOut()} className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-extrabold hover:bg-muted text-destructive transition-colors">
                       <LogOut className="h-4 w-4" /> Sign Out
                     </button>
                   </div>
