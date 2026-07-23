@@ -114,6 +114,17 @@ function UnifiedPaymentPage() {
     }
   }, [activePayerPhone, selectedNetwork, validPayerPhone]);
 
+  // Dynamically load Paystack Popup JS v2
+  useEffect(() => {
+    if (typeof window !== "undefined" && !document.getElementById("paystack-inline-js")) {
+      const script = document.createElement("script");
+      script.id = "paystack-inline-js";
+      script.src = "https://js.paystack.co/v2/inline.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   const [authUrl, setAuthUrl] = useState<string | null>(null);
 
   // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
@@ -134,9 +145,22 @@ function UnifiedPaymentPage() {
       });
 
       if (res.displayText) setPromptMessage(res.displayText);
+
+      // 1. Paystack Popup V2 integration
+      if (res.accessCode && (window as any).PaystackPop) {
+        try {
+          const popup = new (window as any).PaystackPop();
+          popup.resumeTransaction(res.accessCode);
+          setStep("PROMPT_PUSHED");
+          return;
+        } catch (popupErr) {
+          console.warn("PaystackPop resume error:", popupErr);
+        }
+      }
+
+      // 2. Direct Redirect Fallback
       if (res.authorizationUrl) {
         setAuthUrl(res.authorizationUrl);
-        // Instant redirect to Paystack's MoMo authorization screen
         window.location.href = res.authorizationUrl;
         return;
       }
