@@ -136,8 +136,9 @@ function UnifiedPaymentPage() {
       if (res.displayText) setPromptMessage(res.displayText);
       if (res.authorizationUrl) {
         setAuthUrl(res.authorizationUrl);
-        // Automatically popup Paystack overlay
-        window.open(res.authorizationUrl, "PaystackMoMo", "width=500,height=700,top=100,left=100");
+        // Instant redirect to Paystack's MoMo authorization screen
+        window.location.href = res.authorizationUrl;
+        return;
       }
 
       if (res.requiresOtp) {

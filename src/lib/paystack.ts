@@ -86,6 +86,9 @@ async function paystackFetch<T>(endpoint: string, options: RequestInit = {}): Pr
  */
 export async function initializePaystackTransaction(params: InitializePaystackParams): Promise<PaystackInitResponse> {
   const amountPesewas = Math.round(params.amountGhs * 100);
+  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL 
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` 
+    : "https://ghana-data-hub-gold.vercel.app";
 
   return paystackFetch<PaystackInitResponse>("/transaction/initialize", {
     method: "POST",
@@ -94,9 +97,9 @@ export async function initializePaystackTransaction(params: InitializePaystackPa
       amount: amountPesewas,
       currency: "GHS",
       reference: params.reference,
-      callback_url: params.callbackUrl,
-      channels: ["mobile_money", "card"],
+      callback_url: params.callbackUrl || `${baseUrl}/payment/${params.reference}`,
       metadata: params.metadata,
+      channels: ["mobile_money", "card"],
     }),
   });
 }
