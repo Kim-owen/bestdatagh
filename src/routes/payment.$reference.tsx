@@ -40,7 +40,7 @@ function UnifiedPaymentPage() {
 
   // Unified Payment State: "MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED"
   const [step, setStep] = useState<"MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED">("MOMO_INPUT");
-  const [sameAsRecipient, setSameAsRecipient] = useState(true);
+  const [sameAsRecipient, setSameAsRecipient] = useState(false);
   const [paymentPhone, setPaymentPhone] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("MTN");
   const [otpCode, setOtpCode] = useState("");
@@ -72,12 +72,12 @@ function UnifiedPaymentPage() {
   const sizeLabel = firstItem?.size_label || "Data Bundle";
   const totalGhs = order?.total_ghs || 0;
 
-  // Sync recipient phone and network by default
+  // Pre-fill payment phone with recipient phone if empty
   useEffect(() => {
-    if (sameAsRecipient && recipientPhone) {
+    if (recipientPhone && !paymentPhone) {
       setPaymentPhone(recipientPhone);
     }
-  }, [sameAsRecipient, recipientPhone]);
+  }, [recipientPhone, paymentPhone]);
 
   useEffect(() => {
     if (networkName) {
