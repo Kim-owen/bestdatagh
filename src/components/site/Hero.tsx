@@ -76,7 +76,7 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden bg-[#060612] text-foreground">
-      {/* Dynamic Site Background Image/Video Layer */}
+      {/* Dynamic Site Background Image/Video Layer (Crystal Clear) */}
       {currentSlide?.mediaUrl && (
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none transition-all duration-1000 ease-in-out">
           {currentSlide.mediaType === "video" ? (
@@ -87,19 +87,18 @@ export function Hero() {
               loop
               muted
               playsInline
-              className="w-full h-full object-cover opacity-25 scale-105 filter blur-[1px] transition-opacity duration-1000"
+              className="w-full h-full object-cover opacity-90 transition-opacity duration-1000"
             />
           ) : (
             <img
               key={currentSlide.mediaUrl}
               src={currentSlide.mediaUrl}
               alt={currentSlide.title}
-              className="w-full h-full object-cover opacity-35 scale-105 filter contrast-110 transition-opacity duration-1000"
+              className="w-full h-full object-cover opacity-90 transition-opacity duration-1000"
             />
           )}
-          {/* Glass Gradient Overlays for High-Contrast Readability */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#060612]/95 via-[#060612]/80 to-[#060612]/90" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#060612] via-transparent to-[#060612]/70" />
+          {/* Subtle vignette for edge framing */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#060612]/80 via-transparent to-[#060612]/30" />
         </div>
       )}
 
