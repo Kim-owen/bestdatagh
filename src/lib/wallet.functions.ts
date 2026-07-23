@@ -94,3 +94,60 @@ export const payOrderWithWallet = createServerFn({ method: "POST" })
 
     return { ok: true, newBalance };
   });
+
+export const verifyWalletDeposit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { reference: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { verifyPaystackTransaction } = await import("@/lib/paystack");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Check if already credited
+    const { data: existingTx } = await supabaseAdmin
+      .from("wallet_transactions")
+      .select("id, amount_ghs")
+      .eq("reference", data.reference)
+      .maybeSingle();
+
+    if (existingTx) {
+      const { data: curWallet } = await supabaseAdmin
+        .from("wallets")
+        .select("balance_ghs")
+        .eq("user_id", context.userId)
+        .maybeSingle();
+
+      return { ok: true, balanceGhs: Number(curWallet?.balance_ghs || 0), alreadyVerified: true };
+    }
+
+    // 2. Verify with Paystack API
+    const paystackRes = await verifyPaystackTransaction(data.reference);
+    if (paystackRes.data.status !== "success") {
+      throw new Error(`Deposit status is ${paystackRes.data.status}`);
+    }
+
+    const paidGhs = paystackRes.data.amount / 100;
+
+    // 3. Fetch & credit wallet
+    const { data: curWallet } = await supabaseAdmin
+      .from("wallets")
+      .select("balance_ghs")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+
+    await supabaseAdmin
+      .from("wallets")
+      .upsert({ user_id: context.userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+
+    await supabaseAdmin.from("wallet_transactions").insert({
+      user_id: context.userId,
+      amount_ghs: paidGhs,
+      type: "deposit",
+      reference: data.reference,
+      status: "completed",
+      description: `Paystack Deposit (${data.reference})`,
+    });
+
+    return { ok: true, balanceGhs: newBal, alreadyVerified: false };
+  });

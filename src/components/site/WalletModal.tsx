@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { initializeWalletDeposit } from "@/lib/wallet.functions";
+import { initializeWalletDeposit, verifyWalletDeposit } from "@/lib/wallet.functions";
 import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
-import { Wallet, X, Plus, Zap, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Wallet, X, Plus, Zap, CheckCircle2, ShieldCheck, Loader2 } from "lucide-react";
 
 export function WalletTopUpModal({
   isOpen,
@@ -16,9 +16,11 @@ export function WalletTopUpModal({
 }) {
   const queryClient = useQueryClient();
   const initDeposit = useServerFn(initializeWalletDeposit);
+  const verifyDeposit = useServerFn(verifyWalletDeposit);
   const [selectedAmount, setSelectedAmount] = useState<number>(50);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [successMsg, setSuccessMsg] = useState(false);
 
   const amountToUse = customAmount ? Number(customAmount) : selectedAmount;
 
@@ -35,11 +37,22 @@ export function WalletTopUpModal({
           email: userEmail || `user-${Date.now()}@bestdatagh.com`,
           amountGhs: amountToUse,
           reference: res.reference,
-          onSuccess: (ref) => {
-            setIsProcessing(false);
-            queryClient.invalidateQueries({ queryKey: ["myWallet"] });
-            queryClient.invalidateQueries({ queryKey: ["me"] });
-            onClose();
+          onSuccess: async (ref) => {
+            try {
+              // Immediately verify and credit wallet on server
+              await verifyDeposit({ data: { reference: ref } });
+            } catch (err) {
+              console.warn("Direct deposit verification error:", err);
+            } finally {
+              setIsProcessing(false);
+              setSuccessMsg(true);
+              queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+              queryClient.invalidateQueries({ queryKey: ["me"] });
+              setTimeout(() => {
+                setSuccessMsg(false);
+                onClose();
+              }, 1500);
+            }
           },
           onClose: () => {
             setIsProcessing(false);

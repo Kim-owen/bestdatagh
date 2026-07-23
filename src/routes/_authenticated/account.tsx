@@ -6,7 +6,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useAuth } from "@/lib/auth";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
-import { getMyWallet } from "@/lib/wallet.functions";
+import { getMyWallet, verifyWalletDeposit } from "@/lib/wallet.functions";
 import { WalletTopUpModal } from "@/components/site/WalletModal";
 import { User, Phone, Mail, Save, LogOut, KeyRound, ShoppingBag, Store, ShieldCheck, Wallet, Plus } from "lucide-react";
 
@@ -25,6 +25,7 @@ function AccountPage() {
   const fetchProfile = useServerFn(getMyProfile);
   const saveProfile = useServerFn(updateMyProfile);
   const fetchWallet = useServerFn(getMyWallet);
+  const verifyDepositFn = useServerFn(verifyWalletDeposit);
 
   const { data, isLoading } = useQuery({ queryKey: ["me"], queryFn: () => fetchProfile() });
   const { data: walletData } = useQuery({ queryKey: ["myWallet"], queryFn: () => fetchWallet(), enabled: !!user });
@@ -35,6 +36,22 @@ function AccountPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("reference") || params.get("trxref");
+      if (ref && ref.startsWith("DEP-")) {
+        verifyDepositFn({ data: { reference: ref } })
+          .then(() => {
+            qc.invalidateQueries({ queryKey: ["myWallet"] });
+            qc.invalidateQueries({ queryKey: ["me"] });
+            window.history.replaceState({}, document.title, window.location.pathname);
+          })
+          .catch(console.error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (data?.profile) { setName(data.profile.display_name ?? ""); setPhone(data.profile.phone ?? ""); }
