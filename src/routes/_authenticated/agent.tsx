@@ -6,7 +6,8 @@ import {
   ArrowLeft, TrendingUp, Wallet, Clock, Package, Store, ExternalLink, Users,
   BanknoteIcon, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight,
   ShieldCheck, Sparkles, ArrowUpRight, DollarSign, BarChart3, RefreshCw,
-  Search, Filter, Zap, Server, Download, Printer, Receipt, Trophy, Star, UserPlus, Plus
+  Search, Filter, Zap, Server, Download, Printer, Receipt, Trophy, Star, UserPlus, Plus,
+  LayoutDashboard, Share2, Copy, Check, QrCode, Video, Sliders, MessageSquare
 } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
@@ -19,8 +20,8 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 export const Route = createFileRoute("/_authenticated/agent")({
   head: () => ({
     meta: [
-      { title: "Agent Dashboard — Bestdata" },
-      { name: "description", content: "Track your agent storefront performance, orders, commissions, and payout requests." },
+      { title: "Agent Portal — Bestdata" },
+      { name: "description", content: "Agent portal workspace: overview, storefront branding, retail pricing, CRM, and payouts." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -33,6 +34,8 @@ type Withdrawal = {
   status: "pending"|"approved"|"paid"|"rejected"; admin_note: string | null; processed_at: string | null; created_at: string;
 };
 
+type TabType = "overview" | "storefront" | "pricing" | "customers" | "withdrawals" | "orders";
+
 function AgentDashboard() {
   const nav = useNavigate();
   const [data, setData] = useState<Data | null>(null);
@@ -44,6 +47,7 @@ function AgentDashboard() {
   const [orderSearch, setOrderSearch] = useState("");
   const [networkFilter, setNetworkFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   async function refresh() {
     const [d, w] = await Promise.all([getAgentDashboard(), listMyWithdrawals()]);
@@ -164,283 +168,385 @@ function AgentDashboard() {
     document.body.removeChild(link);
   }
 
+  const tabs: Array<{ id: TabType; label: string; icon: any; count?: number }> = [
+    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "storefront", label: "Storefront & Media", icon: Store },
+    { id: "pricing", label: "Retail Pricing", icon: DollarSign },
+    { id: "customers", label: "Customers (CRM)", icon: Users },
+    { id: "withdrawals", label: "Payouts & Wallet", icon: BanknoteIcon, count: withdrawals.length },
+    { id: "orders", label: "Order History", icon: Package, count: data.recentOrders.length },
+  ];
+
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      {/* Background Ambient Spheres */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute top-0 right-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[130px]" />
-        <div className="absolute bottom-1/3 left-10 h-80 w-80 rounded-full bg-emerald-500/10 blur-[120px]" />
-      </div>
-
-      <Header />
-
-      <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 md:py-14 space-y-10 relative z-10">
-        {/* Admin-style Top Agent Banner */}
-        <div className="rounded-3xl border border-border/80 bg-card/80 p-6 md:p-8 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-black text-emerald-500">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                GATEWAY OPERATIONAL
-              </span>
-              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase ${tierInfo.color}`}>
-                <Trophy className="h-3.5 w-3.5" /> {tierInfo.name} ({tierInfo.margin} Margin)
-              </span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-black font-display tracking-tight">Agent Workspace & Operations</h1>
-            <p className="text-xs font-semibold text-muted-foreground">
-              Monitor customer purchases, wholesale margins, instant payouts, and store branding.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => refresh()}
-              className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
-            >
-              <RefreshCw className="h-3.5 w-3.5 text-primary" /> Refresh Data
-            </button>
-            <button
-              onClick={() => setWalletModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-2.5 text-xs font-black text-black shadow-md hover:scale-105 active:scale-95 transition-all"
-            >
-              <Wallet className="h-4 w-4" /> Top Up Wallet
-            </button>
-            <Link
-              to="/agents"
-              className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-background px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
-            >
-              <Store className="h-4 w-4 text-primary" /> Storefront
-            </Link>
-            <Link
-              to="/bulk"
-              className="inline-flex items-center gap-2 rounded-2xl gold-gradient px-5 py-2.5 text-xs font-extrabold text-primary-foreground shadow-md hover:scale-105 active:scale-95 transition-all"
-            >
-              <Users className="h-4 w-4" /> Bulk Resell
-            </Link>
-          </div>
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden flex flex-col justify-between">
+      <div>
+        {/* Background Ambient Spheres */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute top-0 right-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[130px]" />
+          <div className="absolute bottom-1/3 left-10 h-80 w-80 rounded-full bg-emerald-500/10 blur-[120px]" />
         </div>
 
-        {/* Storefront Link Sharing & Media Customization Suite */}
-        <AgentShareAndBrandingSuite />
+        <Header />
 
-        {/* Hero Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <StatCard
-            icon={Wallet}
-            label="Total Commission Earned"
-            value={`GH₵ ${s.commissionEarned.toFixed(2)}`}
-            sub={`Available Payout: GH₵ ${totals.available.toFixed(2)}`}
-            tone="gold"
-          />
-          <StatCard
-            icon={Clock}
-            label="Pending Commission"
-            value={`GH₵ ${s.commissionPending.toFixed(2)}`}
-            sub="Awaiting order delivery"
-            tone="blue"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Delivered Sales Revenue"
-            value={`GH₵ ${s.revenue.toFixed(2)}`}
-            sub="Gross storefront volume"
-            tone="emerald"
-          />
-          <StatCard
-            icon={Package}
-            label="Orders Delivered"
-            value={`${s.deliveredOrders} / ${s.totalOrders}`}
-            sub={`${s.pendingOrders} in progress`}
-            tone="indigo"
-          />
-        </div>
-
-        {/* Custom Retail Price Configurator */}
-        <AgentCustomPriceConfigurator />
-
-        {/* Saved Customer Directory (Mini-CRM) */}
-        <CustomerDirectory />
-
-        {/* Analytics Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ChartCard title="Commission Earnings Trend" subtitle="Last 6 months performance">
-            {chartData.length === 0 ? (
-              <EmptyChart />
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={chartData} margin={{ top: 10, right: 12, left: -8, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gCom" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(243, 85%, 62%)" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="hsl(243, 85%, 62%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
-                  <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`GH₵ ${Number(v).toFixed(2)}`, "Commission"]} />
-                  <Area type="monotone" dataKey="commission" stroke="hsl(243, 85%, 62%)" strokeWidth={3} fill="url(#gCom)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          <ChartCard title="Monthly Sales & Orders" subtitle="Volume vs Gross Revenue (GH₵)">
-            {chartData.length === 0 ? (
-              <EmptyChart />
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={chartData} margin={{ top: 10, right: 12, left: -8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
-                  <Bar dataKey="orders" name="Orders" fill="hsl(243, 85%, 62%)" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="revenue" name="Revenue (GH₵)" fill="hsl(160, 84%, 39%)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-        </div>
-
-        {/* Withdrawals Hub */}
-        <WithdrawalSection
-          available={totals.available}
-          paid={totals.paid}
-          pendingReq={totals.pendingReq}
-          withdrawals={withdrawals}
-          onSubmitted={refresh}
-        />
-
-        {/* Recent Orders with Search, Filters, CSV Export & Receipts */}
-        <section className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl space-y-4 p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-4">
-            <div>
-              <h2 className="text-lg font-extrabold font-display flex items-center gap-2">
-                <Package className="h-5 w-5 text-primary" /> Live Customer Orders & Resells
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Real-time order dispatches, receipts & export</p>
+        <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-8 md:py-12 space-y-8 relative z-10">
+          {/* Top Agent Portal Banner */}
+          <div className="rounded-3xl border border-border/80 bg-card/80 p-6 md:p-8 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-black text-emerald-500">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  GATEWAY OPERATIONAL
+                </span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase ${tierInfo.color}`}>
+                  <Trophy className="h-3.5 w-3.5" /> {tierInfo.name} ({tierInfo.margin} Margin)
+                </span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-black font-display tracking-tight">Agent Command Center</h1>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Manage your storefront, set custom prices, view customer CRM, and execute instant payouts.
+              </p>
             </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
               <button
-                onClick={exportCSV}
-                className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-500 hover:bg-emerald-500/20 transition-all"
+                onClick={() => refresh()}
+                className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
               >
-                <Download className="h-3.5 w-3.5" /> Export CSV
+                <RefreshCw className="h-3.5 w-3.5 text-primary" /> Refresh
               </button>
-
-              {/* Network Filter */}
-              <select
-                value={networkFilter}
-                onChange={(e) => setNetworkFilter(e.target.value)}
-                className="rounded-2xl border border-border/80 bg-background/80 px-3 py-2 text-xs font-bold outline-none focus:border-primary"
+              <button
+                onClick={() => setWalletModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-2.5 text-xs font-black text-black shadow-md hover:scale-105 active:scale-95 transition-all"
               >
-                <option value="all">All Networks</option>
-                <option value="mtn">MTN</option>
-                <option value="telecel">Telecel</option>
-                <option value="airtel">AirtelTigo</option>
-              </select>
-
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-2xl border border-border/80 bg-background/80 px-3 py-2 text-xs font-bold outline-none focus:border-primary"
+                <Wallet className="h-4 w-4" /> Top Up Wallet
+              </button>
+              <Link
+                to="/agents"
+                className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-background px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
               >
-                <option value="all">All Statuses</option>
-                <option value="delivered">Delivered</option>
-                <option value="processing">Processing</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
+                <Store className="h-4 w-4 text-primary" /> Public Store
+              </Link>
+              <Link
+                to="/bulk"
+                className="inline-flex items-center gap-2 rounded-2xl gold-gradient px-5 py-2.5 text-xs font-extrabold text-primary-foreground shadow-md hover:scale-105 active:scale-95 transition-all"
+              >
+                <Users className="h-4 w-4" /> Bulk Resell
+              </Link>
+            </div>
+          </div>
 
-              {/* Search Box */}
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search reference or phone..."
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-border/80 bg-background/80 pl-9 pr-4 py-2 text-xs font-semibold outline-none focus:border-primary"
+          {/* Sticky Agent Portal Navigation Bar */}
+          <div className="sticky top-20 z-30 overflow-x-auto pb-2 pt-1 no-scrollbar">
+            <div className="flex items-center gap-2 rounded-2xl border border-border/80 bg-card/90 p-1.5 shadow-lg backdrop-blur-xl min-w-max">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all duration-200 ${
+                      active
+                        ? "gold-gradient text-primary-foreground shadow-md scale-[1.02]"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 ${active ? "text-primary-foreground" : "text-primary"}`} />
+                    <span>{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-black ${
+                        active ? "bg-black/20 text-white" : "bg-primary/10 text-primary"
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* PAGE VIEW 1: OVERVIEW */}
+          {activeTab === "overview" && (
+            <div className="space-y-8 animate-in fade-in duration-200">
+              {/* Hero Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <StatCard
+                  icon={Wallet}
+                  label="Total Commission Earned"
+                  value={`GH₵ ${s.commissionEarned.toFixed(2)}`}
+                  sub={`Available Payout: GH₵ ${totals.available.toFixed(2)}`}
+                  tone="gold"
+                />
+                <StatCard
+                  icon={Clock}
+                  label="Pending Commission"
+                  value={`GH₵ ${s.commissionPending.toFixed(2)}`}
+                  sub="Awaiting order delivery"
+                  tone="blue"
+                />
+                <StatCard
+                  icon={TrendingUp}
+                  label="Delivered Sales Revenue"
+                  value={`GH₵ ${s.revenue.toFixed(2)}`}
+                  sub="Gross storefront volume"
+                  tone="emerald"
+                />
+                <StatCard
+                  icon={Package}
+                  label="Orders Delivered"
+                  value={`${s.deliveredOrders} / ${s.totalOrders}`}
+                  sub={`${s.pendingOrders} in progress`}
+                  tone="indigo"
                 />
               </div>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40">
-                <tr>
-                  <th className="text-left px-5 py-3.5">Order Ref & Date</th>
-                  <th className="text-left px-5 py-3.5">Recipient & Package</th>
-                  <th className="text-left px-5 py-3.5">Items</th>
-                  <th className="text-left px-5 py-3.5">Live Status</th>
-                  <th className="text-right px-5 py-3.5">Total Amount</th>
-                  <th className="text-center px-5 py-3.5">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40 font-mono">
-                {filteredRecentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-xs font-bold text-muted-foreground">
-                      No agent orders match the selected filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRecentOrders.map((o: any) => {
-                    const item = (o.order_items && o.order_items[0]) || {};
-                    return (
-                      <tr key={o.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-5 py-4 font-bold text-primary">
-                          <div>{o.reference}</div>
-                          <div className="text-[10px] text-muted-foreground font-sans mt-0.5">
-                            {new Date(o.created_at).toLocaleDateString()} {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 font-sans">
-                          <div className="font-bold text-foreground font-mono">{item.recipient_phone || "Store Order"}</div>
-                          <div className="text-[11px] text-muted-foreground">{item.size_label || "Data Bundle"} · {item.network || "MTN"}</div>
-                        </td>
-                        <td className="px-5 py-4 font-bold font-sans">{o.order_items?.length ?? 1} package</td>
-                        <td className="px-5 py-4 font-sans">
-                          <StatusPill status={o.status} />
-                        </td>
-                        <td className="px-5 py-4 text-right font-black text-emerald-500 font-display">
-                          GH₵ {Number(o.total_ghs).toFixed(2)}
-                        </td>
-                        <td className="px-5 py-4 text-center font-sans">
-                          <button
-                            onClick={() => setSelectedReceiptOrder(o)}
-                            className="inline-flex items-center gap-1 rounded-xl bg-primary/10 border border-primary/20 px-2.5 py-1 text-[10px] font-extrabold text-primary hover:bg-primary/20 transition-all"
-                          >
-                            <Receipt className="h-3 w-3" /> Receipt
-                          </button>
-                        </td>
+              {/* Analytics Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ChartCard title="Commission Earnings Trend" subtitle="Last 6 months performance">
+                  {chartData.length === 0 ? (
+                    <EmptyChart />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart data={chartData} margin={{ top: 10, right: 12, left: -8, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="gCom" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="hsl(243, 85%, 62%)" stopOpacity={0.5} />
+                            <stop offset="100%" stopColor="hsl(243, 85%, 62%)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
+                        <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => [`GH₵ ${Number(v).toFixed(2)}`, "Commission"]} />
+                        <Area type="monotone" dataKey="commission" stroke="hsl(243, 85%, 62%)" strokeWidth={3} fill="url(#gCom)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartCard>
+
+                <ChartCard title="Monthly Sales & Orders" subtitle="Volume vs Gross Revenue (GH₵)">
+                  {chartData.length === 0 ? (
+                    <EmptyChart />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={chartData} margin={{ top: 10, right: 12, left: -8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 700 }} />
+                        <Tooltip contentStyle={tooltipStyle} />
+                        <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
+                        <Bar dataKey="orders" name="Orders" fill="hsl(243, 85%, 62%)" radius={[8, 8, 0, 0]} />
+                        <Bar dataKey="revenue" name="Revenue (GH₵)" fill="hsl(160, 84%, 39%)" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartCard>
+              </div>
+
+              {/* Recent Activity Quick View */}
+              <div className="rounded-3xl border border-border/80 bg-card p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                  <h3 className="text-base font-extrabold font-display">Recent Customer Dispatches</h3>
+                  <button onClick={() => setActiveTab("orders")} className="text-xs font-bold text-primary hover:underline">
+                    View All Orders →
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40">
+                      <tr>
+                        <th className="text-left px-4 py-2.5">Order Ref</th>
+                        <th className="text-left px-4 py-2.5">Recipient</th>
+                        <th className="text-left px-4 py-2.5">Status</th>
+                        <th className="text-right px-4 py-2.5">Amount</th>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
+                    </thead>
+                    <tbody className="divide-y divide-border/40 font-mono">
+                      {data.recentOrders.slice(0, 5).map((o: any) => {
+                        const item = (o.order_items && o.order_items[0]) || {};
+                        return (
+                          <tr key={o.id} className="hover:bg-muted/20">
+                            <td className="px-4 py-3 font-bold text-primary">{o.reference}</td>
+                            <td className="px-4 py-3 font-sans font-bold">{item.recipient_phone || "Store Order"}</td>
+                            <td className="px-4 py-3 font-sans"><StatusPill status={o.status} /></td>
+                            <td className="px-4 py-3 text-right font-black font-display text-emerald-500">GH₵ {Number(o.total_ghs).toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
-      <AgentReceiptModal
-        order={selectedReceiptOrder}
-        isOpen={!!selectedReceiptOrder}
-        onClose={() => setSelectedReceiptOrder(null)}
-        agentRate={data.rate}
-      />
+          {/* PAGE VIEW 2: STOREFRONT & BRANDING */}
+          {activeTab === "storefront" && (
+            <div className="animate-in fade-in duration-200">
+              <AgentShareAndBrandingSuite />
+            </div>
+          )}
 
-      <WalletTopUpModal
-        isOpen={walletModalOpen}
-        onClose={() => setWalletModalOpen(false)}
-      />
+          {/* PAGE VIEW 3: RETAIL PRICING */}
+          {activeTab === "pricing" && (
+            <div className="animate-in fade-in duration-200">
+              <AgentCustomPriceConfigurator />
+            </div>
+          )}
+
+          {/* PAGE VIEW 4: CUSTOMERS (CRM) */}
+          {activeTab === "customers" && (
+            <div className="animate-in fade-in duration-200">
+              <CustomerDirectory />
+            </div>
+          )}
+
+          {/* PAGE VIEW 5: PAYOUTS & WITHDRAWALS */}
+          {activeTab === "withdrawals" && (
+            <div className="animate-in fade-in duration-200">
+              <WithdrawalSection
+                available={totals.available}
+                paid={totals.paid}
+                pendingReq={totals.pendingReq}
+                withdrawals={withdrawals}
+                onSubmitted={refresh}
+              />
+            </div>
+          )}
+
+          {/* PAGE VIEW 6: ORDER HISTORY */}
+          {activeTab === "orders" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <section className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl space-y-4 p-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-4">
+                  <div>
+                    <h2 className="text-lg font-extrabold font-display flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" /> Live Customer Orders & Resells
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">Real-time order dispatches, receipts & export</p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <button
+                      onClick={exportCSV}
+                      className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-500 hover:bg-emerald-500/20 transition-all"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Export CSV
+                    </button>
+
+                    {/* Network Filter */}
+                    <select
+                      value={networkFilter}
+                      onChange={(e) => setNetworkFilter(e.target.value)}
+                      className="rounded-2xl border border-border/80 bg-background/80 px-3 py-2 text-xs font-bold outline-none focus:border-primary"
+                    >
+                      <option value="all">All Networks</option>
+                      <option value="mtn">MTN</option>
+                      <option value="telecel">Telecel</option>
+                      <option value="airtel">AirtelTigo</option>
+                    </select>
+
+                    {/* Status Filter */}
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="rounded-2xl border border-border/80 bg-background/80 px-3 py-2 text-xs font-bold outline-none focus:border-primary"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="processing">Processing</option>
+                      <option value="pending">Pending</option>
+                      <option value="failed">Failed</option>
+                    </select>
+
+                    {/* Search Box */}
+                    <div className="relative w-full sm:w-64">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search reference or phone..."
+                        value={orderSearch}
+                        onChange={(e) => setOrderSearch(e.target.value)}
+                        className="w-full rounded-2xl border border-border/80 bg-background/80 pl-9 pr-4 py-2 text-xs font-semibold outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40">
+                      <tr>
+                        <th className="text-left px-5 py-3.5">Order Ref & Date</th>
+                        <th className="text-left px-5 py-3.5">Recipient & Package</th>
+                        <th className="text-left px-5 py-3.5">Items</th>
+                        <th className="text-left px-5 py-3.5">Live Status</th>
+                        <th className="text-right px-5 py-3.5">Total Amount</th>
+                        <th className="text-center px-5 py-3.5">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40 font-mono">
+                      {filteredRecentOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-xs font-bold text-muted-foreground">
+                            No agent orders match the selected filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredRecentOrders.map((o: any) => {
+                          const item = (o.order_items && o.order_items[0]) || {};
+                          return (
+                            <tr key={o.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-5 py-4 font-bold text-primary">
+                                <div>{o.reference}</div>
+                                <div className="text-[10px] text-muted-foreground font-sans mt-0.5">
+                                  {new Date(o.created_at).toLocaleDateString()} {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </td>
+                              <td className="px-5 py-4 font-sans">
+                                <div className="font-bold text-foreground font-mono">{item.recipient_phone || "Store Order"}</div>
+                                <div className="text-[11px] text-muted-foreground">{item.size_label || "Data Bundle"} · {item.network || "MTN"}</div>
+                              </td>
+                              <td className="px-5 py-4 font-bold font-sans">{o.order_items?.length ?? 1} package</td>
+                              <td className="px-5 py-4 font-sans">
+                                <StatusPill status={o.status} />
+                              </td>
+                              <td className="px-5 py-4 text-right font-black text-emerald-500 font-display">
+                                GH₵ {Number(o.total_ghs).toFixed(2)}
+                              </td>
+                              <td className="px-5 py-4 text-center font-sans">
+                                <button
+                                  onClick={() => setSelectedReceiptOrder(o)}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-primary/10 border border-primary/20 px-2.5 py-1 text-[10px] font-extrabold text-primary hover:bg-primary/20 transition-all"
+                                >
+                                  <Receipt className="h-3 w-3" /> Receipt
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          )}
+        </main>
+
+        <AgentReceiptModal
+          order={selectedReceiptOrder}
+          isOpen={!!selectedReceiptOrder}
+          onClose={() => setSelectedReceiptOrder(null)}
+          agentRate={data.rate}
+        />
+
+        <WalletTopUpModal
+          isOpen={walletModalOpen}
+          onClose={() => setWalletModalOpen(false)}
+        />
+      </div>
 
       <Footer />
     </div>
@@ -883,8 +989,6 @@ function EmptyRow({ text }: { text: string }) {
 }
 
 /* ============ Storefront Sharing & Custom Video Theme Suite ============ */
-import { Share2, Copy, Check, QrCode, Video, Sliders, MessageSquare } from "lucide-react";
-
 function AgentShareAndBrandingSuite() {
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
