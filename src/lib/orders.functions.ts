@@ -92,31 +92,11 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       throw new Error(`Failed to save order items: ${itemsErr.message}`);
     }
 
-    // 3. Initialize transaction on Paystack
-    try {
-      const paystackRes = await initializePaystackTransaction({
-        email: data.email,
-        amountGhs: formattedTotal,
-        reference: order.reference,
-        callbackUrl: `${data.callbackUrl}?reference=${encodeURIComponent(order.reference)}`,
-        metadata: {
-          order_id: order.id,
-          recipient_phone: data.recipientPhone,
-          items_count: data.items.length,
-        },
-      });
-
-      return {
-        orderId: order.id,
-        reference: order.reference,
-        totalGhs: order.total_ghs,
-        authorizationUrl: paystackRes.data.authorization_url,
-      };
-    } catch (err: any) {
-      // Mark order as failed if Paystack initialization fails
-      await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);
-      throw new Error(`Paystack initialization failed: ${err.message}`);
-    }
+    return {
+      orderId: order.id,
+      reference: order.reference,
+      totalGhs: order.total_ghs,
+    };
   });
 
 export const verifyOrderPayment = createServerFn({ method: "POST" })
@@ -146,7 +126,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
     try {
       const paystackVerify = await verifyPaystackTransaction(data.reference);
 
-      if (paystackVerify.data.status === "success") {
+      if (paystackVerify.data?.status === "success") {
         const paidAmountGhs = paystackVerify.data.amount / 100;
 
         // Verify paid amount matches stored order amount
@@ -154,14 +134,14 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
           throw new Error(`Payment verification amount mismatch. Expected: GH₵ ${order.total_ghs}, Paid: GH₵ ${paidAmountGhs}`);
         }
 
-        // Update order status to paid / processing
-        await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", order.id);
-        await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", order.id);
+        // Update order status to delivered
+        await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+        await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
 
-        return { status: "paid", verified: true, reference: order.reference };
+        return { status: "delivered", verified: true, reference: order.reference };
       }
 
-      return { status: paystackVerify.data.status, verified: false, reference: order.reference };
+      return { status: paystackVerify.data?.status || "pending", verified: false, reference: order.reference };
     } catch {
       return { status: order.status, verified: false, reference: order.reference };
     }
@@ -213,13 +193,33 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
       };
     } catch (err: any) {
       console.warn("Paystack MoMo Charge info:", err.message);
-      const requiresOtp = Boolean(err.message?.toLowerCase().includes("otp"));
-      return {
-        status: "pending",
-        requiresOtp,
-        displayText: "Please check your phone screen to enter your Mobile Money PIN.",
-        reference: order.reference,
-      };
+      // Fallback: Initialize Paystack transaction with unique fallback reference if charge fails
+      try {
+        const fallbackRef = `${order.reference}-F${Date.now().toString().slice(-4)}`;
+        const initRes = await initializePaystackTransaction({
+          email: `customer-${data.phone}@bestdatagh.com`,
+          amountGhs: order.total_ghs,
+          reference: fallbackRef,
+        });
+
+        return {
+          status: "open_url",
+          requiresOtp: false,
+          authorizationUrl: initRes.data?.authorization_url || null,
+          accessCode: initRes.data?.access_code || null,
+          displayText: "Mobile Money prompt initialized. Please complete payment.",
+          reference: order.reference,
+        };
+      } catch (fallbackErr: any) {
+        return {
+          status: "pending",
+          requiresOtp: false,
+          authorizationUrl: null,
+          accessCode: null,
+          displayText: "Please check your phone screen to enter your Mobile Money PIN.",
+          reference: order.reference,
+        };
+      }
     }
   });
 

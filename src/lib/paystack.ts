@@ -121,9 +121,6 @@ export interface ChargeMobileMoneyParams {
   provider: "mtn" | "vod" | "tgo";
 }
 
-/**
- * Direct Paystack MoMo Push Prompt Charge (No External Redirects)
- */
 export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams) {
   const amountPesewas = Math.round(params.amountGhs * 100);
   let cleanPhone = params.phone.replace(/\s+/g, "");
@@ -132,7 +129,7 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
   if (!cleanPhone.startsWith("0")) cleanPhone = "0" + cleanPhone;
 
   try {
-    return await paystackFetch<any>("/charge", {
+    const chargeRes = await paystackFetch<any>("/charge", {
       method: "POST",
       body: JSON.stringify({
         email: params.email,
@@ -145,13 +142,17 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
         },
       }),
     });
+    return chargeRes;
   } catch (err: any) {
-    console.warn("[Paystack Direct Charge Notice] Direct charge failed, initializing transaction fallback:", err.message);
-    // Fallback: Initialize standard Paystack transaction to obtain authorization URL
+    console.warn("[Paystack Direct Charge Notice] Direct charge notice, initializing transaction fallback:", err.message);
+    const isDuplicate = err.message?.toLowerCase().includes("duplicate") || err.message?.toLowerCase().includes("exist");
+    const fallbackRef = isDuplicate ? `${params.reference}-F${Date.now().toString().slice(-4)}` : params.reference;
+
+    // Fallback: Initialize standard Paystack transaction to obtain authorization URL & access code
     const initRes = await initializePaystackTransaction({
       email: params.email,
       amountGhs: params.amountGhs,
-      reference: params.reference,
+      reference: fallbackRef,
     });
 
     return {
@@ -159,8 +160,9 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
       message: "Authorization URL generated",
       data: {
         status: "open_url",
-        authorization_url: initRes.data.authorization_url,
-        display_text: "Please click to complete Mobile Money payment on Paystack.",
+        authorization_url: initRes.data?.authorization_url,
+        access_code: initRes.data?.access_code,
+        display_text: "Please complete Mobile Money payment via Paystack checkout.",
       },
     };
   }

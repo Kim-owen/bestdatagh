@@ -277,7 +277,7 @@ function UnifiedPaymentPage() {
           <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
 
             {/* 1. DELIVERED STATE 🎉 */}
-            {currentStatus === "delivered" ? (
+            {currentStatus === "delivered" || currentStatus === "paid" ? (
               <div className="space-y-8 text-center animate-in zoom-in-95">
                 <div className="relative mx-auto h-24 w-24 grid place-items-center">
                   <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-pulse" />
