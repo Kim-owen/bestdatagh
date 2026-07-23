@@ -28,6 +28,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAgentRouteImport } from './routes/_authenticated/agent'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as CheckoutVerifyRouteImport } from './routes/checkout.verify'
+import { Route as PaymentMomoReferenceRouteImport } from './routes/payment-momo.$reference'
 import { Route as PaymentReferenceRouteImport } from './routes/payment.$reference'
 import { Route as AuthenticatedAccountApiKeysRouteImport } from './routes/_authenticated/account.api-keys'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -152,6 +153,11 @@ const CheckoutVerifyRoute = CheckoutVerifyRouteImport.update({
   id: '/verify',
   path: '/verify',
   getParentRoute: () => CheckoutRoute,
+} as any)
+const PaymentMomoReferenceRoute = PaymentMomoReferenceRouteImport.update({
+  id: '/payment-momo/$reference',
+  path: '/payment-momo/$reference',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentReferenceRoute = PaymentReferenceRouteImport.update({
   id: '/payment/$reference',
@@ -340,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/checkout/verify': typeof CheckoutVerifyRoute
+  '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
@@ -389,6 +396,7 @@ export interface FileRoutesByTo {
   '/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/checkout/verify': typeof CheckoutVerifyRoute
+  '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
@@ -441,6 +449,7 @@ export interface FileRoutesById {
   '/_authenticated/agent': typeof AuthenticatedAgentRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/checkout/verify': typeof CheckoutVerifyRoute
+  '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
   '/_authenticated/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
@@ -493,6 +502,7 @@ export interface FileRouteTypes {
     | '/agent'
     | '/blog/$slug'
     | '/checkout/verify'
+    | '/payment-momo/$reference'
     | '/payment/$reference'
     | '/account/api-keys'
     | '/admin/agents'
@@ -542,6 +552,7 @@ export interface FileRouteTypes {
     | '/agent'
     | '/blog/$slug'
     | '/checkout/verify'
+    | '/payment-momo/$reference'
     | '/payment/$reference'
     | '/account/api-keys'
     | '/admin/agents'
@@ -593,6 +604,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agent'
     | '/blog/$slug'
     | '/checkout/verify'
+    | '/payment-momo/$reference'
     | '/payment/$reference'
     | '/_authenticated/account/api-keys'
     | '/_authenticated/admin/agents'
@@ -640,6 +652,7 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
+  PaymentMomoReferenceRoute: typeof PaymentMomoReferenceRoute
   PaymentReferenceRoute: typeof PaymentReferenceRoute
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
   ApiV1BalanceRoute: typeof ApiV1BalanceRoute
@@ -787,6 +800,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/checkout/verify'
       preLoaderRoute: typeof CheckoutVerifyRouteImport
       parentRoute: typeof CheckoutRoute
+    }
+    '/payment-momo/$reference': {
+      id: '/payment-momo/$reference'
+      path: '/payment-momo/$reference'
+      fullPath: '/payment-momo/$reference'
+      preLoaderRoute: typeof PaymentMomoReferenceRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/payment/$reference': {
       id: '/payment/$reference'
@@ -1109,6 +1129,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,
   VerifyOtpRoute: VerifyOtpRoute,
+  PaymentMomoReferenceRoute: PaymentMomoReferenceRoute,
   PaymentReferenceRoute: PaymentReferenceRoute,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
   ApiV1BalanceRoute: ApiV1BalanceRoute,

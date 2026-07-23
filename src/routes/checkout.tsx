@@ -104,10 +104,10 @@ function Checkout() {
         },
       });
 
-      // 2. Clear cart & Navigate to dedicated in-app payment & delivery tracking page
+      // 2. Clear cart & Navigate to dedicated MoMo Payment Number Page
       clear();
       navigate({
-        to: "/payment/$reference",
+        to: "/payment-momo/$reference",
         params: { reference: orderRes.reference },
       });
     } catch (err: any) {

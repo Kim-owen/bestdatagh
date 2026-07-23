@@ -57,6 +57,8 @@ function VerifyOtpPage() {
     }
   };
 
+  const triggerChargeFn = useServerFn(initiateMoMoPromptCharge);
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode || otpCode.length !== 6) {
@@ -68,9 +70,21 @@ function VerifyOtpPage() {
 
     try {
       await verifyOtpFn({ data: { phone, otpCode } });
-      
-      // Successfully verified! Redirect to dedicated payment page
+
+      // Trigger MoMo prompt charge for newly verified number
       if (ref) {
+        try {
+          await triggerChargeFn({
+            data: {
+              orderId: ref,
+              phone,
+              network: "MTN",
+            },
+          });
+        } catch {
+          // Continue to payment page
+        }
+
         navigate({
           to: "/payment/$reference",
           params: { reference: ref },
