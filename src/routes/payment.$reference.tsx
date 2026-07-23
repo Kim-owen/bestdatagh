@@ -185,14 +185,6 @@ function UnifiedPaymentPage() {
     }
   };
 
-  // Automatically push prompt when purchase is initiated / page loads!
-  useEffect(() => {
-    if (order && currentStatus === "pending" && recipientPhone && !autoTriggered) {
-      setAutoTriggered(true);
-      executeMoMoCharge(recipientPhone, networkName);
-    }
-  }, [order, currentStatus, recipientPhone, networkName, autoTriggered]);
-
   // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
   const handleMoMoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
