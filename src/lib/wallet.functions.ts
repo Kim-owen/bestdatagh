@@ -33,8 +33,19 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
     return { amountGhs: amt, callbackUrl: d.callbackUrl };
   })
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const reference = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const userEmail = (context.claims?.email as string) || `user-${context.userId}@bestdatagh.com`;
+
+    // Save pending deposit transaction in database
+    await supabaseAdmin.from("wallet_transactions").insert({
+      user_id: context.userId,
+      amount_ghs: data.amountGhs,
+      type: "deposit",
+      reference,
+      status: "pending",
+      description: `Wallet Deposit (GH₵ ${data.amountGhs.toFixed(2)})`,
+    });
 
     const paystackRes = await initializePaystackTransaction({
       email: userEmail,
@@ -49,8 +60,9 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
 
     return {
       reference,
-      authorizationUrl: paystackRes.data.authorization_url,
-      accessCode: paystackRes.data.access_code,
+      amountGhs: data.amountGhs,
+      authorizationUrl: paystackRes.data?.authorization_url || null,
+      accessCode: paystackRes.data?.access_code || null,
     };
   });
 

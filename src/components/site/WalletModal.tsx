@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { initializeWalletDeposit, verifyWalletDeposit } from "@/lib/wallet.functions";
-import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
-import { Wallet, X, Plus, Zap, CheckCircle2, ShieldCheck, Loader2 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { initializeWalletDeposit } from "@/lib/wallet.functions";
+import { Wallet, X, Plus, Zap, CheckCircle2, ShieldCheck, Loader2, ArrowRight } from "lucide-react";
 
 export function WalletTopUpModal({
   isOpen,
@@ -15,33 +15,28 @@ export function WalletTopUpModal({
   userEmail?: string;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const initDeposit = useServerFn(initializeWalletDeposit);
-  const verifyDeposit = useServerFn(verifyWalletDeposit);
   const [selectedAmount, setSelectedAmount] = useState<number>(50);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [successMsg, setSuccessMsg] = useState(false);
 
   const amountToUse = customAmount ? Number(customAmount) : selectedAmount;
 
   const mut = useMutation({
-    mutationFn: () => {
-      const currentUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : undefined;
-      return initDeposit({ data: { amountGhs: amountToUse, callbackUrl: currentUrl } });
-    },
+    mutationFn: () => initDeposit({ data: { amountGhs: amountToUse } }),
     onSuccess: async (res) => {
-      setIsProcessing(true);
-
-      // Directly redirect to Paystack Hosted Payment Gateway
-      if (res.authorizationUrl) {
-        window.location.href = res.authorizationUrl;
-      } else {
-        setIsProcessing(false);
-      }
+      setIsProcessing(false);
+      onClose();
+      // Navigate to our dedicated In-App Payment Hub for MoMo Push Prompt & OTP
+      navigate({
+        to: "/payment/$reference",
+        params: { reference: res.reference },
+      });
     },
     onError: (err: any) => {
       setIsProcessing(false);
-      alert(err?.message || "Failed to initialize Paystack deposit.");
+      alert(err?.message || "Failed to initialize deposit.");
     },
   });
 

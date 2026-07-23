@@ -85,13 +85,14 @@ function UnifiedPaymentPage() {
     },
   });
 
+  const isDeposit = reference.startsWith("DEP-") || Boolean(pollData?.isDeposit);
   const order = pollData?.order;
   const currentStatus = pollData?.status || order?.status || "pending";
   const firstItem = order?.order_items?.[0];
-  const recipientPhone = firstItem?.recipient_phone || "";
+  const recipientPhone = firstItem?.recipient_phone || (user?.email ? "" : "");
   const networkName = firstItem?.network || "MTN";
-  const sizeLabel = firstItem?.size_label || "Data Bundle";
-  const totalGhs = order?.total_ghs || 0;
+  const sizeLabel = firstItem?.size_label || (isDeposit ? "Wallet Deposit" : "Data Bundle");
+  const totalGhs = pollData?.depositAmount || order?.total_ghs || 0;
 
   // Pre-fill payment phone with recipient phone if empty
   useEffect(() => {
@@ -108,10 +109,11 @@ function UnifiedPaymentPage() {
 
   // Clear cart when order is delivered
   useEffect(() => {
-    if (currentStatus === "delivered") {
+    if (currentStatus === "delivered" || currentStatus === "completed") {
       clear();
+      queryClient.invalidateQueries({ queryKey: ["myWallet"] });
     }
-  }, [currentStatus, clear]);
+  }, [currentStatus, clear, queryClient]);
 
   const activePayerPhone = sameAsRecipient ? recipientPhone : paymentPhone;
   const validPayerPhone = /^\d{9,10}$/.test(activePayerPhone.replace(/\s+/g, ""));
@@ -151,7 +153,7 @@ function UnifiedPaymentPage() {
 
   // Core MoMo Charge Execution
   const executeMoMoCharge = async (phoneToCharge: string, netToCharge: string) => {
-    if (!order) return;
+    if (!order && !isDeposit) return;
 
     setLoading(true);
     setErrorMsg("");
@@ -159,7 +161,7 @@ function UnifiedPaymentPage() {
     try {
       const res = await triggerChargeFn({
         data: {
-          orderId: order.id,
+          orderId: order?.id || reference,
           phone: phoneToCharge,
           network: netToCharge,
         },
@@ -203,7 +205,7 @@ function UnifiedPaymentPage() {
   // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
   const handleMoMoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validPayerPhone || !order) return;
+    if (!validPayerPhone || (!order && !isDeposit)) return;
     await executeMoMoCharge(activePayerPhone, selectedNetwork);
   };
 
@@ -297,8 +299,58 @@ function UnifiedPaymentPage() {
           </div>
 
           {/* MAIN PAYMENT HUB CARD */}
-          <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">            {/* 1. VERIFIED / PROCESSING / DELIVERED STATE (Seamless Provider API Integration) */}
-            {currentStatus === "delivered" || currentStatus === "paid" || currentStatus === "processing" ? (
+          <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
+            {/* 1. DEPOSIT SUCCESS CARD 🎉 */}
+            {isDeposit && (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid") ? (
+              <div className="space-y-6 text-center animate-in fade-in py-2">
+                <div className="relative mx-auto h-20 w-20 grid place-items-center rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.35)]">
+                  <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1 text-[11px] font-black text-emerald-400 uppercase tracking-widest">
+                    <Sparkles className="h-3.5 w-3.5" /> Deposit Successful & Credited
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white font-display">Wallet Deposited Successfully!</h2>
+                  <p className="text-xs text-slate-300">
+                    <span className="text-emerald-400 font-bold font-mono">GH₵ {totalGhs.toFixed(2)}</span> has been credited to your Bestdata Wallet.
+                  </p>
+                </div>
+
+                {/* Receipt Card */}
+                <div className="rounded-3xl border border-white/10 bg-slate-900/90 p-6 space-y-4 text-xs font-mono shadow-xl max-w-md mx-auto text-left">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Deposit Reference</span>
+                    <span className="font-bold text-white">{reference}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Amount Deposited</span>
+                    <span className="font-bold text-emerald-400 font-mono">GH₵ {totalGhs.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-white/10 pt-3 text-slate-300">
+                    <span className="text-slate-400">Updated Wallet Balance</span>
+                    <span className="font-bold text-amber-400 font-mono text-sm">GH₵ {walletBalance.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto pt-2">
+                  <Link
+                    to="/agent"
+                    className="flex items-center justify-center gap-2 rounded-2xl gold-gradient py-4 text-xs font-black text-primary-foreground shadow-xl hover:scale-[1.02] active:scale-[.98] transition-all"
+                  >
+                    <span>Go to Agent Portal</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    to="/buy-data"
+                    className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 py-4 text-xs font-bold text-white hover:bg-white/10 transition-all"
+                  >
+                    <span>Buy Data Bundles</span>
+                  </Link>
+                </div>
+              </div>
+            ) : currentStatus === "delivered" || currentStatus === "paid" || currentStatus === "processing" ? (
               <div className="space-y-8 animate-in fade-in">
                 {/* Top Success Icon */}
                 <div className="text-center space-y-3">
@@ -536,32 +588,39 @@ function UnifiedPaymentPage() {
               <div className="space-y-6 animate-in fade-in">
                 <div className="text-center space-y-2">
                   <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/10 border border-amber-400/30 px-3.5 py-1 text-[11px] font-black text-amber-400 uppercase tracking-widest">
-                    <CreditCard className="h-3.5 w-3.5" /> Select MoMo Payment Account
+                    {isDeposit ? <Wallet className="h-3.5 w-3.5" /> : <CreditCard className="h-3.5 w-3.5" />}
+                    {isDeposit ? "Wallet Deposit Payment" : "Select MoMo Payment Account"}
                   </div>
-                  <h2 className="text-2xl font-black text-white font-display">How would you like to pay?</h2>
+                  <h2 className="text-2xl font-black text-white font-display">
+                    {isDeposit ? "Complete Your Wallet Deposit" : "How would you like to pay?"}
+                  </h2>
                   <p className="text-xs text-slate-300">
-                    Data will be sent to <span className="text-amber-400 font-bold">{recipientPhone}</span>. Enter the MoMo account for payment below.
+                    {isDeposit
+                      ? "Enter your Mobile Money number to receive the USSD PIN prompt directly on your phone."
+                      : <>Data will be sent to <span className="text-amber-400 font-bold">{recipientPhone}</span>. Enter the MoMo account for payment below.</>}
                   </p>
                 </div>
 
-                {/* Order Details Mini Card */}
+                {/* Details Mini Card */}
                 <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 space-y-2 text-xs">
                   <div className="flex justify-between text-slate-300">
-                    <span>Bundle Package:</span>
-                    <span className="font-bold text-white">{networkName} · {sizeLabel}</span>
+                    <span>{isDeposit ? "Transaction Type:" : "Bundle Package:"}</span>
+                    <span className="font-bold text-white">{isDeposit ? "Bestdata Wallet Top Up" : `${networkName} · ${sizeLabel}`}</span>
                   </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Data Recipient Line:</span>
-                    <span className="font-bold text-white">{recipientPhone}</span>
-                  </div>
+                  {recipientPhone && !isDeposit && (
+                    <div className="flex justify-between text-slate-300">
+                      <span>Data Recipient Line:</span>
+                      <span className="font-bold text-white">{recipientPhone}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-white/10 pt-2 text-sm">
-                    <span className="font-bold text-slate-200">Total Payable:</span>
+                    <span className="font-bold text-slate-200">{isDeposit ? "Deposit Amount:" : "Total Payable:"}</span>
                     <span className="font-mono font-black text-emerald-400">GH₵ {totalGhs.toFixed(2)}</span>
                   </div>
                 </div>
 
-                {/* Option A: Bestdata Wallet Payment (For Logged-In Users & Agents) */}
-                {user && (
+                {/* Option A: Bestdata Wallet Payment (Only for Order Purchases) */}
+                {user && !isDeposit && (
                   <div className="rounded-2xl border border-primary/40 bg-primary/10 p-5 space-y-3 shadow-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs font-black text-primary uppercase tracking-wider">

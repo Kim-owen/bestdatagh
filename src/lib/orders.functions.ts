@@ -162,19 +162,44 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
     return { orderId: data.orderId, phone: cleanPhone, provider };
   })
   .handler(async ({ data }) => {
-    const { data: order } = await supabaseAdmin
-      .from("orders")
-      .select("id, reference, total_ghs")
-      .eq("id", data.orderId)
-      .single();
+    let reference = data.orderId;
+    let totalGhs = 0;
 
-    if (!order) throw new Error("Order not found.");
+    // A. Check if deposit transaction
+    if (data.orderId.startsWith("DEP-")) {
+      const { data: tx } = await supabaseAdmin
+        .from("wallet_transactions")
+        .select("reference, amount_ghs")
+        .eq("reference", data.orderId)
+        .maybeSingle();
+
+      if (tx) {
+        reference = tx.reference;
+        totalGhs = Number(tx.amount_ghs);
+      }
+    }
+
+    // B. Check standard orders if totalGhs is not found
+    if (!totalGhs) {
+      const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("id, reference, total_ghs")
+        .or(`id.eq.${data.orderId},reference.eq.${data.orderId}`)
+        .maybeSingle();
+
+      if (order) {
+        reference = order.reference;
+        totalGhs = Number(order.total_ghs);
+      }
+    }
+
+    if (!totalGhs) throw new Error("Order or Deposit transaction not found.");
 
     try {
       const chargeRes = await chargePaystackMobileMoney({
         email: `customer-${data.phone}@bestdatagh.com`,
-        amountGhs: order.total_ghs,
-        reference: order.reference,
+        amountGhs: totalGhs,
+        reference,
         phone: data.phone,
         provider: data.provider,
       });
@@ -190,16 +215,16 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         authorizationUrl,
         accessCode,
         displayText: chargeRes.data?.display_text || "Please check your phone screen for the MoMo PIN prompt.",
-        reference: order.reference,
+        reference,
       };
     } catch (err: any) {
       console.warn("Paystack MoMo Charge info:", err.message);
       // Fallback: Initialize Paystack transaction with unique fallback reference if charge fails
       try {
-        const fallbackRef = `${order.reference}-F${Date.now().toString().slice(-4)}`;
+        const fallbackRef = `${reference}-F${Date.now().toString().slice(-4)}`;
         const initRes = await initializePaystackTransaction({
           email: `customer-${data.phone}@bestdatagh.com`,
-          amountGhs: order.total_ghs,
+          amountGhs: totalGhs,
           reference: fallbackRef,
         });
 
@@ -209,7 +234,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
           authorizationUrl: initRes.data?.authorization_url || null,
           accessCode: initRes.data?.access_code || null,
           displayText: "Mobile Money prompt initialized. Please complete payment.",
-          reference: order.reference,
+          reference,
         };
       } catch (fallbackErr: any) {
         return {
@@ -218,7 +243,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
           authorizationUrl: null,
           accessCode: null,
           displayText: "Please check your phone screen to enter your Mobile Money PIN.",
-          reference: order.reference,
+          reference,
         };
       }
     }
