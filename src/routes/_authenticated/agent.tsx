@@ -5,12 +5,14 @@ import { getMyProfile } from "@/lib/profile.functions";
 import {
   ArrowLeft, TrendingUp, Wallet, Clock, Package, Store, ExternalLink, Users,
   BanknoteIcon, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight,
-  ShieldCheck, Sparkles, ArrowUpRight, DollarSign, BarChart3, RefreshCw
+  ShieldCheck, Sparkles, ArrowUpRight, DollarSign, BarChart3, RefreshCw,
+  Search, Filter, Zap, Server
 } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WithdrawalAuditLog } from "@/components/site/WithdrawalAuditLog";
 import { WalletTopUpModal } from "@/components/site/WalletModal";
+import { StatCardSkeleton, TableRowSkeleton } from "@/components/ui/skeleton";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/agent")({
@@ -37,6 +39,9 @@ function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [orderSearch, setOrderSearch] = useState("");
+  const [networkFilter, setNetworkFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   async function refresh() {
     const [d, w] = await Promise.all([getAgentDashboard(), listMyWithdrawals()]);
@@ -57,21 +62,41 @@ function AgentDashboard() {
     })();
   }, [nav]);
 
-  const totals = useMemo(() => {
-    const paid = withdrawals.filter(w => w.status === "paid").reduce((s, w) => s + Number(w.amount_ghs), 0);
-    const pendingReq = withdrawals.filter(w => w.status === "pending" || w.status === "approved").reduce((s, w) => s + Number(w.amount_ghs), 0);
-    const earned = data?.stats.commissionEarned ?? 0;
-    const available = Math.max(0, earned - paid - pendingReq);
-    return { paid, pendingReq, available };
-  }, [withdrawals, data]);
+  const filteredRecentOrders = useMemo(() => {
+    if (!data?.recentOrders) return [];
+    return data.recentOrders.filter((o: any) => {
+      const item = (o.order_items && o.order_items[0]) || {};
+      const matchesSearch =
+        !orderSearch ||
+        o.reference.toLowerCase().includes(orderSearch.toLowerCase()) ||
+        (item.recipient_phone || "").includes(orderSearch);
+
+      const net = (item.network || "").toLowerCase();
+      const matchesNetwork =
+        networkFilter === "all" ||
+        (networkFilter === "mtn" && (net.includes("mtn") || net.includes("yello"))) ||
+        (networkFilter === "telecel" && (net.includes("telecel") || net.includes("voda"))) ||
+        (networkFilter === "airtel" && (net.includes("at") || net.includes("airtel") || net.includes("ishare") || net.includes("bigtime")));
+
+      const matchesStatus = statusFilter === "all" || o.status === statusFilter;
+
+      return matchesSearch && matchesNetwork && matchesStatus;
+    });
+  }, [data?.recentOrders, orderSearch, networkFilter, statusFilter]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col justify-center items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary animate-spin">
-          <Loader2 className="h-6 w-6" />
-        </div>
-        <span className="text-xs font-bold text-muted-foreground">Loading Agent Workspace…</span>
+      <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+        <Header />
+        <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }
@@ -98,7 +123,7 @@ function AgentDashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      {/* Background Ambient Spheres / Dynamic Media Theme */}
+      {/* Background Ambient Spheres */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute top-0 right-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[130px]" />
         <div className="absolute bottom-1/3 left-10 h-80 w-80 rounded-full bg-emerald-500/10 blur-[120px]" />
@@ -107,24 +132,31 @@ function AgentDashboard() {
       <Header />
 
       <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 md:py-14 space-y-10 relative z-10">
-        {/* Top Agent Banner */}
+        {/* Admin-style Top Agent Banner */}
         <div className="rounded-3xl border border-border/80 bg-card/80 p-6 md:p-8 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-black text-emerald-500">
-                <ShieldCheck className="h-3.5 w-3.5" /> Verified Agent
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                GATEWAY OPERATIONAL
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-3 py-1 text-[11px] font-black text-primary">
-                ⚡ {data.rate}% Wholesale Commission
+                ⚡ {data.rate}% Wholesale Margin
               </span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-black font-display tracking-tight">Agent Dashboard & Analytics</h1>
+            <h1 className="text-3xl md:text-4xl font-black font-display tracking-tight">Agent Workspace & Operations</h1>
             <p className="text-xs font-semibold text-muted-foreground">
-              Track real-time bundle sales, earnings, withdrawal requests, and storefront operations.
+              Monitor customer purchases, wholesale margins, instant payouts, and store branding.
             </p>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => refresh()}
+              className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-primary" /> Refresh Data
+            </button>
             <button
               onClick={() => setWalletModalOpen(true)}
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-2.5 text-xs font-black text-black shadow-md hover:scale-105 active:scale-95 transition-all"
@@ -135,13 +167,13 @@ function AgentDashboard() {
               to="/agents"
               className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-background px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
             >
-              <Store className="h-4 w-4 text-primary" /> Public Storefront
+              <Store className="h-4 w-4 text-primary" /> Storefront
             </Link>
             <Link
               to="/bulk"
-              className="inline-flex items-center gap-2 rounded-2xl gold-gradient px-5 py-2.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-105 active:scale-95 transition-all"
+              className="inline-flex items-center gap-2 rounded-2xl gold-gradient px-5 py-2.5 text-xs font-extrabold text-primary-foreground shadow-md hover:scale-105 active:scale-95 transition-all"
             >
-              <Users className="h-4 w-4" /> Bulk Resell Tool
+              <Users className="h-4 w-4" /> Bulk Resell
             </Link>
           </div>
         </div>
@@ -155,7 +187,7 @@ function AgentDashboard() {
             icon={Wallet}
             label="Total Commission Earned"
             value={`GH₵ ${s.commissionEarned.toFixed(2)}`}
-            sub={`Available: GH₵ ${totals.available.toFixed(2)}`}
+            sub={`Available Payout: GH₵ ${totals.available.toFixed(2)}`}
             tone="gold"
           />
           <StatCard
@@ -169,7 +201,7 @@ function AgentDashboard() {
             icon={TrendingUp}
             label="Delivered Sales Revenue"
             value={`GH₵ ${s.revenue.toFixed(2)}`}
-            sub="Gross volume"
+            sub="Gross storefront volume"
             tone="emerald"
           />
           <StatCard
@@ -233,88 +265,103 @@ function AgentDashboard() {
           onSubmitted={refresh}
         />
 
-        {/* Monthly Table */}
-        <section className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-muted/20">
+        {/* Recent Orders with Admin-style Search & Filters */}
+        <section className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl space-y-4 p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-4">
             <div>
-              <h2 className="text-base font-extrabold font-display">Monthly Performance Breakdown</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Historical commission and revenue records</p>
+              <h2 className="text-lg font-extrabold font-display flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" /> Live Customer Orders & Resells
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Real-time order dispatches & recipient lines</p>
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-              Last 6 Months
-            </span>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Network Filter */}
+              <select
+                value={networkFilter}
+                onChange={(e) => setNetworkFilter(e.target.value)}
+                className="rounded-2xl border border-border/80 bg-background/80 px-3 py-2 text-xs font-bold outline-none focus:border-primary"
+              >
+                <option value="all">All Networks</option>
+                <option value="mtn">MTN</option>
+                <option value="telecel">Telecel</option>
+                <option value="airtel">AirtelTigo</option>
+              </select>
+
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-2xl border border-border/80 bg-background/80 px-3 py-2 text-xs font-bold outline-none focus:border-primary"
+              >
+                <option value="all">All Statuses</option>
+                <option value="delivered">Delivered</option>
+                <option value="processing">Processing</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+
+              {/* Search Box */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search reference or phone..."
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  className="w-full rounded-2xl border border-border/80 bg-background/80 pl-9 pr-4 py-2 text-xs font-semibold outline-none focus:border-primary"
+                />
+              </div>
+            </div>
           </div>
 
-          {data.monthly.length === 0 ? (
-            <EmptyRow text="No delivered orders recorded yet — share your agent link or buy in bulk." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40">
+                <tr>
+                  <th className="text-left px-5 py-3.5">Order Ref & Date</th>
+                  <th className="text-left px-5 py-3.5">Recipient & Package</th>
+                  <th className="text-left px-5 py-3.5">Items</th>
+                  <th className="text-left px-5 py-3.5">Live Status</th>
+                  <th className="text-right px-5 py-3.5">Total Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40 font-mono">
+                {filteredRecentOrders.length === 0 ? (
                   <tr>
-                    <th className="text-left px-6 py-3.5">Month</th>
-                    <th className="text-right px-6 py-3.5">Delivered Orders</th>
-                    <th className="text-right px-6 py-3.5">Total Revenue</th>
-                    <th className="text-right px-6 py-3.5">Commission Earned</th>
+                    <td colSpan={5} className="py-8 text-center text-xs font-bold text-muted-foreground">
+                      No agent orders match the selected filters.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {data.monthly.map((m) => (
-                    <tr key={m.month} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 font-bold">{formatMonth(m.month)}</td>
-                      <td className="px-6 py-4 text-right font-extrabold">{m.orders}</td>
-                      <td className="px-6 py-4 text-right font-extrabold">GH₵ {m.revenue.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-right font-black text-emerald-500 font-display">GH₵ {m.commission.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* Recent Orders */}
-        <section className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-muted/20">
-            <div>
-              <h2 className="text-base font-extrabold font-display">Recent Agent Orders</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Live order dispatches & customer references</p>
-            </div>
-            <Link to="/track-order" className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline">
-              Track Order Status <ExternalLink className="h-3.5 w-3.5" />
-            </Link>
+                ) : (
+                  filteredRecentOrders.map((o: any) => {
+                    const item = (o.order_items && o.order_items[0]) || {};
+                    return (
+                      <tr key={o.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-5 py-4 font-bold text-primary">
+                          <div>{o.reference}</div>
+                          <div className="text-[10px] text-muted-foreground font-sans mt-0.5">
+                            {new Date(o.created_at).toLocaleDateString()} {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 font-sans">
+                          <div className="font-bold text-foreground font-mono">{item.recipient_phone || "Store Order"}</div>
+                          <div className="text-[11px] text-muted-foreground">{item.size_label || "Data Bundle"} · {item.network || "MTN"}</div>
+                        </td>
+                        <td className="px-5 py-4 font-bold font-sans">{o.order_items?.length ?? 1} package</td>
+                        <td className="px-5 py-4 font-sans">
+                          <StatusPill status={o.status} />
+                        </td>
+                        <td className="px-5 py-4 text-right font-black text-emerald-500 font-display">
+                          GH₵ {Number(o.total_ghs).toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-
-          {data.recentOrders.length === 0 ? (
-            <EmptyRow text="No orders recorded yet." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/40 text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40">
-                  <tr>
-                    <th className="text-left px-6 py-3.5">Order Ref</th>
-                    <th className="text-left px-6 py-3.5">Date & Time</th>
-                    <th className="text-left px-6 py-3.5">Items Count</th>
-                    <th className="text-left px-6 py-3.5">Dispatch Status</th>
-                    <th className="text-right px-6 py-3.5">Total Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {data.recentOrders.map((o: any) => (
-                    <tr key={o.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 font-mono font-bold text-primary">{o.reference}</td>
-                      <td className="px-6 py-4 text-muted-foreground font-semibold">
-                        {new Date(o.created_at).toLocaleDateString()} {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="px-6 py-4 font-bold">{o.order_items?.length ?? 0} pkg</td>
-                      <td className="px-6 py-4"><StatusPill status={o.status} /></td>
-                      <td className="px-6 py-4 text-right font-black font-display">GH₵ {Number(o.total_ghs).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </section>
       </main>
 
