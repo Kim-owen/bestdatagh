@@ -69,9 +69,51 @@ export const adminListOrders = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.from("orders").select("*, order_items(*)").order("created_at", { ascending: false }).limit(200);
+    const { getSwiftDataOrder } = await import("@/lib/swiftdata");
+
+    const { data, error } = await supabaseAdmin
+      .from("orders")
+      .select("*, order_items(*)")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
     if (error) throw new Error(error.message);
-    return data ?? [];
+
+    const orders = data ?? [];
+
+    // Automatically check and sync live gateway status for in-flight orders
+    const activeOrders = orders.filter(
+      (o) => o.status === "processing" || o.status === "paid" || o.status === "pending"
+    );
+
+    if (activeOrders.length > 0) {
+      await Promise.all(
+        activeOrders.slice(0, 15).map(async (ord) => {
+          try {
+            const apiRes = await getSwiftDataOrder(ord.reference);
+            if (apiRes && apiRes.order) {
+              const swiftStatus = (apiRes.order.status || "").toLowerCase();
+              let newStatus = ord.status;
+
+              if (swiftStatus === "completed" || swiftStatus === "delivered") {
+                newStatus = "delivered";
+              } else if (swiftStatus === "failed") {
+                newStatus = "failed";
+              }
+
+              if (newStatus !== ord.status) {
+                ord.status = newStatus;
+                await supabaseAdmin.from("orders").update({ status: newStatus }).eq("id", ord.id);
+              }
+            }
+          } catch (err) {
+            // Ignore individual gateway network timeouts
+          }
+        })
+      );
+    }
+
+    return orders;
   });
 
 export const adminUpdateOrderStatus = createServerFn({ method: "POST" })

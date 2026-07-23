@@ -43,9 +43,10 @@ function OrdersPage() {
   const [actionNotice, setActionNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["adminOrders"],
     queryFn: () => list(),
+    refetchInterval: 4000, // Automatically poll live gateway status every 4 seconds!
   });
 
   const updateMutation = useMutation({
@@ -141,12 +142,18 @@ function OrdersPage() {
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-amber-400 font-bold uppercase tracking-widest mb-1">
-            <Zap className="h-4 w-4" /> Live Provider Fulfillment & Retry Center
+          <div className="flex flex-wrap items-center gap-3 mb-1">
+            <span className="flex items-center gap-1.5 text-xs text-amber-400 font-bold uppercase tracking-widest">
+              <Zap className="h-4 w-4" /> Live Provider Fulfillment & Retry Center
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-mono font-bold">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Auto-Sync Active (Every 4s)
+            </span>
           </div>
           <h1 className="text-3xl font-black text-white font-display">Customer Orders</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Monitor live order statuses, re-fulfill failed purchases via SwiftData API, and verify gateway syncs.
+            Real-time gateway status verification automatically updates order statuses in the background.
           </p>
         </div>
 
@@ -154,8 +161,8 @@ function OrdersPage() {
           onClick={() => refetch()}
           className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-xs font-bold text-white hover:bg-white/10 transition-all self-start md:self-auto"
         >
-          <RefreshCcw className="h-4 w-4 text-amber-400" />
-          <span>Refresh Orders</span>
+          <RefreshCcw className={`h-4 w-4 text-amber-400 ${isFetching ? "animate-spin" : ""}`} />
+          <span>{isFetching ? "Syncing..." : "Refresh Orders"}</span>
         </button>
       </div>
 
