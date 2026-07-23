@@ -551,6 +551,35 @@ function UnifiedPaymentPage() {
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
                     <span>{promptMessage}</span>
                   </div>
+
+                  {/* MTN / Telecel Manual Approval Help Banner */}
+                  <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-xs space-y-2 text-left">
+                    <div className="font-extrabold text-amber-300 flex items-center gap-2">
+                      <PhoneCall className="h-4 w-4 shrink-0 text-amber-400" />
+                      <span>No prompt on your screen? Approve manually:</span>
+                    </div>
+                    <div className="space-y-1 text-slate-300 text-[11px] font-mono leading-relaxed pl-6">
+                      {selectedNetwork.toUpperCase().includes("MTN") ? (
+                        <>
+                          <p>1. Dial <span className="text-white font-bold">*170#</span> on your MTN phone</p>
+                          <p>2. Select <span className="text-white font-bold">Option 6 (My Wallet)</span></p>
+                          <p>3. Select <span className="text-white font-bold">Option 3 (My Approvals)</span></p>
+                          <p>4. Enter your MoMo PIN to approve GH₵ {totalGhs.toFixed(2)}</p>
+                        </>
+                      ) : selectedNetwork.toUpperCase().includes("VODA") || selectedNetwork.toUpperCase().includes("TELECEL") ? (
+                        <>
+                          <p>1. Dial <span className="text-white font-bold">*110#</span> on your Telecel phone</p>
+                          <p>2. Select <span className="text-white font-bold">Option 6 (My Approvals)</span></p>
+                          <p>3. Enter your PIN to approve GH₵ {totalGhs.toFixed(2)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p>1. Check your SMS inbox for the Paystack payment link</p>
+                          <p>2. Or dial your network USSD menu to approve pending transactions</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* 4-Step Progress Stepper */}
