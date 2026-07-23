@@ -97,7 +97,7 @@ function Checkout() {
         },
       });
 
-      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_b8e1f57e62d49e75eb82b5b3a4fdf24d3525cb7a";
+      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_live_74ed2ba7f110bcec6ca98f9d270ff1bd025b24c3";
 
       if (publicKey) {
         // 2. Open Paystack Inline Pop-up directly on page

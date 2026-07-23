@@ -24,23 +24,35 @@ export function WalletTopUpModal({
 
   const mut = useMutation({
     mutationFn: () => initDeposit({ data: { amountGhs: amountToUse } }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       setIsProcessing(true);
-      // Launch Paystack Inline Popup
-      openPaystackInlineCheckout({
-        email: userEmail || "customer@bestdatagh.com",
-        amountGhs: amountToUse,
-        reference: res.reference,
-        onSuccess: (ref) => {
+      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_live_74ed2ba7f110bcec6ca98f9d270ff1bd025b24c3";
+
+      try {
+        // Launch Paystack Inline Popup
+        await openPaystackInlineCheckout({
+          key: publicKey,
+          email: userEmail || `user-${Date.now()}@bestdatagh.com`,
+          amountGhs: amountToUse,
+          reference: res.reference,
+          onSuccess: (ref) => {
+            setIsProcessing(false);
+            queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+            queryClient.invalidateQueries({ queryKey: ["me"] });
+            onClose();
+          },
+          onClose: () => {
+            setIsProcessing(false);
+          },
+        });
+      } catch (e) {
+        // Fallback to Paystack Hosted Payment Page
+        if (res.authorizationUrl) {
+          window.location.href = res.authorizationUrl;
+        } else {
           setIsProcessing(false);
-          queryClient.invalidateQueries({ queryKey: ["myWallet"] });
-          queryClient.invalidateQueries({ queryKey: ["me"] });
-          onClose();
-        },
-        onCancel: () => {
-          setIsProcessing(false);
-        },
-      });
+        }
+      }
     },
     onError: () => {
       setIsProcessing(false);
