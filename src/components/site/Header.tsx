@@ -1,11 +1,16 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Menu, Moon, ShoppingBag, Sun, X, User as UserIcon, LogOut, Shield, KeyRound, Upload, Store,
-  Home, Smartphone, Users, Package, Search, Code, Star, HelpCircle, Sparkles, ChevronRight, Zap
+  Home, Smartphone, Users, Package, Search, Code, Star, HelpCircle, Sparkles, ChevronRight, Zap,
+  Wallet, Plus
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyWallet } from "@/lib/wallet.functions";
+import { WalletTopUpModal } from "./WalletModal";
 import { NotificationBell } from "./NotificationBell";
 
 export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: boolean) {
@@ -80,12 +85,6 @@ export function Logo({ className = "" }: { className?: string }) {
   );
 }
 
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { getMyWallet } from "@/lib/wallet.functions";
-import { WalletTopUpModal } from "./WalletModal";
-import { Wallet } from "lucide-react";
-
 export function Header() {
   const { dark, toggle } = useTheme();
   const { count, open: openCart } = useCart();
@@ -104,7 +103,6 @@ export function Header() {
   });
 
   const walletBalance = walletData?.balanceGhs || 0;
-
   const navItems = getRoleBasedNav(isAdmin, isAgent, !!user);
 
   useEffect(() => { setOpen(false); setMenu(false); }, [pathname]);
@@ -126,12 +124,13 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-2xl transition-all duration-300">
-        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
+      {/* iOS Glassmorphism Header Bar */}
+      <header className="sticky top-0 z-40 border-b border-border/40 bg-background/70 backdrop-blur-2xl transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_30px_rgba(0,0,0,0.3)]">
+        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-3 px-4 sm:px-6">
           <Logo />
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-1 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 backdrop-blur-xl shadow-inner" aria-label="Primary">
+          {/* Desktop Glass Navigation Pills */}
+          <nav className="hidden lg:flex items-center gap-1 rounded-full border border-border/50 bg-card/40 px-3 py-1.5 backdrop-blur-xl shadow-inner" aria-label="Primary">
             {navItems.map((item) => {
               const active = pathname === item.to;
               const Icon = item.icon;
@@ -143,7 +142,7 @@ export function Header() {
                   className={`relative flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-all duration-200 ${
                     active
                       ? "bg-primary text-primary-foreground shadow-[0_4px_14px_-2px_hsl(243_85%_62%_/_0.6)] scale-[1.02]"
-                      : "text-foreground/70 hover:text-foreground hover:bg-muted/80"
+                      : "text-foreground/70 hover:text-foreground hover:bg-muted/60"
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5 opacity-80" />
@@ -153,8 +152,31 @@ export function Header() {
             })}
           </nav>
 
-          {/* Controls & Actions */}
+          {/* Controls & Wallet Pill */}
           <div className="flex items-center gap-2">
+            {/* User Wallet Balance Pill */}
+            {user && (
+              <div className="flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/30 p-1 text-xs font-bold text-emerald-500 shadow-sm backdrop-blur-md">
+                <button
+                  onClick={() => setWalletModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-0.5 hover:opacity-80 transition-opacity"
+                  title="View Wallet & Top Up"
+                >
+                  <Wallet className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <span className="font-black text-emerald-500 dark:text-emerald-400 font-mono text-xs leading-none whitespace-nowrap">
+                    GH₵ {walletBalance.toFixed(2)}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setWalletModalOpen(true)}
+                  className="flex items-center gap-1 rounded-full bg-emerald-500 text-black px-2.5 py-1 text-[10px] font-black hover:bg-emerald-400 transition-all shadow-md active:scale-95 shrink-0"
+                  title="Deposit Funds into Wallet"
+                >
+                  <Plus className="h-3 w-3 stroke-[3]" /> Top Up
+                </button>
+              </div>
+            )}
+
             <button
               onClick={toggle}
               aria-label="Toggle theme"
@@ -175,18 +197,6 @@ export function Header() {
                 </span>
               )}
             </button>
-
-            {user && (
-              <button
-                onClick={() => setWalletModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-500 hover:bg-emerald-500/20 transition-all shadow-sm"
-                title="Click to Top Up Wallet Balance"
-              >
-                <Wallet className="h-3.5 w-3.5" />
-                <span>GH₵ {walletBalance.toFixed(2)}</span>
-                <span className="rounded-full bg-emerald-500 text-black px-1.5 py-0.2 text-[10px] font-black">+</span>
-              </button>
-            )}
 
             {user && <NotificationBell />}
 
@@ -298,8 +308,26 @@ export function Header() {
                 </button>
               </div>
 
+              {/* Mobile Wallet Balance Card */}
+              {user && (
+                <div className="mt-4 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3 backdrop-blur-xl">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-500 dark:text-emerald-400">
+                      <Wallet className="h-4 w-4" /> My Wallet Balance
+                    </div>
+                    <span className="font-mono font-black text-emerald-500 dark:text-emerald-400 text-sm">GH₵ {walletBalance.toFixed(2)}</span>
+                  </div>
+                  <button
+                    onClick={() => { setWalletModalOpen(true); setOpen(false); }}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black py-2.5 text-xs font-black shadow-md active:scale-95 transition-all"
+                  >
+                    <Plus className="h-4 w-4" /> Top Up Wallet Deposit
+                  </button>
+                </div>
+              )}
+
               {/* Quick Status / Promo */}
-              <div className="mt-5 rounded-2xl bg-primary/10 border border-primary/20 p-3.5 flex items-center justify-between">
+              <div className="mt-4 rounded-2xl bg-primary/10 border border-primary/20 p-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
                     <Zap className="h-4 w-4" />
@@ -410,13 +438,13 @@ export function Header() {
       )}
 
       {/* Floating Bottom App Navigation Dock for iPhone & Android Mobile View */}
-      <MobileBottomDock />
+      <MobileBottomDock onOpenWallet={() => setWalletModalOpen(true)} />
     </>
   );
 }
 
-/* ============ Native Mobile Bottom App Navigation Dock ============ */
-function MobileBottomDock() {
+/* ============ Native iOS Floating Glass Bottom Navigation Dock ============ */
+function MobileBottomDock({ onOpenWallet }: { onOpenWallet: () => void }) {
   const { count, open: openCart } = useCart();
   const { user, isAgent, isAdmin } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -425,7 +453,9 @@ function MobileBottomDock() {
     { label: "Home", to: "/" as const, search: undefined, icon: Home },
     { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
     { label: "Bulk", to: "/bulk" as const, search: undefined, icon: Package },
-    { label: "Cart", isCart: true, icon: ShoppingBag },
+    ...(user
+      ? [{ label: "Deposit", isWallet: true, icon: Wallet }]
+      : [{ label: "Cart", isCart: true, icon: ShoppingBag }]),
     {
       label: user ? (isAgent ? "Agent" : isAdmin ? "Admin" : "Account") : "Log In",
       to: (user ? (isAgent ? "/agent" : isAdmin ? "/admin" : "/account") : "/auth") as any,
@@ -435,18 +465,33 @@ function MobileBottomDock() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-border/80 bg-card/95 backdrop-blur-2xl px-2 py-1.5 shadow-2xl pb-safe">
+    <div className="fixed bottom-4 left-4 right-4 z-40 lg:hidden rounded-full border border-white/20 dark:border-white/10 bg-card/85 backdrop-blur-2xl px-4 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
       <div className="flex items-center justify-around">
         {dockItems.map((item, idx) => {
           const active = item.to ? pathname === item.to : false;
           const Icon = item.icon;
+
+          if (item.isWallet) {
+            return (
+              <button
+                key="wallet-dock"
+                onClick={onOpenWallet}
+                className="flex flex-col items-center gap-0.5 text-[10px] font-extrabold text-emerald-500 hover:scale-105 active:scale-95 transition-all"
+              >
+                <div className="grid h-7 w-7 place-items-center rounded-full bg-emerald-500/20 text-emerald-500 shadow-sm">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span>Deposit</span>
+              </button>
+            );
+          }
 
           if (item.isCart) {
             return (
               <button
                 key="cart-dock"
                 onClick={openCart}
-                className="relative flex flex-col items-center gap-1 p-2 text-[10px] font-extrabold text-foreground/70 hover:text-foreground active:scale-95 transition-all"
+                className="relative flex flex-col items-center gap-1 text-[10px] font-extrabold text-foreground/70 hover:text-foreground active:scale-95 transition-all"
               >
                 <div className="relative">
                   <Icon className="h-5 w-5 opacity-80" />
@@ -466,7 +511,7 @@ function MobileBottomDock() {
               key={idx}
               to={item.to as any}
               search={item.search as any}
-              className={`flex flex-col items-center gap-1 p-2 text-[10px] font-extrabold transition-all active:scale-95 ${
+              className={`flex flex-col items-center gap-1 text-[10px] font-extrabold transition-all active:scale-95 ${
                 active ? "text-primary font-black scale-105" : "text-foreground/70 hover:text-foreground"
               }`}
             >
@@ -479,5 +524,3 @@ function MobileBottomDock() {
     </div>
   );
 }
-
-
