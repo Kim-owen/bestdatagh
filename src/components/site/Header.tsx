@@ -80,14 +80,30 @@ export function Logo({ className = "" }: { className?: string }) {
   );
 }
 
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyWallet } from "@/lib/wallet.functions";
+import { WalletTopUpModal } from "./WalletModal";
+import { Wallet } from "lucide-react";
+
 export function Header() {
   const { dark, toggle } = useTheme();
   const { count, open: openCart } = useCart();
   const { user, isAdmin, isAgent, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const fetchWallet = useServerFn(getMyWallet);
+  const { data: walletData } = useQuery({
+    queryKey: ["myWallet"],
+    queryFn: () => fetchWallet(),
+    enabled: !!user,
+  });
+
+  const walletBalance = walletData?.balanceGhs || 0;
 
   const navItems = getRoleBasedNav(isAdmin, isAgent, !!user);
 
@@ -159,6 +175,18 @@ export function Header() {
                 </span>
               )}
             </button>
+
+            {user && (
+              <button
+                onClick={() => setWalletModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-500 hover:bg-emerald-500/20 transition-all shadow-sm"
+                title="Click to Top Up Wallet Balance"
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                <span>GH₵ {walletBalance.toFixed(2)}</span>
+                <span className="rounded-full bg-emerald-500 text-black px-1.5 py-0.2 text-[10px] font-black">+</span>
+              </button>
+            )}
 
             {user && <NotificationBell />}
 
@@ -239,6 +267,12 @@ export function Header() {
           </div>
         </div>
       </header>
+
+      <WalletTopUpModal
+        isOpen={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        userEmail={user?.email}
+      />
 
       {/* Side Slide-Over Drawer for Mobile View */}
       {open && (

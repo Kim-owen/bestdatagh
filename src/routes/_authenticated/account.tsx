@@ -6,7 +6,9 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useAuth } from "@/lib/auth";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
-import { User, Phone, Mail, Save, LogOut, KeyRound, ShoppingBag, Store, ShieldCheck } from "lucide-react";
+import { getMyWallet } from "@/lib/wallet.functions";
+import { WalletTopUpModal } from "@/components/site/WalletModal";
+import { User, Phone, Mail, Save, LogOut, KeyRound, ShoppingBag, Store, ShieldCheck, Wallet, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/account")({
   head: () => ({ meta: [
@@ -22,7 +24,13 @@ function AccountPage() {
   const qc = useQueryClient();
   const fetchProfile = useServerFn(getMyProfile);
   const saveProfile = useServerFn(updateMyProfile);
+  const fetchWallet = useServerFn(getMyWallet);
+
   const { data, isLoading } = useQuery({ queryKey: ["me"], queryFn: () => fetchProfile() });
+  const { data: walletData } = useQuery({ queryKey: ["myWallet"], queryFn: () => fetchWallet(), enabled: !!user });
+
+  const walletBalance = walletData?.balanceGhs || 0;
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -88,6 +96,29 @@ function AccountPage() {
           </section>
 
           <aside className="space-y-4">
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-primary" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-primary">Wallet Balance</h3>
+                </div>
+                <button
+                  onClick={() => setWalletModalOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-xl gold-gradient px-3 py-1.5 text-xs font-black text-primary-foreground shadow-sm hover:scale-105 transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Top Up
+                </button>
+              </div>
+
+              <div className="text-3xl font-black font-display text-foreground">
+                GH₵ {walletBalance.toFixed(2)}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Use your wallet balance for instant 1-click purchases at checkout.
+              </p>
+            </div>
+
             <div className="rounded-2xl border border-border bg-card p-6">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Quick links</h3>
               <div className="grid gap-2">
@@ -103,6 +134,11 @@ function AccountPage() {
           </aside>
         </div>
       </main>
+      <WalletTopUpModal
+        isOpen={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        userEmail={user?.email}
+      />
       <Footer />
     </div>
   );

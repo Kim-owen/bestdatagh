@@ -35,30 +35,69 @@ export const Route = createFileRoute("/api/paystack/webhook")({
 
               if (paystackVerify.data.status === "success") {
                 const paidGhs = paystackVerify.data.amount / 100;
+                const metadata = paystackVerify.data.metadata || {};
 
-                // Find local order
-                const { data: order } = await supabaseAdmin
-                  .from("orders")
-                  .select("id, reference, total_ghs, status")
-                  .eq("reference", reference)
-                  .maybeSingle();
+                // A. Handle Wallet Deposit
+                if (reference.startsWith("DEP-") || metadata.type === "wallet_deposit") {
+                  const userId = metadata.user_id;
+                  if (userId) {
+                    // Check if already credited
+                    const { data: existingTx } = await supabaseAdmin
+                      .from("wallet_transactions")
+                      .select("id")
+                      .eq("reference", reference)
+                      .maybeSingle();
 
-                if (order && (order.status === "pending" || order.status === "failed")) {
-                  // Verify paid amount matches expected order total
-                  if (Math.abs(paidGhs - Number(order.total_ghs)) <= 0.01) {
-                    await supabaseAdmin
-                      .from("orders")
-                      .update({ status: "paid" })
-                      .eq("id", order.id);
+                    if (!existingTx) {
+                      // Fetch current wallet
+                      const { data: curWallet } = await supabaseAdmin
+                        .from("wallets")
+                        .select("balance_ghs")
+                        .eq("user_id", userId)
+                        .maybeSingle();
 
-                    await supabaseAdmin
-                      .from("order_items")
-                      .update({ status: "processing" })
-                      .eq("order_id", order.id);
+                      const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
 
-                    console.log(`Paystack Webhook: Order ${reference} updated to PAID.`);
-                  } else {
-                    console.error(`Paystack Webhook Mismatch: Order ${reference} expected ${order.total_ghs} GHS but received ${paidGhs} GHS.`);
+                      await supabaseAdmin
+                        .from("wallets")
+                        .upsert({ user_id: userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+
+                      await supabaseAdmin.from("wallet_transactions").insert({
+                        user_id: userId,
+                        amount_ghs: paidGhs,
+                        type: "deposit",
+                        reference,
+                        status: "completed",
+                        description: `Paystack Deposit (${reference})`,
+                      });
+
+                      console.log(`Paystack Webhook: Wallet deposit ${reference} credited GH₵ ${paidGhs} to user ${userId}.`);
+                    }
+                  }
+                } else {
+                  // B. Handle Standard Order Payment
+                  const { data: order } = await supabaseAdmin
+                    .from("orders")
+                    .select("id, reference, total_ghs, status")
+                    .eq("reference", reference)
+                    .maybeSingle();
+
+                  if (order && (order.status === "pending" || order.status === "failed")) {
+                    if (Math.abs(paidGhs - Number(order.total_ghs)) <= 0.01) {
+                      await supabaseAdmin
+                        .from("orders")
+                        .update({ status: "paid" })
+                        .eq("id", order.id);
+
+                      await supabaseAdmin
+                        .from("order_items")
+                        .update({ status: "processing" })
+                        .eq("order_id", order.id);
+
+                      console.log(`Paystack Webhook: Order ${reference} updated to PAID.`);
+                    } else {
+                      console.error(`Paystack Webhook Mismatch: Order ${reference} expected ${order.total_ghs} GHS but received ${paidGhs} GHS.`);
+                    }
                   }
                 }
               }

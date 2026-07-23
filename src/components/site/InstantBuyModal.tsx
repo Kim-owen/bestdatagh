@@ -4,13 +4,58 @@ import type { Network } from "@/lib/cart";
 import { createCheckoutOrder, verifyOrderPayment } from "@/lib/orders.functions";
 import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
 
+import { useAuth } from "@/lib/auth";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyWallet, payOrderWithWallet } from "@/lib/wallet.functions";
+import { Wallet } from "lucide-react";
+
 export type InstantBuyItem = { network: Network; size: string; price: number } | null;
 
 export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClose: () => void }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const fetchWallet = useServerFn(getMyWallet);
+  const payWallet = useServerFn(payOrderWithWallet);
+
+  const { data: walletData } = useQuery({
+    queryKey: ["myWallet"],
+    queryFn: () => fetchWallet(),
+    enabled: !!user,
+  });
+
+  const walletBalance = walletData?.balanceGhs || 0;
+  const canPayWallet = user && walletBalance >= (item?.price || 0);
+
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
   const [orderId, setOrderId] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  const handleWalletPay = async () => {
+    if (!validPhone || !item) return;
+    setStatus("processing");
+    setErrorMsg("");
+
+    try {
+      // Create order
+      const orderRes = await createCheckoutOrder({
+        data: {
+          items: [{ id: `${item.network}-${item.size}`, network: item.network, size: item.size, price: item.price, qty: 1 }],
+          recipientPhone: phone,
+        },
+      });
+
+      // Pay with wallet
+      await payWallet({ data: { orderId: orderRes.orderId, amountGhs: item.price } });
+      queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+      setOrderId(orderRes.orderId);
+      setStatus("done");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to complete wallet payment.");
+      setStatus("error");
+    }
+  };
 
   useEffect(() => {
     if (!item) {
@@ -157,6 +202,18 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
               </div>
             </div>
 
+            {canPayWallet && (
+              <button
+                type="button"
+                onClick={handleWalletPay}
+                disabled={!validPhone || status === "processing"}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-4 py-3 text-sm font-bold text-black disabled:opacity-60 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md"
+              >
+                <Wallet className="h-4 w-4" />
+                Pay GHS {item.price.toFixed(2)} with Wallet (GH₵ {walletBalance.toFixed(2)} Avail)
+              </button>
+            )}
+
             <button
               type="submit"
               disabled={!validPhone || status === "processing"}
@@ -164,7 +221,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
             >
               {status === "processing" ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Launching Paystack Payment…
+                  <Loader2 className="h-4 w-4 animate-spin" /> Processing Payment…
                 </>
               ) : (
                 <>Pay GHS {item.price.toFixed(2)} with Paystack</>

@@ -9,6 +9,12 @@ import { checkPhoneVerification } from "@/lib/otp.functions";
 import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
 import { OtpVerificationModal } from "@/components/site/OtpVerificationModal";
 
+import { useAuth } from "@/lib/auth";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyWallet, payOrderWithWallet } from "@/lib/wallet.functions";
+import { Wallet } from "lucide-react";
+
 export const Route = createFileRoute("/checkout")({
   head: () => ({
     meta: [
@@ -24,6 +30,19 @@ export const Route = createFileRoute("/checkout")({
 });
 
 function Checkout() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const fetchWallet = useServerFn(getMyWallet);
+  const payWallet = useServerFn(payOrderWithWallet);
+
+  const { data: walletData } = useQuery({
+    queryKey: ["myWallet"],
+    queryFn: () => fetchWallet(),
+    enabled: !!user,
+  });
+
+  const walletBalance = walletData?.balanceGhs || 0;
+
   const { items, subtotal, clear, setQty, removeItem } = useCart();
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<"idle" | "verifying_phone" | "processing" | "done" | "error">("idle");
@@ -33,6 +52,31 @@ function Checkout() {
   const navigate = useNavigate();
 
   const validPhone = /^\d{9,10}$/.test(phone.replace(/\s+/g, ""));
+  const canPayWallet = user && walletBalance >= subtotal && subtotal > 0;
+
+  const handleWalletCheckout = async () => {
+    if (!validPhone || items.length === 0) return;
+    setStatus("processing");
+    setErrorMsg("");
+
+    try {
+      const orderRes = await createCheckoutOrder({
+        data: {
+          items: items.map((it) => ({ id: it.id, network: it.network, size: it.size, price: it.price, qty: it.qty })),
+          recipientPhone: phone,
+        },
+      });
+
+      await payWallet({ data: { orderId: orderRes.orderId, amountGhs: subtotal } });
+      queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+      setOrderId(orderRes.reference);
+      setStatus("done");
+      clear();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to process wallet payment");
+      setStatus("error");
+    }
+  };
 
   const initiatePaymentFlow = async () => {
     setStatus("processing");
@@ -273,6 +317,18 @@ function Checkout() {
                 </div>
               )}
 
+              {canPayWallet && (
+                <button
+                  type="button"
+                  onClick={handleWalletCheckout}
+                  disabled={!validPhone || status === "processing" || status === "verifying_phone"}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-4 text-xs font-black text-black shadow-md hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+                >
+                  <Wallet className="h-4 w-4" />
+                  Pay GH₵ {subtotal.toFixed(2)} with Wallet (GH₵ {walletBalance.toFixed(2)} Avail)
+                </button>
+              )}
+
               <button
                 type="submit"
                 disabled={!validPhone || status === "processing" || status === "verifying_phone"}
@@ -281,7 +337,7 @@ function Checkout() {
                 {status === "verifying_phone" ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Verifying Buyer Security…</>
                 ) : status === "processing" ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Opening Paystack Popup…</>
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Processing Payment…</>
                 ) : (
                   <>Pay GH₵ {subtotal.toFixed(2)} with Paystack</>
                 )}
