@@ -10,6 +10,7 @@ import {
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WithdrawalAuditLog } from "@/components/site/WithdrawalAuditLog";
+import { WalletTopUpModal } from "@/components/site/WalletModal";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/agent")({
@@ -35,6 +36,7 @@ function AgentDashboard() {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   async function refresh() {
     const [d, w] = await Promise.all([getAgentDashboard(), listMyWithdrawals()]);
@@ -123,6 +125,12 @@ function AgentDashboard() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setWalletModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-2.5 text-xs font-black text-black shadow-md hover:scale-105 active:scale-95 transition-all"
+            >
+              <Wallet className="h-4 w-4" /> Top Up Wallet
+            </button>
             <Link
               to="/agents"
               className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-background px-4 py-2.5 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all shadow-sm"
@@ -309,6 +317,11 @@ function AgentDashboard() {
           )}
         </section>
       </main>
+
+      <WalletTopUpModal
+        isOpen={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+      />
 
       <Footer />
     </div>
