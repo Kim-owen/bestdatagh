@@ -218,6 +218,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+    const { buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } = await import("@/lib/swiftdata");
 
     // Fetch order details
     const { data: order, error } = await supabaseAdmin
@@ -228,36 +229,35 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
 
     if (error || !order) throw new Error("Order not found");
 
-    // Trigger automated fulfillment via SwiftData API
     const item = (order.order_items && order.order_items[0]) || {};
-    let swiftNetwork: "yello" | "at_ishare" | "at_bigtime" | "telecel" = "yello";
-    const netLower = (item.network || "").toLowerCase();
-    if (netLower.includes("telecel") || netLower.includes("vodafone")) swiftNetwork = "telecel";
-    else if (netLower.includes("ishare") || netLower.includes("airteltigo")) swiftNetwork = "at_ishare";
-    else if (netLower.includes("bigtime")) swiftNetwork = "at_bigtime";
+    const swiftNetwork = mapToSwiftDataNetwork(item.network || "MTN", item.size_label);
+    const sizeGb = parseSizeGb(item.size_label || "1GB");
 
-    const sizeGb = Number((item.size_label || "").replace(/[^\d.]/g, "")) || 1;
+    let apiSuccess = false;
+    let apiErrorMsg = "";
 
-    try {
-      const { buySwiftDataBundle } = await import("@/lib/swiftdata");
-      if (item.recipient_phone) {
-        await buySwiftDataBundle({
+    if (item.recipient_phone) {
+      try {
+        const swiftRes = await buySwiftDataBundle({
           phone: item.recipient_phone,
           network: swiftNetwork,
           sizeGb,
           reference: order.reference,
         });
+        if (swiftRes && (swiftRes.success || swiftRes.status === "completed" || swiftRes.status === "processing")) {
+          apiSuccess = true;
+        }
+      } catch (swiftErr: any) {
+        apiErrorMsg = swiftErr.message || "Provider API error";
+        console.warn("SwiftData retry error:", apiErrorMsg);
       }
-    } catch (swiftErr) {
-      console.warn("SwiftData purchase fallback notice:", swiftErr);
     }
 
-    // Update status to delivered
-    const { error: updErr } = await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
-    if (updErr) throw new Error(updErr.message);
+    const newStatus = apiSuccess ? "delivered" : "processing";
+    await supabaseAdmin.from("orders").update({ status: newStatus }).eq("id", order.id);
 
-    // Send SMS notification if recipient phone is available
-    if (item.recipient_phone) {
+    // Send SMS notification if successful
+    if (apiSuccess && item.recipient_phone) {
       try {
         await sendTxtConnectSms(
           item.recipient_phone,
@@ -268,8 +268,50 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true, reference: order.reference };
+    // Audit log
+    await supabaseAdmin.from("admin_audit_logs").insert({
+      admin_id: context.user.id,
+      admin_email: context.user.email,
+      action: "RETRY_ORDER_FULFILLMENT",
+      target_type: "order",
+      target_id: order.id,
+      details: { reference: order.reference, apiSuccess, apiErrorMsg, newStatus },
+    });
+
+    return {
+      ok: true,
+      reference: order.reference,
+      status: newStatus,
+      apiSuccess,
+      apiErrorMsg,
+    };
   });
+
+export const adminCheckSwiftDataOrderStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { reference: string }) => ({ reference: String(d.reference) }))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { getSwiftDataOrder } = await import("@/lib/swiftdata");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    try {
+      const apiRes = await getSwiftDataOrder(data.reference);
+      if (apiRes && apiRes.order) {
+        const swiftStatus = (apiRes.order.status || "").toLowerCase();
+        let dbStatus = "processing";
+        if (swiftStatus === "completed" || swiftStatus === "delivered") dbStatus = "delivered";
+        else if (swiftStatus === "failed") dbStatus = "failed";
+
+        await supabaseAdmin.from("orders").update({ status: dbStatus }).eq("reference", data.reference);
+        return { ok: true, status: dbStatus, apiData: apiRes.order };
+      }
+      return { ok: false, message: "Order not found on SwiftData gateway" };
+    } catch (e: any) {
+      return { ok: false, message: e.message };
+    }
+  });
+
 
 export const adminToggleApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
