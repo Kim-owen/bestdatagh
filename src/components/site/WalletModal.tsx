@@ -132,19 +132,28 @@ export function WalletTopUpModal({
           />
         </div>
 
-        <div className="rounded-2xl bg-primary/10 border border-primary/20 p-3.5 flex items-center gap-2.5 text-xs text-primary font-bold">
-          <ShieldCheck className="h-4 w-4 shrink-0" />
-          <span>Instant credit to your BestData Wallet via Paystack.</span>
+        <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3.5 flex items-center gap-2.5 text-xs text-emerald-500 font-bold">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
+          <span>Secured by Paystack Gateway. Accepts MTN MoMo, Telecel, AT & Bank Cards.</span>
         </div>
 
-        <button
-          onClick={() => mut.mutate()}
-          disabled={mut.isPending || isProcessing || amountToUse < 1}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl gold-gradient py-4 text-xs font-black text-primary-foreground shadow-md hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          {mut.isPending || isProcessing ? "Initializing Paystack Deposit…" : `Proceed to Deposit GH₵ ${amountToUse.toFixed(2)}`}
-        </button>
+        {successMsg ? (
+          <div className="rounded-2xl bg-emerald-500/15 border border-emerald-500/30 p-4 text-center text-xs font-black text-emerald-500 flex items-center justify-center gap-2">
+            <CheckCircle2 className="h-5 w-5" /> Wallet Deposited & Credited Successfully!
+          </div>
+        ) : (
+          <button
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending || isProcessing || amountToUse < 1}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl gold-gradient py-4 text-xs font-black text-primary-foreground shadow-lg hover:scale-[1.01] active:scale-95 disabled:opacity-50 transition-all"
+          >
+            {mut.isPending || isProcessing ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Connecting to Paystack Gateway…</>
+            ) : (
+              <><Zap className="h-4 w-4" /> Deposit GH₵ {amountToUse.toFixed(2)} via Paystack Gateway</>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
