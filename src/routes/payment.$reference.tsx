@@ -7,11 +7,13 @@ import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-r
 import { useState, useEffect } from "react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus, resolveMoMoAccountName, createPaymentRequestInvoice } from "@/lib/orders.functions";
+import { getMyWallet, payOrderWithWallet } from "@/lib/wallet.functions";
+import { useAuth } from "@/lib/auth";
 import { sendPhoneOtp } from "@/lib/otp.functions";
-import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle, X } from "lucide-react";
+import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle, X, Wallet } from "lucide-react";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
 import { useCart } from "@/lib/cart";
 
@@ -19,7 +21,7 @@ export const Route = createFileRoute("/payment/$reference")({
   head: ({ params }) => ({
     meta: [
       { title: `Payment Hub #${params.reference} — Bestdata` },
-      { name: "description", content: "Complete your Mobile Money payment and track instant data delivery in real-time." },
+      { name: "description", content: "Complete your Mobile Money or Wallet payment and track instant data delivery in real-time." },
     ],
   }),
   component: UnifiedPaymentPage,
@@ -35,6 +37,8 @@ function UnifiedPaymentPage() {
   const { reference } = useParams({ from: "/payment/$reference" });
   const navigate = useNavigate();
   const { clear } = useCart();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const checkStatusFn = useServerFn(pollOrderStatus);
   const triggerChargeFn = useServerFn(initiateMoMoPromptCharge);
@@ -42,6 +46,17 @@ function UnifiedPaymentPage() {
   const sendOtpFn = useServerFn(sendPhoneOtp);
   const resolveNameFn = useServerFn(resolveMoMoAccountName);
   const createInvoiceFn = useServerFn(createPaymentRequestInvoice);
+  const fetchWallet = useServerFn(getMyWallet);
+  const payWallet = useServerFn(payOrderWithWallet);
+
+  const { data: walletData } = useQuery({
+    queryKey: ["myWallet"],
+    queryFn: () => fetchWallet(),
+    enabled: !!user,
+  });
+
+  const walletBalance = walletData?.balanceGhs || 0;
+  const [walletPaying, setWalletPaying] = useState(false);
 
   // Unified Payment State: "MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED"
   const [step, setStep] = useState<"MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED">("MOMO_INPUT");
@@ -229,6 +244,22 @@ function UnifiedPaymentPage() {
       setPromptMessage("Prompt re-sent! Please check your phone screen to enter your MoMo PIN.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleWalletPay = async () => {
+    if (!order) return;
+    setWalletPaying(true);
+    setErrorMsg("");
+    try {
+      await payWallet({ data: { orderId: order.id, amountGhs: totalGhs } });
+      queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+      setStep("PROMPT_PUSHED");
+      setPromptMessage("Wallet payment successful! Your data bundle is now being processed.");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to process wallet payment.");
+    } finally {
+      setWalletPaying(false);
     }
   };
 
@@ -527,6 +558,51 @@ function UnifiedPaymentPage() {
                     <span className="font-bold text-slate-200">Total Payable:</span>
                     <span className="font-mono font-black text-emerald-400">GH₵ {totalGhs.toFixed(2)}</span>
                   </div>
+                </div>
+
+                {/* Option A: Bestdata Wallet Payment (For Logged-In Users & Agents) */}
+                {user && (
+                  <div className="rounded-2xl border border-primary/40 bg-primary/10 p-5 space-y-3 shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-black text-primary uppercase tracking-wider">
+                        <Wallet className="h-4 w-4" /> Option A: Pay with Bestdata Wallet
+                      </div>
+                      <span className="text-xs font-mono font-black text-white bg-black/40 px-2.5 py-1 rounded-full border border-white/10">
+                        Balance: GH₵ {walletBalance.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {walletBalance >= totalGhs ? (
+                      <button
+                        type="button"
+                        disabled={walletPaying}
+                        onClick={handleWalletPay}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl gold-gradient py-3.5 text-xs font-black text-primary-foreground shadow-xl hover:scale-[1.01] active:scale-[.98] transition-all"
+                      >
+                        {walletPaying ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Deducting Wallet Balance...</>
+                        ) : (
+                          <><Zap className="h-4 w-4" /> Instant Pay GH₵ {totalGhs.toFixed(2)} with Wallet (0-Fee)</>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs pt-1 border-t border-white/10">
+                        <span className="text-amber-300 font-semibold">
+                          Wallet Balance: GH₵ {walletBalance.toFixed(2)} (Insufficient for GH₵ {totalGhs.toFixed(2)})
+                        </span>
+                        <Link to="/agent" className="text-xs font-extrabold text-primary hover:underline flex items-center gap-1 shrink-0">
+                          Top Up Wallet →
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+                  <span className="relative bg-slate-950 px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    {user ? "OR PAY VIA MOBILE MONEY" : "MOBILE MONEY PAYMENT"}
+                  </span>
                 </div>
 
                 <form onSubmit={handleMoMoSubmit} className="space-y-5">
