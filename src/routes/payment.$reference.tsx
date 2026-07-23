@@ -1,3 +1,8 @@
+
+
+
+
+
 import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Header } from "@/components/site/Header";
@@ -6,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus, resolveMoMoAccountName, createPaymentRequestInvoice } from "@/lib/orders.functions";
 import { sendPhoneOtp } from "@/lib/otp.functions";
-import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle, X } from "lucide-react";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
 import { useCart } from "@/lib/cart";
 
@@ -50,6 +55,7 @@ function UnifiedPaymentPage() {
   const [promptMessage, setPromptMessage] = useState("Check your phone screen now! Enter your 4-digit MoMo PIN.");
   const [resolvedAccountName, setResolvedAccountName] = useState<string | null>(null);
   const [resolvingName, setResolvingName] = useState(false);
+  const [showPaystackModal, setShowPaystackModal] = useState(false);
 
   // Poll order status every 3 seconds
   const { data: pollData } = useQuery({
@@ -158,10 +164,11 @@ function UnifiedPaymentPage() {
         }
       }
 
-      // 2. Direct Redirect Fallback
+      // 2. Embedded Modal Overlay (No External Redirect!)
       if (res.authorizationUrl) {
         setAuthUrl(res.authorizationUrl);
-        window.location.href = res.authorizationUrl;
+        setShowPaystackModal(true);
+        setStep("PROMPT_PUSHED");
         return;
       }
 
@@ -230,7 +237,7 @@ function UnifiedPaymentPage() {
 
       <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 md:py-16 w-full">
         <div className="mx-auto max-w-2xl space-y-8">
-          
+
           {/* Top Reference Badge */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-white/10 p-5 rounded-3xl backdrop-blur-xl shadow-xl">
             <div>
@@ -253,7 +260,7 @@ function UnifiedPaymentPage() {
 
           {/* MAIN PAYMENT HUB CARD */}
           <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
-            
+
             {/* 1. DELIVERED STATE 🎉 */}
             {currentStatus === "delivered" ? (
               <div className="space-y-8 text-center animate-in zoom-in-95">
@@ -314,7 +321,7 @@ function UnifiedPaymentPage() {
                 </div>
               </div>
             ) : step === "MOMO_INPUT" ? (
-              
+
               /* 2. STEP A: ENTER MOMO PAYMENT NUMBER */
               <div className="space-y-6 animate-in fade-in">
                 <div className="text-center space-y-2">
@@ -398,11 +405,10 @@ function UnifiedPaymentPage() {
                             key={net.key}
                             type="button"
                             onClick={() => setSelectedNetwork(net.key)}
-                            className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${
-                              isSelected
+                            className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${isSelected
                                 ? net.color + " ring-2 ring-amber-400/50 scale-[1.03]"
                                 : "border-white/10 bg-slate-900/60 text-slate-400 hover:border-white/20"
-                            }`}
+                              }`}
                           >
                             <NetworkLogo network={net.key as any} className="h-6 w-6" />
                             <span className="text-[10px] font-black uppercase tracking-wider">{net.label}</span>
@@ -534,7 +540,7 @@ function UnifiedPaymentPage() {
 
               /* 4. STEP C: PROMPT PUSHED & LIVE 3-SECOND POLLING */
               <div className="space-y-8 animate-in fade-in">
-                
+
                 {/* Visual MoMo Phone Visualizer */}
                 <div className="relative mx-auto max-w-sm rounded-3xl border border-amber-500/30 bg-slate-900/90 p-6 text-center shadow-xl space-y-4">
                   <div className="relative mx-auto h-20 w-20 grid place-items-center">
@@ -638,9 +644,8 @@ function UnifiedPaymentPage() {
 
                     {/* Step 3 */}
                     <div className="flex items-center gap-3">
-                      <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-black text-xs ${
-                        currentStatus === "paid" || currentStatus === "processing" ? "bg-emerald-500 text-slate-950" : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                      }`}>
+                      <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-black text-xs ${currentStatus === "paid" || currentStatus === "processing" ? "bg-emerald-500 text-slate-950" : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        }`}>
                         {currentStatus === "paid" || currentStatus === "processing" ? <CheckCircle2 className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
                       </div>
                       <div className="min-w-0">
@@ -712,6 +717,45 @@ function UnifiedPaymentPage() {
 
         </div>
       </main>
+
+      {/* Embedded Paystack Checkout Modal Overlay (In-Site, No External Redirect!) */}
+      {showPaystackModal && authUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl border border-white/15 bg-slate-900 shadow-2xl overflow-hidden flex flex-col h-[650px] max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-slate-950">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                <span className="text-sm font-black text-white font-display">Paystack Secure Checkout</span>
+              </div>
+              <button
+                onClick={() => setShowPaystackModal(false)}
+                className="rounded-full bg-white/10 p-1.5 text-slate-400 hover:bg-white/20 hover:text-white transition-all"
+                title="Close Modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Embedded Paystack Iframe */}
+            <iframe
+              src={authUrl}
+              title="Paystack Checkout"
+              className="w-full flex-1 border-0 bg-white"
+              allow="payment"
+            />
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-white/10 bg-slate-950 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                <span>Polling order status automatically…</span>
+              </div>
+              <span className="font-extrabold text-amber-400">256-bit Encrypted</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
