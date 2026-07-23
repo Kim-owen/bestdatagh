@@ -19,6 +19,7 @@ const empty = {
   size_label: "",
   size_mb: 1024,
   price_ghs: 0,
+  agent_price_ghs: 0,
   validity: "Non-Expiry",
   popular: false,
   active: true,
@@ -209,13 +210,25 @@ function BundlesPage() {
             </label>
 
             <label className="space-y-1.5">
-              <span className="text-slate-400 font-bold">Retail Price (GH₵)</span>
+              <span className="text-slate-400 font-bold">Public Retail Price (GH₵)</span>
               <input
                 type="number"
                 step="0.01"
                 value={editing.price_ghs}
                 onChange={(e) => setEditing({ ...editing, price_ghs: +e.target.value })}
                 className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-amber-400 font-mono font-bold focus:border-amber-400 outline-none"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-slate-400 font-bold">Agent Wholesale Price (GH₵)</span>
+              <input
+                type="number"
+                step="0.01"
+                value={editing.agent_price_ghs ?? (editing.price_ghs ? +(editing.price_ghs * 0.93).toFixed(2) : 0)}
+                onChange={(e) => setEditing({ ...editing, agent_price_ghs: +e.target.value })}
+                className="w-full rounded-xl border border-emerald-500/40 bg-slate-950 px-3 py-2 text-emerald-400 font-mono font-bold focus:border-emerald-400 outline-none"
+                placeholder="Wholesale price"
               />
             </label>
 
@@ -325,7 +338,8 @@ function BundlesPage() {
                 <tr>
                   <th className="p-4">Network</th>
                   <th className="p-4">Package Size</th>
-                  <th className="p-4">Retail Price</th>
+                  <th className="p-4">Public Retail</th>
+                  <th className="p-4">Agent Wholesale</th>
                   <th className="p-4">Validity</th>
                   <th className="p-4">Badges & Status</th>
                   <th className="p-4 text-right">Actions</th>
@@ -334,16 +348,16 @@ function BundlesPage() {
               <tbody className="divide-y divide-white/5 font-mono">
                 {loadingStore && (
                   <>
-                    <TableRowSkeleton columns={6} />
-                    <TableRowSkeleton columns={6} />
-                    <TableRowSkeleton columns={6} />
-                    <TableRowSkeleton columns={6} />
-                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={7} />
+                    <TableRowSkeleton columns={7} />
+                    <TableRowSkeleton columns={7} />
+                    <TableRowSkeleton columns={7} />
+                    <TableRowSkeleton columns={7} />
                   </>
                 )}
                 {filteredStoreBundles.length === 0 && !loadingStore && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-400">No store bundles found. Click "Sync SwiftData API Packages" above to populate!</td>
+                    <td colSpan={7} className="p-8 text-center text-slate-400">No store bundles found. Click "Sync SwiftData API Packages" above to populate!</td>
                   </tr>
                 )}
                 {filteredStoreBundles.map((b: any) => (
@@ -356,6 +370,9 @@ function BundlesPage() {
                     </td>
                     <td className="p-4 font-extrabold text-amber-400">{b.size_label}</td>
                     <td className="p-4 text-white font-bold">GH₵ {Number(b.price_ghs).toFixed(2)}</td>
+                    <td className="p-4 text-emerald-400 font-extrabold">
+                      GH₵ {Number(b.agent_price_ghs ?? (b.price_ghs * 0.95)).toFixed(2)}
+                    </td>
                     <td className="p-4 text-slate-300 font-sans">{b.validity}</td>
                     <td className="p-4 font-sans">
                       <div className="flex items-center gap-1.5">

@@ -487,6 +487,16 @@ function DedicatedAgentCustomerStorefront({
   const [buyItem, setBuyItem] = useState<InstantBuyItem | null>(null);
   const cart = useCart();
 
+  const customPrices = useMemo(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = localStorage.getItem("bestdata_agent_custom_prices");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
   const formattedRefName = agentRef.charAt(0).toUpperCase() + agentRef.slice(1).replace(/[-_]/g, " ");
 
   const filteredBundles = useMemo(() => {
@@ -589,54 +599,58 @@ function DedicatedAgentCustomerStorefront({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {filteredBundles.map((b) => (
-                <div
-                  key={b.id}
-                  className="group relative rounded-3xl border border-border/80 bg-card p-6 shadow-sm hover:border-primary/50 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/50 border border-border/60 px-3 py-1 text-[10px] font-black uppercase text-muted-foreground">
-                        <NetworkLogo network={b.network} className="h-3.5 w-3.5" /> {b.network}
-                      </span>
-                      {b.popular && (
-                        <span className="inline-flex items-center gap-1 rounded-full gold-gradient px-2.5 py-0.5 text-[10px] font-black text-primary-foreground">
-                          ★ Best Seller
+              {filteredBundles.map((b) => {
+                const displayPrice = customPrices[b.id] ?? Number(b.price_ghs);
+
+                return (
+                  <div
+                    key={b.id}
+                    className="group relative rounded-3xl border border-border/80 bg-card p-6 shadow-sm hover:border-primary/50 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/50 border border-border/60 px-3 py-1 text-[10px] font-black uppercase text-muted-foreground">
+                          <NetworkLogo network={b.network} className="h-3.5 w-3.5" /> {b.network}
                         </span>
-                      )}
-                    </div>
+                        {b.popular && (
+                          <span className="inline-flex items-center gap-1 rounded-full gold-gradient px-2.5 py-0.5 text-[10px] font-black text-primary-foreground">
+                            ★ Best Seller
+                          </span>
+                        )}
+                      </div>
 
-                    <div>
-                      <div className="text-3xl font-black font-display tracking-tight text-foreground">{b.size_label}</div>
-                      <div className="text-xs font-semibold text-muted-foreground mt-1">{b.validity || "Non-Expiry Data"}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-border/40 space-y-4">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs font-extrabold text-muted-foreground">Price</span>
-                      <div className="text-2xl font-black font-display text-primary">
-                        GH₵ {Number(b.price_ghs).toFixed(2)}
+                      <div>
+                        <div className="text-3xl font-black font-display tracking-tight text-foreground">{b.size_label}</div>
+                        <div className="text-xs font-semibold text-muted-foreground mt-1">{b.validity || "Non-Expiry Data"}</div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setBuyItem({ network: b.network as Network, size: b.size_label, price: Number(b.price_ghs) })}
-                        className="w-full rounded-2xl gold-gradient px-3 py-3 text-xs font-extrabold text-primary-foreground shadow-sm hover:scale-105 active:scale-95 transition-all"
-                      >
-                        Buy Now
-                      </button>
-                      <button
-                        onClick={() => cart.addItem({ id: `${b.network}-${b.size_label}`, network: b.network as Network, size: b.size_label, price: Number(b.price_ghs) })}
-                        className="w-full rounded-2xl border border-border/80 bg-background px-3 py-3 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all"
-                      >
-                        Add to Cart
-                      </button>
+                    <div className="mt-6 pt-4 border-t border-border/40 space-y-4">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs font-extrabold text-muted-foreground">Price</span>
+                        <div className="text-2xl font-black font-display text-primary">
+                          GH₵ {Number(displayPrice).toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setBuyItem({ network: b.network as Network, size: b.size_label, price: Number(displayPrice) })}
+                          className="w-full rounded-2xl gold-gradient px-3 py-3 text-xs font-extrabold text-primary-foreground shadow-sm hover:scale-105 active:scale-95 transition-all"
+                        >
+                          Buy Now
+                        </button>
+                        <button
+                          onClick={() => cart.addItem({ id: `${b.network}-${b.size_label}`, network: b.network as Network, size: b.size_label, price: Number(displayPrice) })}
+                          className="w-full rounded-2xl border border-border/80 bg-background px-3 py-3 text-xs font-extrabold hover:bg-muted active:scale-95 transition-all"
+                        >
+                          Add to Cart
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>

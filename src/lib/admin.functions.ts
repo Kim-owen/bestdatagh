@@ -190,11 +190,14 @@ export const adminSaveBundle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const payload = {
+    const payload: any = {
       network: data.network, size_label: data.size_label, size_mb: Number(data.size_mb),
       price_ghs: Number(data.price_ghs), validity: data.validity || "90 days",
       popular: !!data.popular, active: data.active !== false, sort_order: Number(data.sort_order ?? 100),
     };
+    if (data.agent_price_ghs !== undefined) {
+      payload.agent_price_ghs = Number(data.agent_price_ghs);
+    }
     if (data.id) {
       const { error } = await supabaseAdmin.from("bundles").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
