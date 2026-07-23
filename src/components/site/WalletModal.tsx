@@ -25,50 +25,23 @@ export function WalletTopUpModal({
   const amountToUse = customAmount ? Number(customAmount) : selectedAmount;
 
   const mut = useMutation({
-    mutationFn: () => initDeposit({ data: { amountGhs: amountToUse } }),
+    mutationFn: () => {
+      const currentUrl = typeof window !== "undefined" ? window.location.href.split("?")[0] : undefined;
+      return initDeposit({ data: { amountGhs: amountToUse, callbackUrl: currentUrl } });
+    },
     onSuccess: async (res) => {
       setIsProcessing(true);
-      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_live_74ed2ba7f110bcec6ca98f9d270ff1bd025b24c3";
 
-      try {
-        // Launch Paystack Inline Popup
-        await openPaystackInlineCheckout({
-          key: publicKey,
-          email: userEmail || `user-${Date.now()}@bestdatagh.com`,
-          amountGhs: amountToUse,
-          reference: res.reference,
-          onSuccess: async (ref) => {
-            try {
-              // Immediately verify and credit wallet on server
-              await verifyDeposit({ data: { reference: ref } });
-            } catch (err) {
-              console.warn("Direct deposit verification error:", err);
-            } finally {
-              setIsProcessing(false);
-              setSuccessMsg(true);
-              queryClient.invalidateQueries({ queryKey: ["myWallet"] });
-              queryClient.invalidateQueries({ queryKey: ["me"] });
-              setTimeout(() => {
-                setSuccessMsg(false);
-                onClose();
-              }, 1500);
-            }
-          },
-          onClose: () => {
-            setIsProcessing(false);
-          },
-        });
-      } catch (e) {
-        // Fallback to Paystack Hosted Payment Page
-        if (res.authorizationUrl) {
-          window.location.href = res.authorizationUrl;
-        } else {
-          setIsProcessing(false);
-        }
+      // Directly redirect to Paystack Hosted Payment Gateway
+      if (res.authorizationUrl) {
+        window.location.href = res.authorizationUrl;
+      } else {
+        setIsProcessing(false);
       }
     },
-    onError: () => {
+    onError: (err: any) => {
       setIsProcessing(false);
+      alert(err?.message || "Failed to initialize Paystack deposit.");
     },
   });
 

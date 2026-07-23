@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { getAgentDashboard, listMyWithdrawals, requestWithdrawal, sweepCommissionToWallet } from "@/lib/agent.functions";
+import { verifyWalletDeposit } from "@/lib/wallet.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import {
   ArrowLeft, TrendingUp, Wallet, Clock, Package, Store, ExternalLink, Users,
@@ -16,6 +17,7 @@ import { WalletTopUpModal } from "@/components/site/WalletModal";
 import { AgentReceiptModal } from "@/components/site/AgentReceiptModal";
 import { StatCardSkeleton, TableRowSkeleton } from "@/components/ui/skeleton";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/agent")({
   head: () => ({
@@ -38,6 +40,7 @@ type TabType = "overview" | "storefront" | "pricing" | "customers" | "withdrawal
 
 function AgentDashboard() {
   const nav = useNavigate();
+  const verifyDepositFn = useServerFn(verifyWalletDeposit);
   const [data, setData] = useState<Data | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +57,21 @@ function AgentDashboard() {
     setData(d);
     setWithdrawals(w as any);
   }
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("reference") || params.get("trxref");
+      if (ref && ref.startsWith("DEP-")) {
+        verifyDepositFn({ data: { reference: ref } })
+          .then(() => {
+            refresh();
+            window.history.replaceState({}, document.title, window.location.pathname);
+          })
+          .catch(console.error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
