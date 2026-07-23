@@ -91,6 +91,8 @@ function UnifiedPaymentPage() {
   const activePayerPhone = sameAsRecipient ? recipientPhone : paymentPhone;
   const validPayerPhone = /^\d{9,10}$/.test(activePayerPhone.replace(/\s+/g, ""));
 
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+
   // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
   const handleMoMoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +111,11 @@ function UnifiedPaymentPage() {
       });
 
       if (res.displayText) setPromptMessage(res.displayText);
+      if (res.authorizationUrl) {
+        setAuthUrl(res.authorizationUrl);
+        // Automatically popup Paystack overlay
+        window.open(res.authorizationUrl, "PaystackMoMo", "width=500,height=700,top=100,left=100");
+      }
 
       if (res.requiresOtp) {
         setStep("OTP_INPUT");
@@ -475,7 +482,7 @@ function UnifiedPaymentPage() {
 
                   <div className="space-y-1.5">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-400">
-                      <Zap className="h-3 w-3" /> USSD Push Prompt Active
+                      <Zap className="h-3 w-3" /> Mobile Money Payment Active
                     </span>
                     <h3 className="text-lg font-black text-white font-display">Check Your Phone Screen!</h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
@@ -483,6 +490,21 @@ function UnifiedPaymentPage() {
                       Enter your 4-digit PIN to authorize <span className="text-emerald-400 font-bold">GH₵ {totalGhs.toFixed(2)}</span>.
                     </p>
                   </div>
+
+                  {/* If Paystack fallback URL generated */}
+                  {authUrl && (
+                    <div className="pt-2">
+                      <a
+                        href={authUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient py-3 text-xs font-black text-slate-950 shadow-lg hover:scale-105 transition-all"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Open Paystack MoMo Screen</span>
+                      </a>
+                    </div>
+                  )}
 
                   {/* Live Status Log */}
                   <div className="rounded-xl bg-slate-950 p-3 text-[11px] font-mono text-slate-400 border border-white/10 flex items-center justify-center gap-2">

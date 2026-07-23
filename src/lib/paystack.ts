@@ -123,21 +123,44 @@ export interface ChargeMobileMoneyParams {
  */
 export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams) {
   const amountPesewas = Math.round(params.amountGhs * 100);
-  const cleanPhone = params.phone.replace(/\s+/g, "");
+  let cleanPhone = params.phone.replace(/\s+/g, "");
+  if (cleanPhone.startsWith("+233")) cleanPhone = "0" + cleanPhone.slice(4);
+  if (cleanPhone.startsWith("233")) cleanPhone = "0" + cleanPhone.slice(3);
+  if (!cleanPhone.startsWith("0")) cleanPhone = "0" + cleanPhone;
 
-  return paystackFetch<any>("/charge", {
-    method: "POST",
-    body: JSON.stringify({
+  try {
+    return await paystackFetch<any>("/charge", {
+      method: "POST",
+      body: JSON.stringify({
+        email: params.email,
+        amount: amountPesewas,
+        currency: "GHS",
+        reference: params.reference,
+        mobile_money: {
+          phone: cleanPhone,
+          provider: params.provider,
+        },
+      }),
+    });
+  } catch (err: any) {
+    console.warn("[Paystack Direct Charge Notice] Direct charge failed, initializing transaction fallback:", err.message);
+    // Fallback: Initialize standard Paystack transaction to obtain authorization URL
+    const initRes = await initializePaystackTransaction({
       email: params.email,
-      amount: amountPesewas,
-      currency: "GHS",
+      amountGhs: params.amountGhs,
       reference: params.reference,
-      mobile_money: {
-        phone: cleanPhone,
-        provider: params.provider,
+    });
+
+    return {
+      status: true,
+      message: "Authorization URL generated",
+      data: {
+        status: "open_url",
+        authorization_url: initRes.data.authorization_url,
+        display_text: "Please click to complete Mobile Money payment on Paystack.",
       },
-    }),
-  });
+    };
+  }
 }
 
 /**

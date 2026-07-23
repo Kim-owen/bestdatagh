@@ -200,10 +200,12 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
 
       const chargeStatus = chargeRes.data?.status || "pending";
       const requiresOtp = chargeStatus === "send_otp" || Boolean(chargeRes.data?.display_text?.toLowerCase().includes("otp"));
+      const authorizationUrl = chargeRes.data?.authorization_url || null;
 
       return {
         status: chargeStatus,
         requiresOtp,
+        authorizationUrl,
         displayText: chargeRes.data?.display_text || "Please check your phone screen for the MoMo PIN prompt.",
         reference: order.reference,
       };
