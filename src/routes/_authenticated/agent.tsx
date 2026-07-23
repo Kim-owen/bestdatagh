@@ -1138,14 +1138,16 @@ function AgentCustomPriceConfigurator() {
                 {netBundles.map((b) => {
                   const wholesaleCost = Number(b.agent_price_ghs ?? (b.price_ghs * 0.95));
                   const defaultPrice = Number(b.price_ghs);
-                  const currentPrice = customPrices[b.id] ?? defaultPrice;
+                  const currentPrice = Math.max(wholesaleCost, customPrices[b.id] ?? defaultPrice);
                   const profit = Math.max(0, currentPrice - wholesaleCost);
 
                   return (
                     <div key={b.id} className="rounded-xl border border-border/60 bg-card p-3 space-y-2">
                       <div className="flex items-center justify-between text-xs font-extrabold">
                         <span>{b.size_label}</span>
-                        <span className="text-[11px] font-mono text-muted-foreground">Cost: GH₵ {wholesaleCost.toFixed(2)}</span>
+                        <span className="text-[11px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                          Admin Base: GH₵ {wholesaleCost.toFixed(2)}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1154,6 +1156,7 @@ function AgentCustomPriceConfigurator() {
                           <input
                             type="number"
                             step="0.5"
+                            min={wholesaleCost}
                             value={currentPrice}
                             onChange={(e) => handlePriceChange(b.id, e.target.value)}
                             className="w-full rounded-xl border border-border bg-background pl-11 pr-3 py-1.5 text-xs font-mono font-bold text-foreground outline-none focus:border-primary"
