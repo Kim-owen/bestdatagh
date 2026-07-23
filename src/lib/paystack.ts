@@ -224,6 +224,84 @@ export async function initiatePaystackTransfer(params: InitiateTransferParams) {
 }
 
 /**
+ * Create a Paystack Customer
+ */
+export async function createPaystackCustomer(params: { email: string; phone: string; name?: string }) {
+  let cleanPhone = params.phone.replace(/\s+/g, "");
+  if (cleanPhone.startsWith("+233")) cleanPhone = "0" + cleanPhone.slice(4);
+  if (cleanPhone.startsWith("233")) cleanPhone = "0" + cleanPhone.slice(3);
+  if (!cleanPhone.startsWith("0")) cleanPhone = "0" + cleanPhone;
+
+  return paystackFetch<any>("/customer", {
+    method: "POST",
+    body: JSON.stringify({
+      email: params.email,
+      phone: cleanPhone,
+      first_name: params.name || "Customer",
+    }),
+  });
+}
+
+/**
+ * Resolve Ghana Mobile Money Account Number & Holder Name
+ */
+export async function resolvePaystackAccount(params: { accountNumber: string; bankCode: string }) {
+  let cleanPhone = params.accountNumber.replace(/\s+/g, "");
+  if (cleanPhone.startsWith("+233")) cleanPhone = "0" + cleanPhone.slice(4);
+  if (cleanPhone.startsWith("233")) cleanPhone = "0" + cleanPhone.slice(3);
+  if (!cleanPhone.startsWith("0")) cleanPhone = "0" + cleanPhone;
+
+  const normalizedBankCode = params.bankCode.toUpperCase().includes("MTN")
+    ? "MTN"
+    : params.bankCode.toUpperCase().includes("TELECEL") || params.bankCode.toUpperCase().includes("VODAFONE") || params.bankCode.toUpperCase().includes("VDF")
+    ? "VDF"
+    : "TGO";
+
+  return paystackFetch<any>(`/bank/resolve?account_number=${cleanPhone}&bank_code=${normalizedBankCode}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Create Paystack Payment Request (Invoice)
+ */
+export async function createPaystackPaymentRequest(params: {
+  customer: string; // Customer ID or Code (e.g. CUS_xxx or email)
+  amountGhs: number;
+  description: string;
+  lineItems?: Array<{ name: string; amount: number; quantity?: number }>;
+}) {
+  const amountPesewas = Math.round(params.amountGhs * 100);
+
+  const formattedItems = (params.lineItems || []).map((it) => ({
+    name: it.name,
+    amount: Math.round(it.amount * 100),
+    quantity: it.quantity || 1,
+  }));
+
+  return paystackFetch<any>("/paymentrequest", {
+    method: "POST",
+    body: JSON.stringify({
+      customer: params.customer,
+      amount: amountPesewas,
+      currency: "GHS",
+      description: params.description,
+      line_items: formattedItems.length > 0 ? formattedItems : undefined,
+      send_notification: true,
+    }),
+  });
+}
+
+/**
+ * Verify Paystack Payment Request status
+ */
+export async function verifyPaystackPaymentRequest(code: string) {
+  return paystackFetch<any>(`/paymentrequest/verify/${encodeURIComponent(code)}`, {
+    method: "GET",
+  });
+}
+
+/**
  * Verify HMAC SHA512 signature for incoming Paystack webhooks
  */
 export function verifyPaystackWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {

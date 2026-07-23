@@ -4,7 +4,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus } from "@/lib/orders.functions";
+import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus, resolveMoMoAccountName } from "@/lib/orders.functions";
 import { sendPhoneOtp } from "@/lib/otp.functions";
 import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle } from "lucide-react";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
@@ -35,6 +35,7 @@ function UnifiedPaymentPage() {
   const triggerChargeFn = useServerFn(initiateMoMoPromptCharge);
   const submitOtpFn = useServerFn(submitPaystackOtpCharge);
   const sendOtpFn = useServerFn(sendPhoneOtp);
+  const resolveNameFn = useServerFn(resolveMoMoAccountName);
 
   // Unified Payment State: "MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED"
   const [step, setStep] = useState<"MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED">("MOMO_INPUT");
@@ -46,6 +47,8 @@ function UnifiedPaymentPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
   const [promptMessage, setPromptMessage] = useState("Check your phone screen now! Enter your 4-digit MoMo PIN.");
+  const [resolvedAccountName, setResolvedAccountName] = useState<string | null>(null);
+  const [resolvingName, setResolvingName] = useState(false);
 
   // Poll order status every 3 seconds
   const { data: pollData } = useQuery({
@@ -90,6 +93,25 @@ function UnifiedPaymentPage() {
 
   const activePayerPhone = sameAsRecipient ? recipientPhone : paymentPhone;
   const validPayerPhone = /^\d{9,10}$/.test(activePayerPhone.replace(/\s+/g, ""));
+
+  // Live resolve MoMo Account Name via Paystack Bank Resolve API
+  useEffect(() => {
+    if (validPayerPhone && selectedNetwork) {
+      setResolvingName(true);
+      resolveNameFn({ data: { phone: activePayerPhone, network: selectedNetwork } })
+        .then((res) => {
+          setResolvedAccountName(res.accountName);
+        })
+        .catch(() => {
+          setResolvedAccountName(null);
+        })
+        .finally(() => {
+          setResolvingName(false);
+        });
+    } else {
+      setResolvedAccountName(null);
+    }
+  }, [activePayerPhone, selectedNetwork, validPayerPhone]);
 
   const [authUrl, setAuthUrl] = useState<string | null>(null);
 
@@ -363,6 +385,22 @@ function UnifiedPaymentPage() {
                       })}
                     </div>
                   </div>
+
+                  {/* MoMo Account Holder Name Badge */}
+                  {resolvingName ? (
+                    <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs font-bold text-amber-400 flex items-center gap-2 animate-pulse">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Verifying MoMo Account Holder Name via Paystack…</span>
+                    </div>
+                  ) : resolvedAccountName ? (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-400 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                        <span>Account Holder: <span className="text-white font-extrabold uppercase">{resolvedAccountName}</span></span>
+                      </div>
+                      <span className="text-[10px] font-mono uppercase bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">Verified</span>
+                    </div>
+                  ) : null}
 
                   {errorMsg && (
                     <div className="rounded-xl bg-destructive/15 border border-destructive/30 p-3 text-xs font-medium text-destructive flex items-center gap-2">

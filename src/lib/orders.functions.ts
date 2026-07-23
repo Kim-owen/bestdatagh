@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp } from "./paystack";
+import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackPaymentRequest } from "./paystack";
 
 export interface CartItemInput {
   id: string;
@@ -218,6 +218,21 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         displayText: "Please check your phone screen to enter your Mobile Money PIN.",
         reference: order.reference,
       };
+    }
+  });
+
+export const resolveMoMoAccountName = createServerFn({ method: "POST" })
+  .validator((data: { phone: string; network: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const res = await resolvePaystackAccount({ accountNumber: data.phone, bankCode: data.network });
+      return {
+        accountName: res.data?.account_name || null,
+        accountNumber: res.data?.account_number || data.phone,
+      };
+    } catch (err: any) {
+      console.warn("[MoMo Account Resolve Warning]:", err.message);
+      return { accountName: null, accountNumber: data.phone };
     }
   });
 
