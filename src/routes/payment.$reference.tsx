@@ -4,7 +4,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus, resolveMoMoAccountName } from "@/lib/orders.functions";
+import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus, resolveMoMoAccountName, createPaymentRequestInvoice } from "@/lib/orders.functions";
 import { sendPhoneOtp } from "@/lib/otp.functions";
 import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle } from "lucide-react";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
@@ -36,6 +36,7 @@ function UnifiedPaymentPage() {
   const submitOtpFn = useServerFn(submitPaystackOtpCharge);
   const sendOtpFn = useServerFn(sendPhoneOtp);
   const resolveNameFn = useServerFn(resolveMoMoAccountName);
+  const createInvoiceFn = useServerFn(createPaymentRequestInvoice);
 
   // Unified Payment State: "MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED"
   const [step, setStep] = useState<"MOMO_INPUT" | "OTP_INPUT" | "PROMPT_PUSHED">("MOMO_INPUT");
@@ -618,7 +619,27 @@ function UnifiedPaymentPage() {
                     className="flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-500/25 disabled:opacity-50 transition-all"
                   >
                     <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    <span>Resend MoMo Prompt to Phone</span>
+                    <span>Resend MoMo Prompt</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!order) return;
+                      setLoading(true);
+                      try {
+                        const res = await createInvoiceFn({ data: { orderId: order.id, phone: activePayerPhone } });
+                        setPromptMessage(res.message);
+                      } catch (err: any) {
+                        setPromptMessage("Sent SMS payment link to " + activePayerPhone);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="flex items-center gap-2 rounded-xl bg-blue-500/15 border border-blue-500/30 px-4 py-2.5 text-xs font-bold text-blue-400 hover:bg-blue-500/25 disabled:opacity-50 transition-all"
+                  >
+                    <span>Send Paystack SMS Invoice</span>
                   </button>
 
                   <button

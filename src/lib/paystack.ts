@@ -302,6 +302,15 @@ export async function verifyPaystackPaymentRequest(code: string) {
 }
 
 /**
+ * Send notification for a Paystack Payment Request (SMS / Email)
+ */
+export async function notifyPaystackPaymentRequest(code: string) {
+  return paystackFetch<any>(`/paymentrequest/notify/${encodeURIComponent(code)}`, {
+    method: "POST",
+  });
+}
+
+/**
  * Verify HMAC SHA512 signature for incoming Paystack webhooks
  */
 export function verifyPaystackWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {

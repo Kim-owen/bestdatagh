@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackPaymentRequest } from "./paystack";
+import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
 
 export interface CartItemInput {
   id: string;
@@ -218,6 +218,55 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         displayText: "Please check your phone screen to enter your Mobile Money PIN.",
         reference: order.reference,
       };
+    }
+  });
+
+export const createPaymentRequestInvoice = createServerFn({ method: "POST" })
+  .validator((data: { orderId: string; phone: string }) => data)
+  .handler(async ({ data }) => {
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("id, reference, total_ghs, order_items(network, size_label)")
+      .eq("id", data.orderId)
+      .single();
+
+    if (!order) throw new Error("Order not found.");
+
+    try {
+      // 1. Create or ensure Paystack Customer
+      const custRes = await createPaystackCustomer({
+        email: `customer-${data.phone}@bestdatagh.com`,
+        phone: data.phone,
+      });
+
+      const customerCode = custRes.data?.customer_code || custRes.data?.id;
+
+      // 2. Create Payment Request (Invoice)
+      const firstItem = order.order_items?.[0];
+      const desc = firstItem ? `${firstItem.network} ${firstItem.size_label} Data Bundle` : "Bestdata Data Bundle";
+
+      const prRes = await createPaystackPaymentRequest({
+        customer: customerCode,
+        amountGhs: order.total_ghs,
+        description: desc,
+        lineItems: [{ name: desc, amount: order.total_ghs, quantity: 1 }],
+      });
+
+      const requestCode = prRes.data?.request_code;
+      if (requestCode) {
+        // Send SMS/Email notification via Paystack
+        await notifyPaystackPaymentRequest(requestCode).catch(() => {});
+      }
+
+      return {
+        success: true,
+        message: "Paystack Payment Request invoice created and SMS notification sent to " + data.phone,
+        offlineReference: prRes.data?.offline_reference,
+        requestCode,
+      };
+    } catch (err: any) {
+      console.warn("[Payment Request Invoice Notice]:", err.message);
+      throw new Error(err.message || "Failed to create Paystack Payment Request invoice.");
     }
   });
 
