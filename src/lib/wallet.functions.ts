@@ -34,9 +34,10 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const reference = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const userEmail = (context.claims?.email as string) || `user-${context.userId}@bestdatagh.com`;
 
     const paystackRes = await initializePaystackTransaction({
-      email: context.user.email || `user-${context.userId}@bestdatagh.com`,
+      email: userEmail,
       amountGhs: data.amountGhs,
       reference,
       callbackUrl: data.callbackUrl || `${process.env.APP_URL || "https://ghana-data-hub-gold.vercel.app"}/account`,
