@@ -71,8 +71,20 @@ export const Route = createFileRoute("/api/v1/buy-data")({
         const { phone, network, size_gb, reference: userRef } = parsed.data;
         const cleanPhone = phone.replace(/\s+/g, "");
 
-        const pricePerGb = PRICE_PER_GB[network] || 4.50;
-        const totalAmount = Number((pricePerGb * size_gb).toFixed(2));
+        // Query database for official bundle price matching network and size
+        const networkQueryName = NETWORK_LABELS[network] || network;
+        const sizeLabelQuery = `${size_gb}GB`;
+
+        const { data: dbBundle } = await supabaseAdmin
+          .from("bundles")
+          .select("price_ghs")
+          .ilike("network", `%${networkQueryName}%`)
+          .ilike("size_label", sizeLabelQuery)
+          .eq("active", true)
+          .maybeSingle();
+
+        const calculatedPrice = dbBundle?.price_ghs ? Number(dbBundle.price_ghs) : Number(((PRICE_PER_GB[network] || 4.50) * size_gb).toFixed(2));
+        const totalAmount = Number(calculatedPrice.toFixed(2));
         const reference = userRef || `ORD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
         // Create order in database

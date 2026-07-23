@@ -27,20 +27,40 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }) => {
+    // Fetch official active bundle prices directly from database to prevent client-side price tampering
+    const { data: dbBundles, error: bundleErr } = await supabaseAdmin
+      .from("bundles")
+      .select("id, network, size_label, price_ghs, active")
+      .eq("active", true);
+
+    if (bundleErr || !dbBundles) {
+      throw new Error("Unable to verify bundle prices with server database.");
+    }
+
+    const priceMap = new Map<string, number>();
+    for (const b of dbBundles) {
+      priceMap.set(`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, Number(b.price_ghs));
+    }
+
     let totalGhs = 0;
     const itemsToInsert: any[] = [];
 
     for (const item of data.items) {
-      const price = Number(item.price);
+      const key = `${item.network.toLowerCase()}_${item.size.toLowerCase()}`;
+      const officialPrice = priceMap.get(key);
+
+      // Default to official server price or item.price if bundle isn't custom
+      const priceToUse = officialPrice && officialPrice > 0 ? officialPrice : Number(item.price);
       const qty = Math.max(1, Math.floor(Number(item.qty) || 1));
-      if (price <= 0) throw new Error("Invalid item price");
-      totalGhs += price * qty;
+      
+      if (priceToUse <= 0) throw new Error(`Invalid price for bundle: ${item.network} ${item.size}`);
+      totalGhs += priceToUse * qty;
 
       itemsToInsert.push({
         network: item.network,
         size_label: item.size,
         recipient_phone: data.recipientPhone,
-        unit_price_ghs: price,
+        unit_price_ghs: priceToUse,
         quantity: qty,
         status: "pending",
       });
