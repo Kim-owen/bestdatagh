@@ -40,7 +40,6 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
     return [
       { label: "Home", to: "/" as const, search: undefined, icon: Home },
       { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
-      { label: "Bulk Purchase", to: "/bulk" as const, search: undefined, icon: Package },
       { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
       { label: "Become an Agent", to: "/agents" as const, search: undefined, icon: Users },
       { label: "FAQ", to: "/faq" as const, search: undefined, icon: HelpCircle },
@@ -233,9 +232,11 @@ export function Header() {
                     <Link to="/account/api-keys" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
                       <KeyRound className="h-4 w-4" /> Developer API Keys
                     </Link>
-                    <Link to="/bulk" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
-                      <Upload className="h-4 w-4" /> Bulk Order Tool
-                    </Link>
+                    {(isAgent || isAdmin) && (
+                      <Link to="/bulk" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
+                        <Upload className="h-4 w-4" /> Bulk Order Tool
+                      </Link>
+                    )}
                     <Link to="/track-order" className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold hover:bg-muted transition-colors">
                       <ShoppingBag className="h-4 w-4" /> Track My Orders
                     </Link>
@@ -445,20 +446,50 @@ function MobileBottomDock({ onOpenWallet }: { onOpenWallet: () => void }) {
   const { user, isAgent, isAdmin } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const dockItems = [
-    { label: "Home", to: "/" as const, search: undefined, icon: Home },
-    { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
-    { label: "Bulk", to: "/bulk" as const, search: undefined, icon: Package },
-    ...(user
-      ? [{ label: "Deposit", isWallet: true, icon: Wallet }]
-      : [{ label: "Cart", isCart: true, icon: ShoppingBag }]),
-    {
-      label: user ? (isAgent ? "Agent" : isAdmin ? "Admin" : "Account") : "Log In",
-      to: (user ? (isAgent ? "/agent" : isAdmin ? "/admin" : "/account") : "/auth") as any,
-      search: user ? undefined : { tab: "login" as const, next: undefined },
-      icon: UserIcon,
-    },
-  ];
+  // Strictly Scoped Dock Items Based on Exact Role
+  const dockItems = useMemo(() => {
+    if (!user) {
+      // 1. Visitor / Public Unauthenticated User
+      return [
+        { label: "Home", to: "/" as const, search: undefined, icon: Home },
+        { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+        { label: "Track", to: "/track-order" as const, search: undefined, icon: Search },
+        { label: "Cart", isCart: true, icon: ShoppingBag },
+        { label: "Log In", to: "/auth" as const, search: { tab: "login" as const, next: undefined }, icon: UserIcon },
+      ];
+    }
+
+    if (isAdmin) {
+      // 2. Admin User
+      return [
+        { label: "Admin", to: "/admin" as const, search: undefined, icon: Shield },
+        { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+        { label: "Bulk", to: "/bulk" as const, search: undefined, icon: Package },
+        { label: "Deposit", isWallet: true, icon: Wallet },
+        { label: "Account", to: "/account" as const, search: undefined, icon: UserIcon },
+      ];
+    }
+
+    if (isAgent) {
+      // 3. Verified Agent
+      return [
+        { label: "Agent", to: "/agent" as const, search: undefined, icon: Store },
+        { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+        { label: "Bulk", to: "/bulk" as const, search: undefined, icon: Package },
+        { label: "Deposit", isWallet: true, icon: Wallet },
+        { label: "Account", to: "/account" as const, search: undefined, icon: UserIcon },
+      ];
+    }
+
+    // 4. Retail Account Holder (Logged In, Non-Agent)
+    return [
+      { label: "Home", to: "/" as const, search: undefined, icon: Home },
+      { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+      { label: "Deposit", isWallet: true, icon: Wallet },
+      { label: "Cart", isCart: true, icon: ShoppingBag },
+      { label: "Account", to: "/account" as const, search: undefined, icon: UserIcon },
+    ];
+  }, [user, isAdmin, isAgent]);
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-40 lg:hidden rounded-full border border-white/20 dark:border-white/10 bg-card/85 backdrop-blur-2xl px-4 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
