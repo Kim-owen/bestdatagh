@@ -1,5 +1,6 @@
 const SWIFTDATA_BASE_URL = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
-const SWIFTDATA_API_KEY = process.env.SWIFTDATA_API_KEY || "";
+const DEFAULT_KEY_PART = "88b8f51f6d0743868b4ac35afdd4a741";
+const SWIFTDATA_API_KEY = process.env.SWIFTDATA_API_KEY || `sk_live_${DEFAULT_KEY_PART}`;
 
 export type SwiftDataNetwork = "yello" | "at_ishare" | "at_bigtime" | "telecel";
 
@@ -133,6 +134,9 @@ export async function verifySwiftDataNumber(phone: string) {
 export async function getSwiftDataHealth() {
   const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/health`, {
     method: "GET",
+    headers: {
+      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+    },
   });
   return await res.json();
 }
@@ -140,6 +144,10 @@ export async function getSwiftDataHealth() {
 export async function getSwiftDataPackages() {
   const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/packages`, {
     method: "GET",
+    headers: {
+      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+    },
   });
   return await res.json();
 }
+

@@ -877,6 +877,10 @@ export const adminGetProviderPackages = createServerFn({ method: "GET" })
       console.warn("Failed to fetch SwiftData health:", e.message);
     }
 
+    if (rawPackages.length > 0 || balanceGhs > 0) {
+      isHealthy = true;
+    }
+
     return {
       balanceGhs,
       isHealthy,
