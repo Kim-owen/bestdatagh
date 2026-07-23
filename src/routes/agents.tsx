@@ -7,6 +7,7 @@ import { Footer } from "@/components/site/Footer";
 import { useAuth } from "@/lib/auth";
 import { listActiveBundles } from "@/lib/public-bundles.functions";
 import { getMyProfile, applyForAgent, AGENT_DISCOUNT_PCT } from "@/lib/profile.functions";
+import { getPublicHeroSlides } from "@/lib/admin.functions";
 import { useCart, type Network } from "@/lib/cart";
 import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantBuyModal";
 import { Store, TrendingUp, Percent, Users, ArrowRight, CheckCircle2, Clock, XCircle, Zap, Plus, Play, Pause, ChevronLeft, ChevronRight, Shield, Sparkles } from "lucide-react";
