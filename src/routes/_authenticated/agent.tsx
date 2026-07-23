@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { getAgentDashboard, listMyWithdrawals, requestWithdrawal } from "@/lib/agent.functions";
+import { getAgentDashboard, listMyWithdrawals, requestWithdrawal, sweepCommissionToWallet } from "@/lib/agent.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import {
   ArrowLeft, TrendingUp, Wallet, Clock, Package, Store, ExternalLink, Users,
   BanknoteIcon, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight,
   ShieldCheck, Sparkles, ArrowUpRight, DollarSign, BarChart3, RefreshCw,
-  Search, Filter, Zap, Server
+  Search, Filter, Zap, Server, Download, Printer, Receipt, Trophy, Star, UserPlus, Plus
 } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WithdrawalAuditLog } from "@/components/site/WithdrawalAuditLog";
 import { WalletTopUpModal } from "@/components/site/WalletModal";
+import { AgentReceiptModal } from "@/components/site/AgentReceiptModal";
 import { StatCardSkeleton, TableRowSkeleton } from "@/components/ui/skeleton";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 
@@ -39,6 +40,7 @@ function AgentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<any | null>(null);
   const [orderSearch, setOrderSearch] = useState("");
   const [networkFilter, setNetworkFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -92,6 +94,14 @@ function AgentDashboard() {
     return { paid, pendingReq, available };
   }, [withdrawals, data]);
 
+  const tierInfo = useMemo(() => {
+    const count = data?.stats.deliveredOrders ?? 0;
+    if (count >= 500) return { name: "💎 Diamond Agent", color: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30", target: 1000, margin: "12%" };
+    if (count >= 150) return { name: "🥇 Gold VIP Agent", color: "text-amber-400 bg-amber-500/15 border-amber-500/30", target: 500, margin: "10%" };
+    if (count >= 50) return { name: "🥈 Silver Agent", color: "text-slate-300 bg-slate-500/15 border-slate-500/30", target: 150, margin: "7%" };
+    return { name: "🥉 Bronze Agent", color: "text-amber-600 bg-amber-600/15 border-amber-600/30", target: 50, margin: "5%" };
+  }, [data?.stats.deliveredOrders]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
@@ -129,6 +139,31 @@ function AgentDashboard() {
   const s = data.stats;
   const chartData = [...data.monthly].reverse().map(m => ({ ...m, label: formatMonthShort(m.month) }));
 
+  function exportCSV() {
+    if (!filteredRecentOrders || filteredRecentOrders.length === 0) return;
+    const headers = ["Reference", "Date", "Recipient Phone", "Network", "Package Size", "Total (GHS)", "Status"];
+    const rows = filteredRecentOrders.map((o) => {
+      const item = (o.order_items && o.order_items[0]) || {};
+      return [
+        `"${o.reference}"`,
+        `"${new Date(o.created_at).toLocaleString()}"`,
+        `"${item.recipient_phone || 'N/A'}"`,
+        `"${item.network || 'MTN'}"`,
+        `"${item.size_label || 'Data Package'}"`,
+        `"${Number(o.total_ghs).toFixed(2)}"`,
+        `"${o.status}"`,
+      ];
+    });
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `bestdata_agent_orders_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       {/* Background Ambient Spheres */}
@@ -142,14 +177,14 @@ function AgentDashboard() {
       <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 md:py-14 space-y-10 relative z-10">
         {/* Admin-style Top Agent Banner */}
         <div className="rounded-3xl border border-border/80 bg-card/80 p-6 md:p-8 backdrop-blur-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-black text-emerald-500">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 GATEWAY OPERATIONAL
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-3 py-1 text-[11px] font-black text-primary">
-                ⚡ {data.rate}% Wholesale Margin
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase ${tierInfo.color}`}>
+                <Trophy className="h-3.5 w-3.5" /> {tierInfo.name} ({tierInfo.margin} Margin)
               </span>
             </div>
             <h1 className="text-3xl md:text-4xl font-black font-display tracking-tight">Agent Workspace & Operations</h1>
@@ -221,6 +256,9 @@ function AgentDashboard() {
           />
         </div>
 
+        {/* Saved Customer Directory (Mini-CRM) */}
+        <CustomerDirectory />
+
         {/* Analytics Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ChartCard title="Commission Earnings Trend" subtitle="Last 6 months performance">
@@ -273,17 +311,24 @@ function AgentDashboard() {
           onSubmitted={refresh}
         />
 
-        {/* Recent Orders with Admin-style Search & Filters */}
+        {/* Recent Orders with Search, Filters, CSV Export & Receipts */}
         <section className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl space-y-4 p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-4">
             <div>
               <h2 className="text-lg font-extrabold font-display flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" /> Live Customer Orders & Resells
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Real-time order dispatches & recipient lines</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Real-time order dispatches, receipts & export</p>
             </div>
 
             <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                onClick={exportCSV}
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-500 hover:bg-emerald-500/20 transition-all"
+              >
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </button>
+
               {/* Network Filter */}
               <select
                 value={networkFilter}
@@ -332,12 +377,13 @@ function AgentDashboard() {
                   <th className="text-left px-5 py-3.5">Items</th>
                   <th className="text-left px-5 py-3.5">Live Status</th>
                   <th className="text-right px-5 py-3.5">Total Amount</th>
+                  <th className="text-center px-5 py-3.5">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 font-mono">
                 {filteredRecentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-xs font-bold text-muted-foreground">
+                    <td colSpan={6} className="py-8 text-center text-xs font-bold text-muted-foreground">
                       No agent orders match the selected filters.
                     </td>
                   </tr>
@@ -363,6 +409,14 @@ function AgentDashboard() {
                         <td className="px-5 py-4 text-right font-black text-emerald-500 font-display">
                           GH₵ {Number(o.total_ghs).toFixed(2)}
                         </td>
+                        <td className="px-5 py-4 text-center font-sans">
+                          <button
+                            onClick={() => setSelectedReceiptOrder(o)}
+                            className="inline-flex items-center gap-1 rounded-xl bg-primary/10 border border-primary/20 px-2.5 py-1 text-[10px] font-extrabold text-primary hover:bg-primary/20 transition-all"
+                          >
+                            <Receipt className="h-3 w-3" /> Receipt
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
@@ -373,12 +427,127 @@ function AgentDashboard() {
         </section>
       </main>
 
+      <AgentReceiptModal
+        order={selectedReceiptOrder}
+        isOpen={!!selectedReceiptOrder}
+        onClose={() => setSelectedReceiptOrder(null)}
+        agentRate={data.rate}
+      />
+
       <WalletTopUpModal
         isOpen={walletModalOpen}
         onClose={() => setWalletModalOpen(false)}
       />
 
       <Footer />
+    </div>
+  );
+}
+
+/* ============ Customer Directory Component (Mini-CRM) ============ */
+function CustomerDirectory() {
+  const [contacts, setContacts] = useState<Array<{ id: string; name: string; phone: string; network: string }>>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("bestdata_agent_contacts");
+      return saved ? JSON.parse(saved) : [
+        { id: "1", name: "Ama Serwaa", phone: "0241234567", network: "MTN" },
+        { id: "2", name: "Kwame Mensah", phone: "0509876543", network: "Telecel" },
+      ];
+    } catch {
+      return [];
+    }
+  });
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [network, setNetwork] = useState("MTN");
+
+  function addContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name || !phone) return;
+    const next = [...contacts, { id: String(Date.now()), name, phone, network }];
+    setContacts(next);
+    localStorage.setItem("bestdata_agent_contacts", JSON.stringify(next));
+    setName("");
+    setPhone("");
+  }
+
+  function removeContact(id: string) {
+    const next = contacts.filter(c => c.id !== id);
+    setContacts(next);
+    localStorage.setItem("bestdata_agent_contacts", JSON.stringify(next));
+  }
+
+  return (
+    <div className="rounded-3xl border border-border/80 bg-card p-6 md:p-8 space-y-5 shadow-sm">
+      <div className="flex items-center justify-between border-b border-border/50 pb-4">
+        <div>
+          <h3 className="text-lg font-extrabold font-display flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" /> Saved Customer Directory (Mini-CRM)
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Quick re-order data for frequent clients</p>
+        </div>
+        <span className="text-xs font-black bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
+          {contacts.length} Saved Contacts
+        </span>
+      </div>
+
+      <form onSubmit={addContact} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <input
+          required
+          placeholder="Client Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="rounded-2xl border border-border/80 bg-background px-3.5 py-2.5 text-xs font-bold outline-none focus:border-primary"
+        />
+        <input
+          required
+          placeholder="Phone Number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="rounded-2xl border border-border/80 bg-background px-3.5 py-2.5 text-xs font-bold outline-none focus:border-primary font-mono"
+        />
+        <select
+          value={network}
+          onChange={(e) => setNetwork(e.target.value)}
+          className="rounded-2xl border border-border/80 bg-background px-3.5 py-2.5 text-xs font-bold outline-none focus:border-primary"
+        >
+          <option>MTN</option>
+          <option>Telecel</option>
+          <option>AirtelTigo</option>
+        </select>
+        <button
+          type="submit"
+          className="rounded-2xl gold-gradient px-4 py-2.5 text-xs font-black text-primary-foreground hover:scale-105 transition-all"
+        >
+          + Save Contact
+        </button>
+      </form>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {contacts.map((c) => (
+          <div key={c.id} className="rounded-2xl border border-border/80 bg-background/50 p-3.5 flex items-center justify-between gap-2 hover:border-primary/50 transition-all">
+            <div>
+              <div className="font-extrabold text-xs text-foreground">{c.name}</div>
+              <div className="text-[11px] font-mono text-muted-foreground">{c.phone} · <span className="text-primary font-bold">{c.network}</span></div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Link
+                to="/bulk"
+                className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] font-extrabold text-emerald-500 hover:bg-emerald-500/30 transition-all"
+              >
+                Send Data
+              </Link>
+              <button
+                onClick={() => removeContact(c.id)}
+                className="rounded-xl p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -395,6 +564,7 @@ function WithdrawalSection({
   const [destination, setDestination] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [sweeping, setSweeping] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok"|"err"; text: string } | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -412,6 +582,25 @@ function WithdrawalSection({
       setMsg({ type: "err", text: e?.message ?? "Failed to submit payout request." });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSweep() {
+    if (!amount || Number(amount) < 1) {
+      setMsg({ type: "err", text: "Enter a valid amount to sweep to your main wallet (Min GH₵ 1.00)." });
+      return;
+    }
+    setSweeping(true);
+    setMsg(null);
+    try {
+      const res = await sweepCommissionToWallet({ data: { amount_ghs: Number(amount) } });
+      setMsg({ type: "ok", text: `Successfully swept GH₵ ${res.amount_ghs.toFixed(2)} to your main wallet balance!` });
+      setAmount("");
+      await onSubmitted();
+    } catch (e: any) {
+      setMsg({ type: "err", text: e?.message ?? "Failed to sweep commission." });
+    } finally {
+      setSweeping(false);
     }
   }
 
@@ -503,7 +692,7 @@ function WithdrawalSection({
             <label className="block text-xs font-bold mb-1.5">Withdrawal Amount (GH₵)</label>
             <input
               type="number"
-              min="10"
+              min="1"
               step="0.01"
               required
               value={amount}
@@ -550,13 +739,24 @@ function WithdrawalSection({
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting || available < 10}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
-        >
-          {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Submitting Request…</>) : (<>Submit Payout Request</>)}
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="submit"
+            disabled={submitting || available < 10}
+            className="flex items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3 text-xs font-extrabold text-primary-foreground shadow-md hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+          >
+            {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Requesting...</>) : (<>MoMo Payout</>)}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSweep}
+            disabled={sweeping || available < 1}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-3 text-xs font-black text-black shadow-md hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+          >
+            {sweeping ? (<><Loader2 className="h-4 w-4 animate-spin" /> Sweeping...</>) : (<><Zap className="h-4 w-4" /> Sweep to Wallet (0 Fee)</>)}
+          </button>
+        </div>
 
         {msg && (
           <div className={`text-xs rounded-2xl p-3.5 font-bold flex items-center gap-2 ${
@@ -773,7 +973,6 @@ function AgentShareAndBrandingSuite() {
         {showQR && (
           <div className="rounded-2xl border border-border bg-muted/30 p-5 text-center space-y-3 animate-in fade-in zoom-in-95 duration-200">
             <div className="mx-auto grid h-36 w-36 place-items-center rounded-2xl border border-primary/40 bg-white p-3 shadow-md">
-              {/* SVG QR Code Simulation */}
               <div className="grid grid-cols-5 gap-1.5 w-full h-full p-1 bg-black rounded-lg">
                 <div className="bg-white rounded-sm col-span-2 row-span-2" />
                 <div className="bg-white rounded-sm col-start-4 col-span-2 row-span-2" />
@@ -853,5 +1052,3 @@ function formatMonthShort(key: string) {
   const [y, m] = key.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "short" });
 }
-
-

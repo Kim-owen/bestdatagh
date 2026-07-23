@@ -339,3 +339,72 @@ export const markNotificationRead = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const sweepCommissionToWallet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { amount_ghs: number }) => {
+    const amount = Number(d.amount_ghs);
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter a valid amount");
+    if (amount < 1) throw new Error("Minimum sweep amount is GH₵ 1.00");
+    return { amount_ghs: Number(amount.toFixed(2)) };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAgent(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Calculate available commission
+    const { data: orders } = await context.supabase
+      .from("orders").select("total_ghs, status").eq("user_id", context.userId).eq("status", "delivered");
+    const rate = AGENT_DISCOUNT_PCT / 100;
+    const earned = (orders ?? []).reduce((s: number, o: any) => s + Number(o.total_ghs || 0), 0) * rate;
+
+    const { data: ws } = await context.supabase
+      .from("withdrawals").select("amount_ghs, status").eq("user_id", context.userId).in("status", ["pending","approved","paid"]);
+    const requested = (ws ?? []).reduce((s: number, w: any) => s + Number(w.amount_ghs || 0), 0);
+    const available = earned - requested;
+
+    if (data.amount_ghs > available + 0.001) {
+      throw new Error(`Insufficient commission balance. Available: GH₵ ${available.toFixed(2)}`);
+    }
+
+    // 2. Create paid withdrawal record with method 'Wallet Sweep'
+    const { error: wErr } = await context.supabase
+      .from("withdrawals")
+      .insert({
+        user_id: context.userId,
+        amount_ghs: data.amount_ghs,
+        method: "Wallet Sweep",
+        destination: "Main Wallet",
+        status: "paid",
+        notes: "Instant 0-fee commission sweep to main purchasing wallet",
+        processed_at: new Date().toISOString(),
+      });
+    if (wErr) throw new Error(wErr.message);
+
+    // 3. Credit wallet balance
+    const { data: wallet } = await supabaseAdmin
+      .from("wallets")
+      .select("balance_ghs")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    const currentBal = Number(wallet?.balance_ghs || 0);
+    const newBal = Number((currentBal + data.amount_ghs).toFixed(2));
+
+    const { error: balErr } = await supabaseAdmin
+      .from("wallets")
+      .upsert({ user_id: context.userId, balance_ghs: newBal }, { onConflict: "user_id" });
+    if (balErr) throw new Error(balErr.message);
+
+    // 4. Record wallet transaction
+    await supabaseAdmin.from("wallet_transactions").insert({
+      user_id: context.userId,
+      amount_ghs: data.amount_ghs,
+      type: "commission_sweep",
+      status: "completed",
+      reference: `SWEEP-${Date.now()}`,
+      description: "Instant Commission Sweep to Main Wallet",
+    });
+
+    return { ok: true, amount_ghs: data.amount_ghs, newBalanceGhs: newBal };
+  });
