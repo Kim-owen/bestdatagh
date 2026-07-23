@@ -6,8 +6,8 @@ import { Footer } from "@/components/site/Footer";
 import { useCart } from "@/lib/cart";
 import { createCheckoutOrder, verifyOrderPayment } from "@/lib/orders.functions";
 import { checkPhoneVerification } from "@/lib/otp.functions";
-import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
 import { OtpVerificationModal } from "@/components/site/OtpVerificationModal";
+import { InAppPaymentModal } from "@/components/site/InAppPaymentModal";
 
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -78,12 +78,20 @@ function Checkout() {
     }
   };
 
+  const [paymentModalData, setPaymentModalData] = useState<{
+    orderId: string;
+    reference: string;
+    phone: string;
+    network: string;
+    totalGhs: number;
+  } | null>(null);
+
   const initiatePaymentFlow = async () => {
     setStatus("processing");
     setErrorMsg("");
 
     try {
-      // 1. Create order and get Paystack transaction details
+      // 1. Create order
       const orderRes = await createCheckoutOrder({
         data: {
           items: items.map((it) => ({
@@ -97,52 +105,15 @@ function Checkout() {
         },
       });
 
-      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_live_74ed2ba7f110bcec6ca98f9d270ff1bd025b24c3";
-
-      if (publicKey) {
-        // 2. Open Paystack Inline Pop-up directly on page
-        try {
-          await openPaystackInlineCheckout({
-            key: publicKey,
-            email: `customer-${phone.replace(/\s+/g, "")}@bestdatagh.com`,
-            amountGhs: subtotal,
-            reference: orderRes.reference,
-            metadata: {
-              order_id: orderRes.orderId,
-              recipient_phone: phone,
-            },
-            onSuccess: async (ref) => {
-              // Automatically verify payment upon inline completion
-              try {
-                const verifyRes = await verifyOrderPayment({ data: { reference: ref } });
-                if (verifyRes.verified) {
-                  setOrderId(orderRes.reference);
-                  setStatus("done");
-                  clear();
-                } else {
-                  throw new Error("Payment verification could not be confirmed.");
-                }
-              } catch (err: any) {
-                setErrorMsg(err.message || "Payment verification failed.");
-                setStatus("error");
-              }
-            },
-            onClose: () => {
-              setStatus("idle");
-            },
-          });
-          return;
-        } catch (inlineErr: any) {
-          console.warn("Paystack Inline popup fallback to redirect:", inlineErr.message);
-        }
-      }
-
-      // Fallback redirect if inline SDK cannot be initialized
-      if (orderRes?.authorizationUrl) {
-        window.location.href = orderRes.authorizationUrl;
-      } else {
-        throw new Error("Paystack checkout URL not available.");
-      }
+      // 2. Open in-app MoMo prompt and live status modal
+      setPaymentModalData({
+        orderId: orderRes.orderId,
+        reference: orderRes.reference,
+        phone,
+        network: items[0]?.network || "MTN",
+        totalGhs: subtotal,
+      });
+      setStatus("idle");
     } catch (err: any) {
       console.error("Checkout payment error:", err);
       setStatus("error");
@@ -349,6 +320,24 @@ function Checkout() {
           </div>
         )}
       </main>
+
+      {/* In-App MoMo Push Prompt & Live Delivery Modal */}
+      {paymentModalData && (
+        <InAppPaymentModal
+          orderId={paymentModalData.orderId}
+          reference={paymentModalData.reference}
+          recipientPhone={paymentModalData.phone}
+          network={paymentModalData.network}
+          totalGhs={paymentModalData.totalGhs}
+          onClose={() => setPaymentModalData(null)}
+          onSuccess={() => {
+            clear();
+            setOrderId(paymentModalData.reference);
+            setStatus("done");
+            setPaymentModalData(null);
+          }}
+        />
+      )}
 
       {/* First-Time Buyer OTP Verification Modal */}
       <OtpVerificationModal

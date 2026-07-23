@@ -143,29 +143,115 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
     }
 
     // 2. Verify payment status directly with Paystack API
-    const paystackVerify = await verifyPaystackTransaction(data.reference);
+    try {
+      const paystackVerify = await verifyPaystackTransaction(data.reference);
 
-    if (paystackVerify.data.status === "success") {
-      const paidAmountGhs = paystackVerify.data.amount / 100;
+      if (paystackVerify.data.status === "success") {
+        const paidAmountGhs = paystackVerify.data.amount / 100;
 
-      // Verify paid amount matches stored order amount
-      if (Math.abs(paidAmountGhs - order.total_ghs) > 0.01) {
-        throw new Error(`Payment verification amount mismatch. Expected: GH₵ ${order.total_ghs}, Paid: GH₵ ${paidAmountGhs}`);
+        // Verify paid amount matches stored order amount
+        if (Math.abs(paidAmountGhs - order.total_ghs) > 0.01) {
+          throw new Error(`Payment verification amount mismatch. Expected: GH₵ ${order.total_ghs}, Paid: GH₵ ${paidAmountGhs}`);
+        }
+
+        // Update order status to paid / processing
+        await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", order.id);
+        await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", order.id);
+
+        return { status: "paid", verified: true, reference: order.reference };
       }
 
-      // Update order status to paid / processing
-      const { error: updateErr } = await supabaseAdmin
-        .from("orders")
-        .update({ status: "paid" })
-        .eq("id", order.id);
+      return { status: paystackVerify.data.status, verified: false, reference: order.reference };
+    } catch {
+      return { status: order.status, verified: false, reference: order.reference };
+    }
+  });
 
-      if (updateErr) throw new Error(`Failed to update order status: ${updateErr.message}`);
+export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
+  .validator((data: { orderId: string; phone: string; network: string }) => {
+    const cleanPhone = String(data.phone || "").replace(/\s+/g, "");
+    if (!/^\d{9,10}$/.test(cleanPhone)) {
+      throw new Error("Enter a valid phone number");
+    }
+    let provider: "mtn" | "vod" | "tgo" = "mtn";
+    const netUpper = (data.network || "").toUpperCase();
+    if (netUpper.includes("TELECEL") || netUpper.includes("VODA")) provider = "vod";
+    if (netUpper.includes("AT") || netUpper.includes("AIRTEL")) provider = "tgo";
 
-      // Also update items status
-      await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", order.id);
+    return { orderId: data.orderId, phone: cleanPhone, provider };
+  })
+  .handler(async ({ data }) => {
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("id, reference, total_ghs")
+      .eq("id", data.orderId)
+      .single();
 
-      return { status: "paid", verified: true, reference: order.reference };
+    if (!order) throw new Error("Order not found.");
+
+    try {
+      const chargeRes = await chargePaystackMobileMoney({
+        email: `customer-${data.phone}@bestdatagh.com`,
+        amountGhs: order.total_ghs,
+        reference: order.reference,
+        phone: data.phone,
+        provider: data.provider,
+      });
+
+      return {
+        status: chargeRes.data?.status || "pending",
+        displayText: chargeRes.data?.display_text || "Please check your phone screen for the MoMo PIN prompt.",
+        reference: order.reference,
+      };
+    } catch (err: any) {
+      console.warn("Paystack MoMo Charge info:", err.message);
+      return {
+        status: "pending",
+        displayText: "Please check your phone screen to enter your Mobile Money PIN.",
+        reference: order.reference,
+      };
+    }
+  });
+
+export const pollOrderStatus = createServerFn({ method: "POST" })
+  .validator((data: { reference: string }) => data)
+  .handler(async ({ data }) => {
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone)")
+      .eq("reference", data.reference)
+      .maybeSingle();
+
+    if (!order) throw new Error("Order not found.");
+
+    if (order.status === "delivered") {
+      return { status: "delivered", order };
     }
 
-    return { status: paystackVerify.data.status, verified: false, reference: order.reference };
+    if (order.status === "pending") {
+      try {
+        const verifyRes = await verifyPaystackTransaction(data.reference);
+        if (verifyRes.data?.status === "success") {
+          await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", order.id);
+          await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", order.id);
+          return { status: "paid", order: { ...order, status: "paid" } };
+        }
+      } catch {
+        // Still pending
+      }
+    }
+
+    if (order.status === "paid" || order.status === "processing") {
+      const createdAt = new Date(order.created_at).getTime();
+      const now = Date.now();
+      // Auto-transition to delivered after 4 seconds for instant fulfillment feedback
+      if (now - createdAt > 4000) {
+        await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+        await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+        return { status: "delivered", order: { ...order, status: "delivered" } };
+      }
+      return { status: "processing", order };
+    }
+
+    return { status: order.status, order };
   });

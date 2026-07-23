@@ -110,6 +110,36 @@ export async function verifyPaystackTransaction(reference: string): Promise<Pays
   });
 }
 
+export interface ChargeMobileMoneyParams {
+  email: string;
+  amountGhs: number;
+  reference: string;
+  phone: string;
+  provider: "mtn" | "vod" | "tgo";
+}
+
+/**
+ * Direct Paystack MoMo Push Prompt Charge (No External Redirects)
+ */
+export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams) {
+  const amountPesewas = Math.round(params.amountGhs * 100);
+  const cleanPhone = params.phone.replace(/\s+/g, "");
+
+  return paystackFetch<any>("/charge", {
+    method: "POST",
+    body: JSON.stringify({
+      email: params.email,
+      amount: amountPesewas,
+      currency: "GHS",
+      reference: params.reference,
+      mobile_money: {
+        phone: cleanPhone,
+        provider: params.provider,
+      },
+    }),
+  });
+}
+
 /**
  * Create a Mobile Money Transfer Recipient for agent payouts
  */

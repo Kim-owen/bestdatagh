@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2, X, Lock, ShieldCheck } from "lucide-react";
 import type { Network } from "@/lib/cart";
-import { createCheckoutOrder, verifyOrderPayment } from "@/lib/orders.functions";
-import { openPaystackInlineCheckout } from "@/lib/paystack-inline";
+import { createCheckoutOrder } from "@/lib/orders.functions";
+import { InAppPaymentModal } from "./InAppPaymentModal";
 
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,6 +31,14 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
   const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
   const [orderId, setOrderId] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  const [paymentModalData, setPaymentModalData] = useState<{
+    orderId: string;
+    reference: string;
+    phone: string;
+    network: string;
+    totalGhs: number;
+  } | null>(null);
 
   const handleWalletPay = async () => {
     if (!validPhone || !item) return;
@@ -63,6 +71,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
       setStatus("idle");
       setOrderId("");
       setErrorMsg("");
+      setPaymentModalData(null);
     }
   }, [item]);
 
@@ -83,7 +92,6 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
     setErrorMsg("");
 
     try {
-      // 1. Create order and get Paystack authorization details
       const orderRes = await createCheckoutOrder({
         data: {
           items: [
@@ -99,42 +107,38 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
         },
       });
 
-      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_live_74ed2ba7f110bcec6ca98f9d270ff1bd025b24c3";
-
-      // 2. Open Paystack Inline Pop-up directly on page
-      await openPaystackInlineCheckout({
-        key: publicKey,
-        email: `customer-${phone.replace(/\s+/g, "")}@bestdatagh.com`,
-        amountGhs: item.price,
+      setPaymentModalData({
+        orderId: orderRes.orderId,
         reference: orderRes.reference,
-        metadata: {
-          order_id: orderRes.orderId,
-          recipient_phone: phone,
-        },
-        onSuccess: async (ref) => {
-          try {
-            const verifyRes = await verifyOrderPayment({ data: { reference: ref } });
-            if (verifyRes.verified) {
-              setOrderId(orderRes.reference);
-              setStatus("done");
-            } else {
-              throw new Error("Payment verification failed.");
-            }
-          } catch (err: any) {
-            setErrorMsg(err.message || "Payment verification failed.");
-            setStatus("error");
-          }
-        },
-        onClose: () => {
-          setStatus("idle");
-        },
+        phone,
+        network: item.network,
+        totalGhs: item.price,
       });
+      setStatus("idle");
     } catch (err: any) {
       console.error("Paystack instant checkout error:", err);
-      setErrorMsg(err.message || "Failed to initialize Paystack payment.");
+      setErrorMsg(err.message || "Failed to initialize MoMo payment.");
       setStatus("error");
     }
   };
+
+  if (paymentModalData) {
+    return (
+      <InAppPaymentModal
+        orderId={paymentModalData.orderId}
+        reference={paymentModalData.reference}
+        recipientPhone={paymentModalData.phone}
+        network={paymentModalData.network}
+        totalGhs={paymentModalData.totalGhs}
+        onClose={onClose}
+        onSuccess={() => {
+          setOrderId(paymentModalData.reference);
+          setStatus("done");
+          setPaymentModalData(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -147,10 +151,10 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
         <div className="flex items-start justify-between">
           <div>
             <div className="eyebrow mb-1 flex items-center gap-1">
-              <Lock className="h-3 w-3 text-primary" /> Paystack Instant Checkout
+              <Lock className="h-3 w-3 text-primary" /> In-App MoMo Checkout
             </div>
             <h3 className="text-lg font-bold">{item.size} · {item.network}</h3>
-            <p className="text-xs text-muted-foreground">Delivered within 2 minutes to your phone.</p>
+            <p className="text-xs text-muted-foreground">Delivered instantly after MoMo PIN prompt.</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-md border border-border hover:bg-muted">
             <X className="h-4 w-4" />
@@ -158,75 +162,98 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
         </div>
 
         {status === "done" ? (
-          <div className="mt-6 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 border border-emerald-500/30">
-              <Check className="h-7 w-7 text-emerald-500" />
+          <div className="mt-6 space-y-4 text-center">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-500/10 text-emerald-500">
+              <Check className="h-6 w-6" />
             </div>
-            <h4 className="mt-4 text-base font-bold">Payment Complete & Order Confirmed</h4>
-            <p className="mt-1 text-sm text-muted-foreground">Reference <span className="font-mono font-semibold text-foreground">{orderId}</span></p>
-            <p className="mt-1 text-xs text-muted-foreground">Your {item.size} {item.network} bundle has been processed for +233 {phone}.</p>
-            <button onClick={onClose} className="mt-5 w-full rounded-xl gold-gradient px-4 py-2.5 text-sm font-bold text-primary-foreground">Done</button>
+            <div>
+              <h4 className="font-bold text-foreground">Order Delivered! 🎉</h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your data bundle has been credited to <span className="font-semibold text-foreground">{phone}</span>.
+              </p>
+              {orderId && (
+                <p className="mt-2 font-mono text-xs text-primary font-bold">
+                  Reference: {orderId}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full rounded-md gold-gradient py-2 text-xs font-semibold text-primary-foreground"
+            >
+              Done
+            </button>
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-5 space-y-4">
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Network:</span>
+                <span className="font-bold">{item.network}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Bundle:</span>
+                <span className="font-bold">{item.size}</span>
+              </div>
+              <div className="flex justify-between text-xs border-t border-border/50 pt-1 mt-1">
+                <span className="font-bold">Total:</span>
+                <span className="font-bold text-primary">GH₵ {item.price.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="instant-phone" className="block text-xs font-semibold">
+                Recipient Phone Number
+              </label>
+              <input
+                id="instant-phone"
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="024XXXXXXX"
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                required
+              />
+            </div>
+
             {errorMsg && (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-bold">
+              <div className="rounded-md bg-destructive/10 p-2.5 text-xs text-destructive">
                 {errorMsg}
               </div>
             )}
 
-            <div>
-              <label htmlFor="ib-phone" className="text-xs font-semibold text-foreground/80">Recipient phone number</label>
-              <div className="mt-1.5 flex items-center rounded-xl border border-border bg-background focus-within:ring-2 focus-within:ring-primary/40">
-                <span className="pl-3 pr-2 text-sm font-semibold text-muted-foreground">🇬🇭 +233</span>
-                <input
-                  id="ib-phone"
-                  inputMode="numeric"
-                  autoFocus
-                  placeholder="24 123 4567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ""))}
-                  className="flex-1 bg-transparent py-2.5 pr-3 text-sm font-medium outline-none"
-                />
+            {user && (
+              <div className="pt-1 border-t border-border/50">
+                <button
+                  type="button"
+                  onClick={handleWalletPay}
+                  disabled={!canPayWallet || !validPhone || status === "processing"}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 py-2.5 text-xs font-bold text-primary hover:bg-primary/20 disabled:opacity-50 transition-all mb-2"
+                >
+                  <Wallet className="h-4 w-4" />
+                  <span>Pay GH₵ {item.price.toFixed(2)} with Wallet (Bal: GH₵ {walletBalance.toFixed(2)})</span>
+                </button>
               </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-background p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Total Amount</span>
-                <span className="text-lg font-extrabold font-display">GHS {item.price.toFixed(2)}</span>
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                Secured by Paystack — MTN MoMo, Telecel Cash, AT Money, Visa & Mastercard.
-              </div>
-            </div>
-
-            {canPayWallet && (
-              <button
-                type="button"
-                onClick={handleWalletPay}
-                disabled={!validPhone || status === "processing"}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 px-4 py-3 text-sm font-bold text-black disabled:opacity-60 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md"
-              >
-                <Wallet className="h-4 w-4" />
-                Pay GHS {item.price.toFixed(2)} with Wallet (GH₵ {walletBalance.toFixed(2)} Avail)
-              </button>
             )}
 
             <button
               type="submit"
               disabled={!validPhone || status === "processing"}
-              className="flex w-full items-center justify-center gap-2 rounded-xl gold-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              className="flex w-full items-center justify-center gap-2 rounded-md gold-gradient py-3 text-xs font-bold text-primary-foreground disabled:opacity-50 shadow-md hover:scale-[1.01] active:scale-[.98] transition-all"
             >
               {status === "processing" ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Processing Payment…
+                  <Loader2 className="h-4 w-4 animate-spin" /> Initiating MoMo Prompt…
                 </>
               ) : (
-                <>Pay GHS {item.price.toFixed(2)} with Paystack</>
+                <>Pay GH₵ {item.price.toFixed(2)} via MoMo Push Prompt</>
               )}
             </button>
+
+            <p className="text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1">
+              <ShieldCheck className="h-3 w-3 text-emerald-500" /> Direct MoMo PIN prompt pushed straight to your phone screen.
+            </p>
           </form>
         )}
       </div>
