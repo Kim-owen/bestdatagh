@@ -118,6 +118,14 @@ function AgentDashboard() {
 
   if (!data) return null;
 
+  const totals = useMemo(() => {
+    const paid = withdrawals.filter(w => w.status === "paid").reduce((s, w) => s + Number(w.amount_ghs), 0);
+    const pendingReq = withdrawals.filter(w => w.status === "pending" || w.status === "approved").reduce((s, w) => s + Number(w.amount_ghs), 0);
+    const earned = data?.stats.commissionEarned ?? 0;
+    const available = Math.max(0, earned - paid - pendingReq);
+    return { paid, pendingReq, available };
+  }, [withdrawals, data]);
+
   const s = data.stats;
   const chartData = [...data.monthly].reverse().map(m => ({ ...m, label: formatMonthShort(m.month) }));
 
