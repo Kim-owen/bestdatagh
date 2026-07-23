@@ -30,12 +30,19 @@ import { Route as CheckoutVerifyRouteImport } from './routes/checkout.verify'
 import { Route as AuthenticatedAccountApiKeysRouteImport } from './routes/_authenticated/account.api-keys'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin.agents'
+import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
 import { Route as AuthenticatedAdminApiKeysRouteImport } from './routes/_authenticated/admin.api-keys'
+import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin.audit-logs'
+import { Route as AuthenticatedAdminBroadcastRouteImport } from './routes/_authenticated/admin.broadcast'
 import { Route as AuthenticatedAdminBundlesRouteImport } from './routes/_authenticated/admin.bundles'
 import { Route as AuthenticatedAdminOrdersRouteImport } from './routes/_authenticated/admin.orders'
+import { Route as AuthenticatedAdminReconcileRouteImport } from './routes/_authenticated/admin.reconcile'
+import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin.reports'
 import { Route as AuthenticatedAdminReviewsRouteImport } from './routes/_authenticated/admin.reviews'
+import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authenticated/admin.security'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminSlideshowRouteImport } from './routes/_authenticated/admin.slideshow'
+import { Route as AuthenticatedAdminSupportTicketsRouteImport } from './routes/_authenticated/admin.support-tickets'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminWithdrawalsRouteImport } from './routes/_authenticated/admin.withdrawals'
 import { Route as ApiPaystackWebhookRouteImport } from './routes/api/paystack/webhook'
@@ -155,10 +162,28 @@ const AuthenticatedAdminAgentsRoute =
     path: '/agents',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminAnalyticsRoute =
+  AuthenticatedAdminAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminApiKeysRoute =
   AuthenticatedAdminApiKeysRouteImport.update({
     id: '/api-keys',
     path: '/api-keys',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAuditLogsRoute =
+  AuthenticatedAdminAuditLogsRouteImport.update({
+    id: '/audit-logs',
+    path: '/audit-logs',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminBroadcastRoute =
+  AuthenticatedAdminBroadcastRouteImport.update({
+    id: '/broadcast',
+    path: '/broadcast',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminBundlesRoute =
@@ -173,10 +198,28 @@ const AuthenticatedAdminOrdersRoute =
     path: '/orders',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminReconcileRoute =
+  AuthenticatedAdminReconcileRouteImport.update({
+    id: '/reconcile',
+    path: '/reconcile',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminReportsRoute =
+  AuthenticatedAdminReportsRouteImport.update({
+    id: '/reports',
+    path: '/reports',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminReviewsRoute =
   AuthenticatedAdminReviewsRouteImport.update({
     id: '/reviews',
     path: '/reviews',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminSecurityRoute =
+  AuthenticatedAdminSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminSettingsRoute =
@@ -189,6 +232,12 @@ const AuthenticatedAdminSlideshowRoute =
   AuthenticatedAdminSlideshowRouteImport.update({
     id: '/slideshow',
     path: '/slideshow',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminSupportTicketsRoute =
+  AuthenticatedAdminSupportTicketsRouteImport.update({
+    id: '/support-tickets',
+    path: '/support-tickets',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
@@ -273,12 +322,19 @@ export interface FileRoutesByFullPath {
   '/checkout/verify': typeof CheckoutVerifyRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
+  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
+  '/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/admin/bundles': typeof AuthenticatedAdminBundlesRoute
   '/admin/orders': typeof AuthenticatedAdminOrdersRoute
+  '/admin/reconcile': typeof AuthenticatedAdminReconcileRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
+  '/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/slideshow': typeof AuthenticatedAdminSlideshowRoute
+  '/admin/support-tickets': typeof AuthenticatedAdminSupportTicketsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
@@ -312,12 +368,19 @@ export interface FileRoutesByTo {
   '/checkout/verify': typeof CheckoutVerifyRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
+  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
+  '/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/admin/bundles': typeof AuthenticatedAdminBundlesRoute
   '/admin/orders': typeof AuthenticatedAdminOrdersRoute
+  '/admin/reconcile': typeof AuthenticatedAdminReconcileRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
+  '/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/slideshow': typeof AuthenticatedAdminSlideshowRoute
+  '/admin/support-tickets': typeof AuthenticatedAdminSupportTicketsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
@@ -354,12 +417,19 @@ export interface FileRoutesById {
   '/checkout/verify': typeof CheckoutVerifyRoute
   '/_authenticated/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
+  '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
+  '/_authenticated/admin/broadcast': typeof AuthenticatedAdminBroadcastRoute
   '/_authenticated/admin/bundles': typeof AuthenticatedAdminBundlesRoute
   '/_authenticated/admin/orders': typeof AuthenticatedAdminOrdersRoute
+  '/_authenticated/admin/reconcile': typeof AuthenticatedAdminReconcileRoute
+  '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/reviews': typeof AuthenticatedAdminReviewsRoute
+  '/_authenticated/admin/security': typeof AuthenticatedAdminSecurityRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/slideshow': typeof AuthenticatedAdminSlideshowRoute
+  '/_authenticated/admin/support-tickets': typeof AuthenticatedAdminSupportTicketsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
@@ -396,12 +466,19 @@ export interface FileRouteTypes {
     | '/checkout/verify'
     | '/account/api-keys'
     | '/admin/agents'
+    | '/admin/analytics'
     | '/admin/api-keys'
+    | '/admin/audit-logs'
+    | '/admin/broadcast'
     | '/admin/bundles'
     | '/admin/orders'
+    | '/admin/reconcile'
+    | '/admin/reports'
     | '/admin/reviews'
+    | '/admin/security'
     | '/admin/settings'
     | '/admin/slideshow'
+    | '/admin/support-tickets'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/api/paystack/webhook'
@@ -435,12 +512,19 @@ export interface FileRouteTypes {
     | '/checkout/verify'
     | '/account/api-keys'
     | '/admin/agents'
+    | '/admin/analytics'
     | '/admin/api-keys'
+    | '/admin/audit-logs'
+    | '/admin/broadcast'
     | '/admin/bundles'
     | '/admin/orders'
+    | '/admin/reconcile'
+    | '/admin/reports'
     | '/admin/reviews'
+    | '/admin/security'
     | '/admin/settings'
     | '/admin/slideshow'
+    | '/admin/support-tickets'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/api/paystack/webhook'
@@ -476,12 +560,19 @@ export interface FileRouteTypes {
     | '/checkout/verify'
     | '/_authenticated/account/api-keys'
     | '/_authenticated/admin/agents'
+    | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/api-keys'
+    | '/_authenticated/admin/audit-logs'
+    | '/_authenticated/admin/broadcast'
     | '/_authenticated/admin/bundles'
     | '/_authenticated/admin/orders'
+    | '/_authenticated/admin/reconcile'
+    | '/_authenticated/admin/reports'
     | '/_authenticated/admin/reviews'
+    | '/_authenticated/admin/security'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/slideshow'
+    | '/_authenticated/admin/support-tickets'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/withdrawals'
     | '/api/paystack/webhook'
@@ -672,11 +763,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAgentsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/analytics': {
+      id: '/_authenticated/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/api-keys': {
       id: '/_authenticated/admin/api-keys'
       path: '/api-keys'
       fullPath: '/admin/api-keys'
       preLoaderRoute: typeof AuthenticatedAdminApiKeysRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/audit-logs': {
+      id: '/_authenticated/admin/audit-logs'
+      path: '/audit-logs'
+      fullPath: '/admin/audit-logs'
+      preLoaderRoute: typeof AuthenticatedAdminAuditLogsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/broadcast': {
+      id: '/_authenticated/admin/broadcast'
+      path: '/broadcast'
+      fullPath: '/admin/broadcast'
+      preLoaderRoute: typeof AuthenticatedAdminBroadcastRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/bundles': {
@@ -693,11 +805,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminOrdersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/reconcile': {
+      id: '/_authenticated/admin/reconcile'
+      path: '/reconcile'
+      fullPath: '/admin/reconcile'
+      preLoaderRoute: typeof AuthenticatedAdminReconcileRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/reports': {
+      id: '/_authenticated/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/reviews': {
       id: '/_authenticated/admin/reviews'
       path: '/reviews'
       fullPath: '/admin/reviews'
       preLoaderRoute: typeof AuthenticatedAdminReviewsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/security': {
+      id: '/_authenticated/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AuthenticatedAdminSecurityRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/settings': {
@@ -712,6 +845,13 @@ declare module '@tanstack/react-router' {
       path: '/slideshow'
       fullPath: '/admin/slideshow'
       preLoaderRoute: typeof AuthenticatedAdminSlideshowRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/support-tickets': {
+      id: '/_authenticated/admin/support-tickets'
+      path: '/support-tickets'
+      fullPath: '/admin/support-tickets'
+      preLoaderRoute: typeof AuthenticatedAdminSupportTicketsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/users': {
@@ -814,12 +954,19 @@ const AuthenticatedAccountRouteWithChildren =
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAgentsRoute: typeof AuthenticatedAdminAgentsRoute
+  AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
   AuthenticatedAdminApiKeysRoute: typeof AuthenticatedAdminApiKeysRoute
+  AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute
+  AuthenticatedAdminBroadcastRoute: typeof AuthenticatedAdminBroadcastRoute
   AuthenticatedAdminBundlesRoute: typeof AuthenticatedAdminBundlesRoute
   AuthenticatedAdminOrdersRoute: typeof AuthenticatedAdminOrdersRoute
+  AuthenticatedAdminReconcileRoute: typeof AuthenticatedAdminReconcileRoute
+  AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
   AuthenticatedAdminReviewsRoute: typeof AuthenticatedAdminReviewsRoute
+  AuthenticatedAdminSecurityRoute: typeof AuthenticatedAdminSecurityRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
   AuthenticatedAdminSlideshowRoute: typeof AuthenticatedAdminSlideshowRoute
+  AuthenticatedAdminSupportTicketsRoute: typeof AuthenticatedAdminSupportTicketsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminWithdrawalsRoute: typeof AuthenticatedAdminWithdrawalsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -827,12 +974,19 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAgentsRoute: AuthenticatedAdminAgentsRoute,
+  AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
   AuthenticatedAdminApiKeysRoute: AuthenticatedAdminApiKeysRoute,
+  AuthenticatedAdminAuditLogsRoute: AuthenticatedAdminAuditLogsRoute,
+  AuthenticatedAdminBroadcastRoute: AuthenticatedAdminBroadcastRoute,
   AuthenticatedAdminBundlesRoute: AuthenticatedAdminBundlesRoute,
   AuthenticatedAdminOrdersRoute: AuthenticatedAdminOrdersRoute,
+  AuthenticatedAdminReconcileRoute: AuthenticatedAdminReconcileRoute,
+  AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
   AuthenticatedAdminReviewsRoute: AuthenticatedAdminReviewsRoute,
+  AuthenticatedAdminSecurityRoute: AuthenticatedAdminSecurityRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
   AuthenticatedAdminSlideshowRoute: AuthenticatedAdminSlideshowRoute,
+  AuthenticatedAdminSupportTicketsRoute: AuthenticatedAdminSupportTicketsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWithdrawalsRoute: AuthenticatedAdminWithdrawalsRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,

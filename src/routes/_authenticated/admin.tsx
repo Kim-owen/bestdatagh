@@ -23,7 +23,13 @@ import {
   Activity,
   UserCheck,
   Settings,
-  Film
+  Film,
+  ShieldAlert,
+  MessageSquare,
+  Banknote,
+  TrendingUp,
+  LifeBuoy,
+  FileSpreadsheet
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -79,23 +85,22 @@ function AdminShell() {
 
   const pendingApps = statsData?.pendingAgentAppsCount || 0;
   const pendingWs = statsData?.pendingWithdrawalsCount || 0;
+  const stats = statsData;
 
   const navGroups = [
     {
-      group: "Overview",
-      items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true }],
-    },
-    {
-      group: "Commerce & Sales",
+      group: "Core Operations",
       items: [
-        { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
-        { to: "/admin/bundles", label: "Data Bundles", icon: Package },
-      ],
-    },
-    {
-      group: "Users & Partners",
-      items: [
-        { to: "/admin/users", label: "User Accounts", icon: Users },
+        { to: "/admin", label: "Command Center", icon: LayoutDashboard },
+        {
+          to: "/admin/orders",
+          label: "Live Orders & Retry",
+          icon: ShoppingBag,
+          badge: stats?.pendingOrders ? stats.pendingOrders : undefined,
+          badgeColor: "bg-destructive",
+        },
+        { to: "/admin/users", label: "Users & Roles", icon: Users },
+        { to: "/admin/bundles", label: "Bundle Packages", icon: Package },
         {
           to: "/admin/agents",
           label: "Agent Applications",
@@ -112,11 +117,28 @@ function AdminShell() {
       ],
     },
     {
-      group: "API & Content",
+      group: "Security & Audit",
       items: [
+        { to: "/admin/audit-logs", label: "Security Audit Logs", icon: ShieldCheck },
+        { to: "/admin/security", label: "Fraud Security Hub", icon: ShieldAlert },
+      ],
+    },
+    {
+      group: "Marketing & Support",
+      items: [
+        { to: "/admin/broadcast", label: "SMS Broadcast", icon: MessageSquare },
+        { to: "/admin/support-tickets", label: "Support Desk", icon: LifeBuoy },
         { to: "/admin/slideshow", label: "Hero Slideshow", icon: Film },
-        { to: "/admin/api-keys", label: "Developer Keys", icon: KeyRound },
         { to: "/admin/reviews", label: "Customer Reviews", icon: Star },
+      ],
+    },
+    {
+      group: "Finance & Reports",
+      items: [
+        { to: "/admin/reconcile", label: "Paystack Ledger", icon: Banknote },
+        { to: "/admin/analytics", label: "Profit Analytics", icon: TrendingUp },
+        { to: "/admin/reports", label: "CSV Export Reports", icon: FileSpreadsheet },
+        { to: "/admin/api-keys", label: "Developer Keys", icon: KeyRound },
         { to: "/admin/settings", label: "Site Settings", icon: Settings },
       ],
     },
