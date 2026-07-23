@@ -363,6 +363,25 @@ export async function chargePaystackAuthorization(params: { authorizationCode: s
 }
 
 /**
+ * Fetch Paystack Payment Session Timeout
+ */
+export async function fetchPaystackSessionTimeout() {
+  return paystackFetch<any>("/integration/payment_session_timeout", {
+    method: "GET",
+  });
+}
+
+/**
+ * Update Paystack Payment Session Timeout (in seconds, 0 = disable)
+ */
+export async function updatePaystackSessionTimeout(timeoutSeconds: number) {
+  return paystackFetch<any>("/integration/payment_session_timeout", {
+    method: "PUT",
+    body: JSON.stringify({ timeout: timeoutSeconds }),
+  });
+}
+
+/**
  * Verify HMAC SHA512 signature for incoming Paystack webhooks
  */
 export function verifyPaystackWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
