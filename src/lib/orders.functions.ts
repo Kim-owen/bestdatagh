@@ -176,6 +176,17 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
       if (tx) {
         reference = tx.reference;
         totalGhs = Number(tx.amount_ghs);
+      } else {
+        // Fallback: Verify with Paystack transaction API to get initialized amount
+        try {
+          const psData = await verifyPaystackTransaction(data.orderId);
+          if (psData.data?.amount) {
+            totalGhs = psData.data.amount / 100;
+            reference = data.orderId;
+          }
+        } catch {
+          // Ignore error if not initialized on Paystack yet
+        }
       }
     }
 
@@ -331,6 +342,104 @@ export const submitPaystackOtpCharge = createServerFn({ method: "POST" })
 export const pollOrderStatus = createServerFn({ method: "POST" })
   .validator((data: { reference: string }) => data)
   .handler(async ({ data }) => {
+    // 1. Check if deposit transaction (starts with "DEP-")
+    if (data.reference.startsWith("DEP-")) {
+      const { data: tx } = await supabaseAdmin
+        .from("wallet_transactions")
+        .select("id, user_id, reference, amount_ghs, status")
+        .eq("reference", data.reference)
+        .maybeSingle();
+
+      if (tx) {
+        if (tx.status === "completed") {
+          return {
+            status: "delivered",
+            isDeposit: true,
+            depositAmount: Number(tx.amount_ghs),
+            reference: tx.reference,
+            order: { reference: tx.reference, total_ghs: Number(tx.amount_ghs) },
+          };
+        }
+
+        // Verify with Paystack
+        try {
+          const verifyRes = await verifyPaystackTransaction(data.reference);
+          if (verifyRes.data?.status === "success") {
+            const paidGhs = verifyRes.data.amount / 100;
+
+            if (tx.user_id) {
+              const { data: curWallet } = await supabaseAdmin
+                .from("wallets")
+                .select("balance_ghs")
+                .eq("user_id", tx.user_id)
+                .maybeSingle();
+
+              const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+              await supabaseAdmin
+                .from("wallets")
+                .upsert({ user_id: tx.user_id, balance_ghs: newBal, updated_at: new Date().toISOString() });
+            }
+
+            await supabaseAdmin
+              .from("wallet_transactions")
+              .update({ status: "completed" })
+              .eq("id", tx.id);
+
+            return {
+              status: "delivered",
+              isDeposit: true,
+              depositAmount: paidGhs,
+              reference: tx.reference,
+              order: { reference: tx.reference, total_ghs: paidGhs },
+            };
+          }
+        } catch {
+          // Still pending
+        }
+
+        return {
+          status: "pending",
+          isDeposit: true,
+          depositAmount: Number(tx.amount_ghs),
+          reference: tx.reference,
+          order: { reference: tx.reference, total_ghs: Number(tx.amount_ghs) },
+        };
+      } else {
+        // Fallback for deposits not found in local DB yet: Verify Paystack directly
+        try {
+          const verifyRes = await verifyPaystackTransaction(data.reference);
+          const paidGhs = (verifyRes.data?.amount || 0) / 100;
+
+          if (verifyRes.data?.status === "success") {
+            return {
+              status: "delivered",
+              isDeposit: true,
+              depositAmount: paidGhs,
+              reference: data.reference,
+              order: { reference: data.reference, total_ghs: paidGhs },
+            };
+          }
+
+          return {
+            status: "pending",
+            isDeposit: true,
+            depositAmount: paidGhs,
+            reference: data.reference,
+            order: { reference: data.reference, total_ghs: paidGhs },
+          };
+        } catch {
+          return {
+            status: "pending",
+            isDeposit: true,
+            depositAmount: 0,
+            reference: data.reference,
+            order: { reference: data.reference, total_ghs: 0 },
+          };
+        }
+      }
+    }
+
+    // 2. Standard order check
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone)")
