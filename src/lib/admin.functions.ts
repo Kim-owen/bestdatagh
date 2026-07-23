@@ -260,17 +260,77 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendTxtConnectSms } = await import("@/lib/otp.functions");
-    const { buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } = await import("@/lib/swiftdata");
+    const { buySwiftDataBundle, getSwiftDataOrder, mapToSwiftDataNetwork, parseSizeGb } = await import("@/lib/swiftdata");
+    const { verifyPaystackTransaction } = await import("@/lib/paystack");
 
-    // Fetch order details
+    // 1. Fetch order details
     const { data: order, error } = await supabaseAdmin
       .from("orders")
-      .select("id, reference, total_ghs, status, order_items(network, size_label, recipient_phone)")
+      .select("id, reference, total_ghs, status, source, order_items(network, size_label, recipient_phone)")
       .eq("id", data.id)
       .maybeSingle();
 
     if (error || !order) throw new Error("Order not found");
 
+    // 2. VERIFY PAYMENT STATUS BEFORE ANY RETRY
+    let isPaymentVerified = false;
+    let paymentNote = "";
+
+    if (order.status === "paid" || order.status === "delivered" || order.source === "agent_wallet" || order.source === "user_wallet") {
+      isPaymentVerified = true;
+      paymentNote = "Verified via database wallet/paid status";
+    } else {
+      try {
+        const pVerify = await verifyPaystackTransaction(order.reference);
+        if (pVerify && pVerify.status && pVerify.data && pVerify.data.status === "success") {
+          isPaymentVerified = true;
+          paymentNote = `Paystack verified payment of GH₵ ${(pVerify.data.amount / 100).toFixed(2)}`;
+          await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", order.id);
+        } else {
+          paymentNote = pVerify?.data?.status ? `Paystack status: ${pVerify.data.status}` : "Payment not confirmed by Paystack";
+        }
+      } catch (pErr: any) {
+        console.warn("Paystack verification check failed:", pErr.message);
+        paymentNote = `Paystack check failed: ${pErr.message}`;
+      }
+    }
+
+    if (!isPaymentVerified) {
+      throw new Error(`Cannot retry order: Payment is not verified! (${paymentNote}). Please ensure customer completed Mobile Money payment before retrying.`);
+    }
+
+    // 3. CHECK PROVIDER GATEWAY TO PREVENT DUPLICATE PURCHASES
+    try {
+      const existingGatewayOrder = await getSwiftDataOrder(order.reference);
+      if (existingGatewayOrder && existingGatewayOrder.order) {
+        const swiftStatus = (existingGatewayOrder.order.status || "").toLowerCase();
+        if (swiftStatus === "completed" || swiftStatus === "delivered") {
+          await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+
+          await supabaseAdmin.from("admin_audit_logs").insert({
+            admin_id: context.user.id,
+            admin_email: context.user.email,
+            action: "PREVENTED_DUPLICATE_RETRY",
+            target_type: "order",
+            target_id: order.id,
+            details: { reference: order.reference, message: "Order was already completed on gateway" },
+          });
+
+          return {
+            ok: true,
+            reference: order.reference,
+            status: "delivered",
+            apiSuccess: true,
+            alreadyCompleted: true,
+            apiErrorMsg: "Order was already completed on gateway. Status updated to Delivered (Duplicate prevented).",
+          };
+        }
+      }
+    } catch (gErr) {
+      // Order not on gateway yet, safe to proceed with purchase
+    }
+
+    // 4. EXECUTE BUNDLE PURCHASE VIA SWIFTDATA API
     const item = (order.order_items && order.order_items[0]) || {};
     const swiftNetwork = mapToSwiftDataNetwork(item.network || "MTN", item.size_label);
     const sizeGb = parseSizeGb(item.size_label || "1GB");
@@ -317,7 +377,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
       action: "RETRY_ORDER_FULFILLMENT",
       target_type: "order",
       target_id: order.id,
-      details: { reference: order.reference, apiSuccess, apiErrorMsg, newStatus },
+      details: { reference: order.reference, apiSuccess, apiErrorMsg, newStatus, paymentNote },
     });
 
     return {
