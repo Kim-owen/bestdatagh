@@ -160,42 +160,116 @@ export const adminListWithdrawals = createServerFn({ method: "GET" })
 
 export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; status: "pending"|"approved"|"paid"|"rejected"; admin_note?: string }) => {
-    if (!["pending","approved","paid","rejected"].includes(d.status)) throw new Error("Bad status");
-    return { id: String(d.id), status: d.status, admin_note: (d.admin_note || "").slice(0, 500) };
+  .inputValidator((d: { id: string; status: "pending" | "approved" | "paid" | "rejected"; admin_note?: string; refundToWallet?: boolean }) => {
+    if (!["pending", "approved", "paid", "rejected"].includes(d.status)) throw new Error("Bad status");
+    return {
+      id: String(d.id),
+      status: d.status,
+      admin_note: (d.admin_note || "").slice(0, 500),
+      refundToWallet: !!d.refundToWallet,
+    };
   })
   .handler(async ({ data, context }) => {
-    const { data: role } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId).eq("role","admin").maybeSingle();
+    const { data: role } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
     if (!role) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Fetch withdrawal record
     const { data: withdrawal } = await supabaseAdmin.from("withdrawals").select("*").eq("id", data.id).single();
-    if (!withdrawal) throw new Error("Withdrawal not found");
+    if (!withdrawal) throw new Error("Withdrawal record not found");
 
     const patch: any = { status: data.status, admin_note: data.admin_note || null };
     if (data.status === "paid" || data.status === "rejected") patch.processed_at = new Date().toISOString();
 
-    // Trigger automated Paystack transfer if approving/paying out with valid secret key
+    // 1. AUTOMATED PAYSTACK PAYOUT / TRANSFER ON APPROVAL
     if ((data.status === "approved" || data.status === "paid") && process.env.PAYSTACK_SECRET_KEY) {
-      const match = withdrawal.notes?.match(/RecipientCode:([A-Za-z0-9_]+)/);
-      const recipientCode = match ? match[1] : "";
+      try {
+        const { createPaystackTransferRecipient, initiatePaystackTransfer } = await import("./paystack");
 
-      if (recipientCode) {
-        try {
-          const { initiatePaystackTransfer } = await import("./paystack");
+        let recipientCode = "";
+        const match = (withdrawal.notes || "").match(/RecipientCode:([A-Za-z0-9_]+)/);
+        if (match) {
+          recipientCode = match[1];
+        } else if (withdrawal.destination) {
+          // Dynamically create transfer recipient if not existing
+          const rec = await createPaystackTransferRecipient({
+            name: `Agent-${withdrawal.user_id.slice(0, 8)}`,
+            phone: withdrawal.destination,
+            bankCode: withdrawal.method || "MTN",
+          });
+          recipientCode = rec.recipient_code;
+        }
+
+        if (recipientCode) {
           const transferRes = await initiatePaystackTransfer({
             amountGhs: Number(withdrawal.amount_ghs),
             recipientCode,
-            reference: withdrawal.id,
-            reason: `Agent Commission Payout - ${withdrawal.id}`,
+            reference: `WD-${withdrawal.id.slice(0, 8)}-${Date.now().toString().slice(-4)}`,
+            reason: `Agent Commission Payout - Bestdata`,
           });
 
-          patch.admin_note = [data.admin_note, `Paystack Transfer Code: ${transferRes.transfer_code}`].filter(Boolean).join(" | ");
-        } catch (err: any) {
-          console.error("Automated Paystack transfer failed:", err.message);
-          patch.admin_note = [data.admin_note, `Paystack Payout Warning: ${err.message}`].filter(Boolean).join(" | ");
+          patch.status = "paid";
+          patch.admin_note = [
+            data.admin_note,
+            `Automated Paystack Transfer: ${transferRes.transfer_code || "Queued"}`,
+          ]
+            .filter(Boolean)
+            .join(" | ");
+
+          // Send SMS Notification
+          const { sendTxtConnectSms } = await import("./otp.functions");
+          await sendTxtConnectSms(
+            withdrawal.destination,
+            `Bestdata Payout Alert: Your withdrawal of GH₵ ${Number(withdrawal.amount_ghs).toFixed(2)} has been approved & transferred to your ${withdrawal.method} MoMo line (${withdrawal.destination}). Thank you!`
+          ).catch((e) => console.warn("Payout SMS notification warning:", e.message));
         }
+      } catch (err: any) {
+        console.error("Automated Paystack transfer failed:", err.message);
+        patch.admin_note = [data.admin_note, `Paystack Payout Warning: ${err.message}`].filter(Boolean).join(" | ");
+      }
+    }
+
+    // 2. REJECT & OPTIONAL REFUND TO AGENT WALLET
+    if (data.status === "rejected" && data.refundToWallet) {
+      const { data: wRecord } = await supabaseAdmin
+        .from("wallets")
+        .select("balance_ghs")
+        .eq("user_id", withdrawal.user_id)
+        .maybeSingle();
+
+      const oldBal = Number(wRecord?.balance_ghs || 0);
+      const refundAmt = Number(withdrawal.amount_ghs);
+      const newBal = oldBal + refundAmt;
+
+      await supabaseAdmin.from("wallets").upsert({
+        user_id: withdrawal.user_id,
+        balance_ghs: newBal,
+        updated_at: new Date().toISOString(),
+      });
+
+      await supabaseAdmin.from("wallet_transactions").insert({
+        user_id: withdrawal.user_id,
+        amount_ghs: refundAmt,
+        type: "refund",
+        reference: `WLT-REF-${Date.now()}`,
+        status: "completed",
+        description: `Returned Withdrawal Request #${withdrawal.id.slice(0, 8)} to Wallet`,
+      });
+
+      patch.admin_note = [
+        data.admin_note,
+        `Returned GH₵ ${refundAmt.toFixed(2)} back to user wallet balance.`,
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+      // Send SMS Notification
+      if (withdrawal.destination) {
+        const { sendTxtConnectSms } = await import("./otp.functions");
+        await sendTxtConnectSms(
+          withdrawal.destination,
+          `Bestdata Notice: Your withdrawal request of GH₵ ${refundAmt.toFixed(2)} was refunded back to your Bestdata Wallet balance.`
+        ).catch((e) => console.warn("Refund SMS warning:", e.message));
       }
     }
 
