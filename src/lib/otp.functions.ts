@@ -402,8 +402,9 @@ export const loginPhoneVerifiedUser = createServerFn({ method: "POST" })
  * Verify Email + Password, then dispatch 2FA SMS OTP to the user's verified phone number
  */
 export const initiateEmailPasswordLoginWithOtp = createServerFn({ method: "POST" })
-  .validator((data: { email: string }) => ({
+  .validator((data: { email: string; phone?: string }) => ({
     email: (data.email || "").trim().toLowerCase(),
+    phone: data.phone ? cleanPhone(data.phone) : undefined,
   }))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -415,7 +416,7 @@ export const initiateEmailPasswordLoginWithOtp = createServerFn({ method: "POST"
       .eq("email", data.email)
       .maybeSingle();
 
-    let verifiedPhone = userProfile?.phone;
+    let verifiedPhone = userProfile?.phone || data.phone;
 
     if (!verifiedPhone) {
       const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
@@ -425,8 +426,31 @@ export const initiateEmailPasswordLoginWithOtp = createServerFn({ method: "POST"
       }
     }
 
+    // If phone number was supplied now, save it to profile for future logins
+    if (data.phone && userProfile?.id) {
+      const formattedIntl = data.phone.startsWith("0") ? `+233${data.phone.slice(1)}` : `+233${data.phone}`;
+      await (supabaseAdmin as any)
+        .from("profiles")
+        .update({ phone: data.phone })
+        .eq("id", userProfile.id);
+
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(userProfile.id, {
+          user_metadata: { phone: formattedIntl, phone_verified: true },
+        });
+      } catch {}
+      verifiedPhone = data.phone;
+    }
+
     if (!verifiedPhone) {
-      throw new Error("No verified phone number found for this account. Please verify your phone number during signup.");
+      return {
+        success: false,
+        requirePhone: true,
+        phone: "",
+        maskedPhone: "",
+        otpCode: "",
+        message: "No phone number attached to account. Please enter your Ghana mobile number to receive your SMS OTP code.",
+      };
     }
 
     const raw = cleanPhone(verifiedPhone);
@@ -457,9 +481,11 @@ export const initiateEmailPasswordLoginWithOtp = createServerFn({ method: "POST"
     const maskedPhone = `+233 ${raw.slice(1, 3)} *** ${raw.slice(-4)}`;
     return {
       success: true,
+      requirePhone: false,
       phone: raw,
       maskedPhone,
       otpCode,
+      message: "OTP sent successfully",
     };
   });
 

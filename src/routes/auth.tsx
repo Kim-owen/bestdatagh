@@ -4,7 +4,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import {
   ArrowRight, Mail, Lock, User, ShieldCheck, Wallet, History, Rocket,
-  Smartphone, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Sparkles, RefreshCw
+  Smartphone, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Sparkles, RefreshCw, Phone
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -192,6 +192,9 @@ function LoginForm({ next }: { next?: string }) {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
+  const [needPhoneInput, setNeedPhoneInput] = useState(false);
+  const [customPhone, setCustomPhone] = useState("");
+
   // Step 1: Verify Email & Password and send SMS OTP to verified phone number
   async function handleInitiateLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -207,7 +210,12 @@ function LoginForm({ next }: { next?: string }) {
       await supabase.auth.signOut();
 
       // 2. Dispatch SMS OTP code to user's registered phone number
-      const res = await initLoginOtpFn({ data: { email } });
+      const res = await initLoginOtpFn({ data: { email, phone: customPhone || undefined } });
+      if (res.requirePhone) {
+        setNeedPhoneInput(true);
+        setErr("No phone number attached to account. Please enter your Ghana mobile number below to receive your 2FA OTP.");
+        return;
+      }
       setVerifiedPhone(res.phone);
       setMaskedPhone(res.maskedPhone);
       setStep("OTP");
@@ -305,6 +313,20 @@ function LoginForm({ next }: { next?: string }) {
               }
             />
           </div>
+
+          {needPhoneInput && (
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3.5 space-y-2">
+              <label className="block text-xs font-bold text-primary">Ghana Phone Number (For 2FA OTP)</label>
+              <Field
+                icon={Phone}
+                type="tel"
+                placeholder="0241234567"
+                value={customPhone}
+                onChange={(e) => setCustomPhone(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
           {err && (
             <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
