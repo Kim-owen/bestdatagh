@@ -25,7 +25,9 @@ export function TopProgressBar() {
   );
 }
 
-/** BrandLoadingSpinner renders a multi-ring glowing brand logo loader */
+import { GoldCoinSpinner } from "@/components/site/GoldCoinSpinner";
+
+/** BrandLoadingSpinner renders the 3D Spinning Gold Coin Loader */
 export function BrandLoadingSpinner({
   size = "md",
   label = "Loading BestData…",
@@ -33,32 +35,9 @@ export function BrandLoadingSpinner({
   size?: "sm" | "md" | "lg";
   label?: string;
 }) {
-  const sizeClasses = {
-    sm: "h-8 w-8 text-xs",
-    md: "h-14 w-14 text-sm",
-    lg: "h-20 w-20 text-base",
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center gap-3 p-4">
-      <div className={`relative flex items-center justify-center ${sizeClasses[size]}`}>
-        {/* Outer Spinning Ring */}
-        <div className="absolute inset-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-
-        {/* Inner Pulsing Ring */}
-        <div className="absolute inset-1.5 rounded-full border border-[hsl(48_100%_60%)]/40 animate-[ring-pulse_2s_infinite]" />
-
-        {/* Center Brand Emblem */}
-        <div className="h-2/3 w-2/3 rounded-xl gold-gradient grid place-items-center font-black text-primary-foreground font-display shadow-lg shadow-primary/30">
-          BD
-        </div>
-      </div>
-
-      {label && (
-        <span className="text-xs font-black tracking-wider uppercase text-muted-foreground animate-pulse flex items-center gap-1.5">
-          <Zap className="h-3 w-3 text-primary animate-bounce" /> {label}
-        </span>
-      )}
+    <div className="flex flex-col items-center justify-center p-4">
+      <GoldCoinSpinner size={size} label={label} />
     </div>
   );
 }

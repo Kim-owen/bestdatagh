@@ -13,6 +13,7 @@ import { getMyWallet } from "@/lib/wallet.functions";
 import { WalletTopUpModal } from "./WalletModal";
 import { NotificationBell } from "./NotificationBell";
 import { InactivityTimer } from "./InactivityTimer";
+import { Logo } from "./Logo";
 
 export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: boolean) {
   if (isAdmin) {
