@@ -119,6 +119,7 @@ export interface ChargeMobileMoneyParams {
   reference: string;
   phone: string;
   provider: "mtn" | "vod" | "tgo";
+  metadata?: Record<string, any>;
 }
 
 export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams) {
@@ -136,6 +137,7 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
         amount: amountPesewas,
         currency: "GHS",
         reference: params.reference,
+        metadata: params.metadata,
         mobile_money: {
           phone: cleanPhone,
           provider: params.provider,
@@ -158,6 +160,7 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
             amount: amountPesewas,
             currency: "GHS",
             reference: subRef,
+            metadata: params.metadata,
             mobile_money: {
               phone: cleanPhone,
               provider: params.provider,

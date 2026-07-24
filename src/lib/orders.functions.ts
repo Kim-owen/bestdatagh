@@ -165,6 +165,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
     let reference = data.orderId;
     let totalGhs = 0;
 
+    let targetUserId = "";
     // A. Check if deposit transaction
     if (data.orderId.startsWith("DEP-")) {
       const parts = data.orderId.split("-");
@@ -173,7 +174,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
 
       const { data: tx } = await (supabaseAdmin as any)
         .from("wallet_transactions")
-        .select("id, reference, amount_ghs")
+        .select("id, user_id, reference, amount_ghs")
         .or(`reference.eq.${data.orderId},reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -182,6 +183,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
       if (tx) {
         reference = tx.reference;
         totalGhs = Number(tx.amount_ghs);
+        targetUserId = tx.user_id;
       } else {
         // Fallback A: Verify rootPrefix or orderId with Paystack API
         const refsToTry = Array.from(new Set([data.orderId, rootPrefix, baseRef].filter(Boolean)));
@@ -202,7 +204,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         if (!totalGhs) {
           const { data: latestPending } = await (supabaseAdmin as any)
             .from("wallet_transactions")
-            .select("reference, amount_ghs")
+            .select("reference, amount_ghs, user_id")
             .eq("type", "deposit")
             .order("created_at", { ascending: false })
             .limit(1)
@@ -211,6 +213,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
           if (latestPending) {
             reference = latestPending.reference;
             totalGhs = Number(latestPending.amount_ghs);
+            targetUserId = latestPending.user_id;
           }
         }
 
@@ -226,13 +229,14 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
     if (!totalGhs) {
       const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("id, reference, total_ghs")
+        .select("id, reference, total_ghs, user_id")
         .or(`id.eq.${data.orderId},reference.eq.${data.orderId}`)
         .maybeSingle();
 
       if (order) {
         reference = order.reference;
         totalGhs = Number(order.total_ghs);
+        targetUserId = (order as any).user_id;
       }
     }
 
@@ -245,6 +249,10 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         reference,
         phone: data.phone,
         provider: data.provider,
+        metadata: {
+          user_id: targetUserId,
+          type: data.orderId.startsWith("DEP-") ? "wallet_deposit" : "order_payment",
+        },
       });
 
       const chargeStatus = chargeRes.data?.status || "pending";
@@ -433,7 +441,19 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
                 .eq("id", targetTx.id);
             }
 
-            const targetUserId = targetTx.user_id;
+            let targetUserId = targetTx.user_id;
+            if (!targetUserId) {
+              const { data: matchedUserTx } = await (supabaseAdmin as any)
+                .from("wallet_transactions")
+                .select("user_id")
+                .or(`reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
+                .not("user_id", "is", null)
+                .limit(1)
+                .maybeSingle();
+
+              targetUserId = matchedUserTx?.user_id;
+            }
+
             if (targetUserId) {
               const { data: curWallet } = await (supabaseAdmin as any)
                 .from("wallets")
@@ -485,7 +505,19 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
               .eq("id", targetTx.id);
           }
 
-          const targetUserId = targetTx.user_id;
+          let targetUserId = targetTx.user_id || matchedPsTx.metadata?.user_id;
+          if (!targetUserId) {
+            const { data: matchedUserTx } = await (supabaseAdmin as any)
+              .from("wallet_transactions")
+              .select("user_id")
+              .or(`reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
+              .not("user_id", "is", null)
+              .limit(1)
+              .maybeSingle();
+
+            targetUserId = matchedUserTx?.user_id;
+          }
+
           if (targetUserId) {
             const { data: curWallet } = await (supabaseAdmin as any)
               .from("wallets")
