@@ -345,97 +345,63 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
     // 1. Check if deposit transaction (starts with "DEP-")
     if (data.reference.startsWith("DEP-")) {
       const baseRef = data.reference.split("-R")[0].split("-F")[0];
-      const { data: tx } = await (supabaseAdmin as any)
+      const { data: txs } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("id, user_id, reference, amount_ghs, status")
         .or(`reference.eq.${data.reference},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
 
-      if (tx) {
-        if (tx.status === "completed" || tx.status === "paid" || tx.status === "delivered" || tx.status === "success") {
-          return {
-            status: "delivered",
-            isDeposit: true,
-            depositAmount: Number(tx.amount_ghs),
-            reference: tx.reference,
-            order: { reference: tx.reference, total_ghs: Number(tx.amount_ghs) },
-          };
-        }
+      const primaryTx = txs?.[0];
 
-        // Verify with Paystack (try exact reference, base reference, and tx reference via both charge and transaction verify APIs)
-        const refsToTry = Array.from(new Set([data.reference, baseRef, tx.reference].filter(Boolean)));
-        for (const ref of refsToTry) {
+      // Check if any matching transaction is already marked completed
+      const completedTx = txs?.find((t: any) => t.status === "completed" || t.status === "paid" || t.status === "delivered" || t.status === "success");
+      if (completedTx) {
+        return {
+          status: "delivered",
+          isDeposit: true,
+          depositAmount: Number(completedTx.amount_ghs),
+          reference: completedTx.reference,
+          order: { reference: completedTx.reference, total_ghs: Number(completedTx.amount_ghs) },
+        };
+      }
+
+      // Verify with Paystack (try exact reference, base reference, and all matching tx references)
+      const refsToTry = Array.from(new Set([
+        data.reference,
+        baseRef,
+        ...(txs || []).map((t: any) => t.reference),
+      ].filter(Boolean)));
+
+      for (const ref of refsToTry) {
+        try {
+          let pStatus = "";
+          let paidGhs = Number(primaryTx?.amount_ghs || 0);
+
           try {
-            // A. Check charge API first
-            let pStatus = "";
-            let paidGhs = Number(tx.amount_ghs);
+            const chargeCheck = await checkPaystackChargeStatus(ref);
+            pStatus = (chargeCheck?.data?.status || "").toLowerCase();
+            if (chargeCheck?.data?.amount) paidGhs = chargeCheck.data.amount / 100;
+          } catch {
+            // Ignore charge API 404
+          }
 
-            try {
-              const chargeCheck = await checkPaystackChargeStatus(ref);
-              pStatus = (chargeCheck?.data?.status || "").toLowerCase();
-              if (chargeCheck?.data?.amount) paidGhs = chargeCheck.data.amount / 100;
-            } catch {
-              // Ignore charge API 404
-            }
+          if (pStatus !== "success" && pStatus !== "paid" && pStatus !== "completed") {
+            const verifyRes = await verifyPaystackTransaction(ref);
+            pStatus = (verifyRes.data?.status || "").toLowerCase();
+            if (verifyRes.data?.amount) paidGhs = verifyRes.data.amount / 100;
+          }
 
-            // B. Check transaction verify API if charge API didn't return success
-            if (pStatus !== "success" && pStatus !== "paid" && pStatus !== "completed") {
-              const verifyRes = await verifyPaystackTransaction(ref);
-              pStatus = (verifyRes.data?.status || "").toLowerCase();
-              if (verifyRes.data?.amount) paidGhs = verifyRes.data.amount / 100;
-            }
+          if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+            const targetTx = primaryTx || { id: null, user_id: null, amount_ghs: paidGhs };
 
-            if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
-              // Update status to completed in database
+            if (targetTx.id) {
               await (supabaseAdmin as any)
                 .from("wallet_transactions")
                 .update({ status: "completed", amount_ghs: paidGhs })
-                .eq("id", tx.id);
-
-              if (tx.user_id) {
-                const { data: curWallet } = await (supabaseAdmin as any)
-                  .from("wallets")
-                  .select("balance_ghs")
-                  .eq("user_id", tx.user_id)
-                  .maybeSingle();
-
-                const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
-                await (supabaseAdmin as any)
-                  .from("wallets")
-                  .upsert({ user_id: tx.user_id, balance_ghs: newBal, updated_at: new Date().toISOString() });
-              }
-
-              return {
-                status: "delivered",
-                isDeposit: true,
-                depositAmount: paidGhs,
-                reference: tx.reference,
-                order: { reference: tx.reference, total_ghs: paidGhs },
-              };
+                .eq("id", targetTx.id);
             }
-          } catch {
-            // Keep trying next reference
-          }
-        }
 
-        return {
-          status: "pending",
-          isDeposit: true,
-          depositAmount: Number(tx.amount_ghs),
-          reference: tx.reference,
-          order: { reference: tx.reference, total_ghs: Number(tx.amount_ghs) },
-        };
-      } else {
-        // Fallback for deposits not found in local DB yet: Verify Paystack directly
-        try {
-          const verifyRes = await verifyPaystackTransaction(data.reference);
-          const paidGhs = (verifyRes.data?.amount || 0) / 100;
-          const pStatus = (verifyRes.data?.status || "").toLowerCase();
-
-          if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
-            const targetUserId = verifyRes.data?.metadata?.user_id;
+            const targetUserId = targetTx.user_id;
             if (targetUserId) {
               const { data: curWallet } = await (supabaseAdmin as any)
                 .from("wallets")
@@ -453,28 +419,22 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
               status: "delivered",
               isDeposit: true,
               depositAmount: paidGhs,
-              reference: data.reference,
-              order: { reference: data.reference, total_ghs: paidGhs },
+              reference: ref,
+              order: { reference: ref, total_ghs: paidGhs },
             };
           }
-
-          return {
-            status: "pending",
-            isDeposit: true,
-            depositAmount: paidGhs,
-            reference: data.reference,
-            order: { reference: data.reference, total_ghs: paidGhs },
-          };
         } catch {
-          return {
-            status: "pending",
-            isDeposit: true,
-            depositAmount: 0,
-            reference: data.reference,
-            order: { reference: data.reference, total_ghs: 0 },
-          };
+          // Keep trying next reference candidate
         }
       }
+
+      return {
+        status: "pending",
+        isDeposit: true,
+        depositAmount: Number(primaryTx?.amount_ghs || 0),
+        reference: data.reference,
+        order: { reference: data.reference, total_ghs: Number(primaryTx?.amount_ghs || 0) },
+      };
     }
 
     // 2. Standard order check
