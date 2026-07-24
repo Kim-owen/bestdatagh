@@ -923,10 +923,16 @@ function UnifiedPaymentPage() {
                       setPromptMessage("Verifying MoMo payment with Paystack...");
                       try {
                         const res = await refetchPollStatus();
-                        if (res.data?.status === "delivered" || res.data?.status === "completed" || res.data?.status === "paid" || res.data?.status === "success") {
+                        const st = res.data?.status;
+                        if (st === "delivered" || st === "completed" || st === "paid" || st === "success") {
+                          setPromptMessage("Payment verified! Crediting wallet...");
                           queryClient.invalidateQueries({ queryKey: ["myWallet"] });
                           queryClient.refetchQueries({ queryKey: ["myWallet"] });
+                        } else {
+                          setPromptMessage((res.data as any)?.displayText || "Awaiting MoMo PIN authorization on your phone...");
                         }
+                      } catch {
+                        setPromptMessage("Could not verify yet. Please ensure you entered your PIN and try again.");
                       } finally {
                         setLoading(false);
                       }
@@ -940,7 +946,16 @@ function UnifiedPaymentPage() {
 
                   {/* Live Status Log */}
                   <div className="rounded-xl bg-slate-950 p-3 text-[11px] font-mono text-slate-400 border border-white/10 flex items-center justify-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                    {loading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
+                    ) : currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid" || currentStatus === "success" ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                      </span>
+                    )}
                     <span>{promptMessage}</span>
                   </div>
 
