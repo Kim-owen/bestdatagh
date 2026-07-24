@@ -349,13 +349,23 @@ export const createPaymentRequestInvoice = createServerFn({ method: "POST" })
     }
   });
 
+const ACCOUNT_NAME_CACHE = new Map<string, { accountName: string | null; expiresAt: number }>();
+
 export const resolveMoMoAccountName = createServerFn({ method: "POST" })
   .validator((data: { phone: string; network: string }) => data)
   .handler(async ({ data }) => {
+    const cacheKey = `${data.phone.trim()}_${data.network.trim().toUpperCase()}`;
+    const cached = ACCOUNT_NAME_CACHE.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return { accountName: cached.accountName, accountNumber: data.phone };
+    }
+
     try {
       const res = await resolvePaystackAccount({ accountNumber: data.phone, bankCode: data.network });
+      const accountName = res.data?.account_name || null;
+      ACCOUNT_NAME_CACHE.set(cacheKey, { accountName, expiresAt: Date.now() + 30 * 60 * 1000 });
       return {
-        accountName: res.data?.account_name || null,
+        accountName,
         accountNumber: res.data?.account_number || data.phone,
       };
     } catch (err: any) {

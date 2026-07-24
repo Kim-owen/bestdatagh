@@ -124,10 +124,12 @@ export function parsePaystackGatewayResponse(res: {
   return { approved, code, message };
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Perform an authenticated request to the Paystack API
  */
-async function paystackFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function paystackFetch<T>(endpoint: string, options: RequestInit = {}, retries = 2): Promise<T> {
   const secretKey = PAYSTACK_SECRET_KEY;
   if (!secretKey) {
     throw new Error("PAYSTACK_SECRET_KEY is not configured in environment variables.");
@@ -142,6 +144,15 @@ async function paystackFetch<T>(endpoint: string, options: RequestInit = {}): Pr
       ...options.headers,
     },
   });
+
+  // Handle Paystack 429 Rate Limiting with Header Parsing (x-ratelimit-reset)
+  if (response.status === 429 && retries > 0) {
+    const resetHeader = response.headers.get("x-ratelimit-reset");
+    const waitSeconds = resetHeader ? Math.min(Math.max(Number(resetHeader), 1), 5) : 2;
+    console.warn(`[Paystack 429 Rate Limit]: Pausing for ${waitSeconds}s before retrying ${endpoint}...`);
+    await sleep(waitSeconds * 1000);
+    return paystackFetch<T>(endpoint, options, retries - 1);
+  }
 
   const body = await response.json();
   if (!response.ok || body.status === false) {
