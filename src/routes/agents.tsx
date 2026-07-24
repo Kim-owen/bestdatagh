@@ -535,13 +535,14 @@ function ApplyPanel({ status }: { status?: string }) {
         </form>
       </div>
 
-      {activeRef && (
+      {activeRef && momoModalOpen && (
         <InAppPaymentModal
-          isOpen={momoModalOpen}
-          onClose={() => setMomoModalOpen(false)}
+          orderId={activeRef}
           reference={activeRef}
-          amountGhs={activationFee}
           recipientPhone={f.phone}
+          network="MTN"
+          totalGhs={activationFee}
+          onClose={() => setMomoModalOpen(false)}
           onSuccess={handleMomoPaymentSuccess}
         />
       )}
