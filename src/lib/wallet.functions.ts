@@ -7,50 +7,7 @@ export const getMyWallet = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Global Paystack Reconciler: Auto-import & link all successful Paystack deposits for this user
-    try {
-      const { listRecentPaystackTransactions } = await import("@/lib/paystack");
-      const psRes = await listRecentPaystackTransactions({ status: "success" });
-      const psTxList = (psRes?.data || []) as any[];
-
-      const depTxs = psTxList.filter((pt: any) => {
-        const ref = String(pt.reference || "");
-        const isDep = ref.startsWith("DEP-") || pt.metadata?.type === "wallet_deposit";
-        return isDep && pt.status === "success";
-      });
-
-      for (const pt of depTxs) {
-        const paidGhs = (pt.amount || 0) / 100;
-        const ref = pt.reference;
-        const baseRef = ref.split("-R")[0].split("-F")[0];
-
-        const { data: existing } = await (supabaseAdmin as any)
-          .from("wallet_transactions")
-          .select("id, status, user_id")
-          .or(`reference.eq.${ref},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
-          .maybeSingle();
-
-        if (!existing) {
-          await (supabaseAdmin as any).from("wallet_transactions").insert({
-            user_id: context.userId,
-            amount_ghs: paidGhs,
-            type: "deposit",
-            reference: ref,
-            status: "completed",
-            description: `Paystack Deposit (GH₵ ${paidGhs.toFixed(2)})`,
-          });
-        } else if (existing.status !== "completed" || !existing.user_id) {
-          await (supabaseAdmin as any)
-            .from("wallet_transactions")
-            .update({ status: "completed", amount_ghs: paidGhs, user_id: context.userId })
-            .eq("id", existing.id);
-        }
-      }
-    } catch (importErr) {
-      console.warn("Global Paystack deposit import notice:", importErr);
-    }
-
-    // 2. Auto-reconcile any remaining pending deposits for this user
+    // 1. Auto-reconcile any pending deposits for THIS user specifically
     try {
       const { data: pendingTxs } = await (supabaseAdmin as any)
         .from("wallet_transactions")
@@ -59,38 +16,35 @@ export const getMyWallet = createServerFn({ method: "GET" })
         .eq("type", "deposit")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(10);
 
       if (pendingTxs && pendingTxs.length > 0) {
         const { verifyPaystackTransaction, checkPaystackChargeStatus } = await import("@/lib/paystack");
         for (const tx of pendingTxs) {
-          const baseRef = (tx.reference || "").split("-R")[0].split("-F")[0];
-          const refsToTry = Array.from(new Set([tx.reference, baseRef].filter(Boolean)));
-          for (const ref of refsToTry) {
+          try {
+            let pStatus = "";
+            let paidGhs = Number(tx.amount_ghs);
+
             try {
-              let pStatus = "";
-              let paidGhs = Number(tx.amount_ghs);
-
-              try {
-                const chk = await checkPaystackChargeStatus(ref);
-                pStatus = (chk?.data?.status || "").toLowerCase();
-                if (chk?.data?.amount) paidGhs = chk.data.amount / 100;
-              } catch {}
-
-              if (pStatus !== "success" && pStatus !== "paid" && pStatus !== "completed") {
-                const ver = await verifyPaystackTransaction(ref);
-                pStatus = (ver?.data?.status || "").toLowerCase();
-                if (ver?.data?.amount) paidGhs = ver.data.amount / 100;
-              }
-
-              if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
-                await (supabaseAdmin as any)
-                  .from("wallet_transactions")
-                  .update({ status: "completed", amount_ghs: paidGhs, user_id: context.userId })
-                  .eq("id", tx.id);
-                break;
-              }
+              const chk = await checkPaystackChargeStatus(tx.reference);
+              pStatus = (chk?.data?.status || "").toLowerCase();
+              if (chk?.data?.amount) paidGhs = chk.data.amount / 100;
             } catch {}
+
+            if (pStatus !== "success" && pStatus !== "paid" && pStatus !== "completed") {
+              const ver = await verifyPaystackTransaction(tx.reference);
+              pStatus = (ver?.data?.status || "").toLowerCase();
+              if (ver?.data?.amount) paidGhs = ver.data.amount / 100;
+            }
+
+            if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+              await (supabaseAdmin as any)
+                .from("wallet_transactions")
+                .update({ status: "completed", amount_ghs: paidGhs, updated_at: new Date().toISOString() })
+                .eq("id", tx.id);
+            }
+          } catch (txErr) {
+            console.warn("Pending deposit check notice:", txErr);
           }
         }
       }
