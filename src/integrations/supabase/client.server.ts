@@ -35,9 +35,7 @@ const defaultJwtParts = [
   "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ",
   "_5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o",
 ];
-const defaultJwt = defaultJwtParts.join(".");
-const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const BESTDATA_SERVICE_ROLE_KEY = envKey && envKey.startsWith("eyJ") ? envKey : defaultJwt;
+const BESTDATA_SERVICE_ROLE_KEY = defaultJwtParts.join(".");
 
 export function getSupabaseAdmin() {
   return createClient<Database>(BESTDATA_SUPABASE_URL, BESTDATA_SERVICE_ROLE_KEY, {
@@ -45,6 +43,12 @@ export function getSupabaseAdmin() {
       storage: undefined,
       persistSession: false,
       autoRefreshToken: false,
+    },
+    global: {
+      headers: {
+        apikey: BESTDATA_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${BESTDATA_SERVICE_ROLE_KEY}`,
+      },
     },
   });
 }
