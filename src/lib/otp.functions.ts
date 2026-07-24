@@ -227,3 +227,38 @@ export const triggerWelcomeSms = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Register phone-verified user with instant auto email confirmation (bypasses email links)
+ */
+export const registerPhoneVerifiedUser = createServerFn({ method: "POST" })
+  .validator((data: { email: string; password: string; name: string; phone: string }) => data)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const clean = data.phone.replace(/[^\d]/g, "");
+    const formattedPhone = clean.startsWith("0") ? `+233${clean.slice(1)}` : `+233${clean}`;
+
+    // Auto-confirm user email instantly since phone is SMS OTP verified
+    const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: {
+        display_name: data.name,
+        phone: formattedPhone,
+        phone_verified: true,
+      },
+    });
+
+    if (error) throw new Error(error.message);
+
+    // Send Welcome SMS
+    try {
+      await sendWelcomeSms(data.phone, data.name);
+    } catch (smsErr: any) {
+      console.warn("[Welcome SMS Notice]:", smsErr.message);
+    }
+
+    return { ok: true, userId: newUser.user.id };
+  });
+

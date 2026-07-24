@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms } from "@/lib/otp.functions";
+import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms, registerPhoneVerifiedUser } from "@/lib/otp.functions";
 import { recordLoginIpSecurity } from "@/lib/security.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -260,7 +260,7 @@ function SignupForm({ next }: { next?: string }) {
   const nav = useNavigate();
   const sendOtpFn = useServerFn(sendPhoneOtp);
   const verifyOtpFn = useServerFn(verifyPhoneOtp);
-  const triggerWelcomeSmsFn = useServerFn(triggerWelcomeSms);
+  const registerUserFn = useServerFn(registerPhoneVerifiedUser);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -347,30 +347,11 @@ function SignupForm({ next }: { next?: string }) {
       // 1. Verify OTP against Supabase phone_verifications table
       await verifyOtpFn({ data: { phone: cleanPhone, otpCode: code } });
 
-      const formattedPhone = cleanPhone.startsWith("0") ? `+233${cleanPhone.slice(1)}` : `+233${cleanPhone}`;
+      // 2. Register user with instant auto email confirmation (bypasses email links)
+      await registerUserFn({ data: { email, password, name, phone: cleanPhone } });
 
-      // 2. Create user account in Supabase
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-          data: {
-            display_name: name,
-            phone: formattedPhone,
-            phone_verified: true,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      // 3. Send Welcome SMS with WhatsApp Channel Link
-      try {
-        await triggerWelcomeSmsFn({ data: { phone: cleanPhone, name } });
-      } catch (smsErr) {
-        console.warn("Welcome SMS dispatch notice:", smsErr);
-      }
+      // 3. Auto sign-in immediately
+      await supabase.auth.signInWithPassword({ email, password });
 
       setOk(true);
       setTimeout(() => nav({ to: (next as any) || "/" }), 1200);
