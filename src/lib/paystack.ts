@@ -212,6 +212,15 @@ export async function submitPaystackOtp(params: { otp: string; reference: string
 }
 
 /**
+ * Check status of a direct Paystack charge
+ */
+export async function checkPaystackChargeStatus(reference: string) {
+  return paystackFetch<any>(`/charge/${encodeURIComponent(reference)}`, {
+    method: "GET",
+  });
+}
+
+/**
  * Create a Mobile Money Transfer Recipient for agent payouts
  */
 export async function createPaystackTransferRecipient(params: CreateRecipientParams) {

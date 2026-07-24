@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { initializePaystackTransaction, verifyPaystackTransaction, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
+import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
 import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder } from "./swiftdata";
 
 export interface CartItemInput {
@@ -364,16 +364,31 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
           };
         }
 
-        // Verify with Paystack (try exact reference, base reference, and tx reference)
+        // Verify with Paystack (try exact reference, base reference, and tx reference via both charge and transaction verify APIs)
         const refsToTry = Array.from(new Set([data.reference, baseRef, tx.reference].filter(Boolean)));
         for (const ref of refsToTry) {
           try {
-            const verifyRes = await verifyPaystackTransaction(ref);
-            const pStatus = (verifyRes.data?.status || "").toLowerCase();
-            if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
-              const paidGhs = (verifyRes.data?.amount || 0) / 100 || Number(tx.amount_ghs);
+            // A. Check charge API first
+            let pStatus = "";
+            let paidGhs = Number(tx.amount_ghs);
 
-              // Update status to completed
+            try {
+              const chargeCheck = await checkPaystackChargeStatus(ref);
+              pStatus = (chargeCheck?.data?.status || "").toLowerCase();
+              if (chargeCheck?.data?.amount) paidGhs = chargeCheck.data.amount / 100;
+            } catch {
+              // Ignore charge API 404
+            }
+
+            // B. Check transaction verify API if charge API didn't return success
+            if (pStatus !== "success" && pStatus !== "paid" && pStatus !== "completed") {
+              const verifyRes = await verifyPaystackTransaction(ref);
+              pStatus = (verifyRes.data?.status || "").toLowerCase();
+              if (verifyRes.data?.amount) paidGhs = verifyRes.data.amount / 100;
+            }
+
+            if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+              // Update status to completed in database
               await (supabaseAdmin as any)
                 .from("wallet_transactions")
                 .update({ status: "completed", amount_ghs: paidGhs })
