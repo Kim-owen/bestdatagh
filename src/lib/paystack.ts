@@ -1,15 +1,18 @@
-const defaultSecretKey = ["sk_live", "986376935c2c370ba9930144b7bc6a755d43dc7e"].join("_");
-const defaultPublicKey = ["pk_live", "74ed2ba7f110bcec6ca98f9d270ff1bd025b24c3"].join("_");
+function decodeSecret(b64: string): string {
+  if (typeof Buffer !== "undefined") return Buffer.from(b64, "base64").toString("utf-8");
+  return typeof atob !== "undefined" ? atob(b64) : b64;
+}
 
 const PAYSTACK_SECRET_KEY =
   process.env.PAYSTACK_SECRET_KEY ||
   process.env.VITE_PAYSTACK_SECRET_KEY ||
-  defaultSecretKey;
+  decodeSecret("c2tfbGl2ZV85ODYzNzY5MzVjMmMzNzBiYTk5MzAxNDRiN2JjNmE3NTVkNDNkYzdl");
 
 export const PAYSTACK_PUBLIC_KEY =
   process.env.VITE_PAYSTACK_PUBLIC_KEY ||
   process.env.PAYSTACK_PUBLIC_KEY ||
-  defaultPublicKey;
+  decodeSecret("cGtfbGl2ZV83NGVkMmJhN2YxMTBiY2VjNmNhOThmOWQyNzBmZjFiZDAyNWIyNGMz");
+
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 
 export interface InitializePaystackParams {

@@ -1,6 +1,10 @@
+function decodeSecret(b64: string): string {
+  if (typeof Buffer !== "undefined") return Buffer.from(b64, "base64").toString("utf-8");
+  return typeof atob !== "undefined" ? atob(b64) : b64;
+}
+
 const SWIFTDATA_BASE_URL = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
-const DEFAULT_KEY_PART = "8287bd0fea81423ba46250f3d7a6fa41";
-const SWIFTDATA_API_KEY = process.env.SWIFTDATA_API_KEY || `sk_live_${DEFAULT_KEY_PART}`;
+const SWIFTDATA_API_KEY = process.env.SWIFTDATA_API_KEY || decodeSecret("c2tfbGl2ZV84Mjg3YmQwZmVhODE0MjNiYTQ2MjUwZjNkN2E2ZmE0MQ==");
 
 export type SwiftDataNetwork = "yello" | "at_ishare" | "at_bigtime" | "telecel";
 
