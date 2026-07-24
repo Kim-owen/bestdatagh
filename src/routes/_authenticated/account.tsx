@@ -6,14 +6,21 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useAuth } from "@/lib/auth";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
-import { getMyWallet, verifyWalletDeposit } from "@/lib/wallet.functions";
+import { getMyWallet, verifyWalletDeposit, payOrderWithWallet } from "@/lib/wallet.functions";
+import { listActiveBundles } from "@/lib/public-bundles.functions";
+import { createCheckoutOrder } from "@/lib/orders.functions";
 import { WalletTopUpModal } from "@/components/site/WalletModal";
-import { User, Phone, Mail, Save, LogOut, KeyRound, ShoppingBag, Store, ShieldCheck, Wallet, Plus } from "lucide-react";
+import { NetworkLogo } from "@/components/site/NetworkLogos";
+import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantBuyModal";
+import {
+  User, Phone, Mail, Save, LogOut, KeyRound, ShoppingBag, Store, ShieldCheck,
+  Wallet, Plus, Zap, Smartphone, CheckCircle2, Sparkles, ArrowRight
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/account")({
   head: () => ({ meta: [
-    { title: "My Account — Bestdata" },
-    { name: "description", content: "Manage your Bestdata profile, contact details and account preferences." },
+    { title: "My Account & Instant Data — Bestdata" },
+    { name: "description", content: "Manage your Bestdata profile, wallet and instant data purchases." },
     { name: "robots", content: "noindex" },
   ] }),
   component: AccountPage,
@@ -26,12 +33,26 @@ function AccountPage() {
   const saveProfile = useServerFn(updateMyProfile);
   const fetchWallet = useServerFn(getMyWallet);
   const verifyDepositFn = useServerFn(verifyWalletDeposit);
+  const fetchBundlesFn = useServerFn(listActiveBundles);
+  const createOrderFn = useServerFn(createCheckoutOrder);
+  const payWalletFn = useServerFn(payOrderWithWallet);
 
   const { data, isLoading } = useQuery({ queryKey: ["me"], queryFn: () => fetchProfile() });
   const { data: walletData } = useQuery({ queryKey: ["myWallet"], queryFn: () => fetchWallet(), enabled: !!user });
+  const { data: bundlesData } = useQuery({ queryKey: ["activeBundles"], queryFn: () => fetchBundlesFn() });
 
+  const bundles = bundlesData || [];
   const walletBalance = walletData?.balanceGhs || 0;
+
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [buyNowItem, setBuyNowItem] = useState<InstantBuyItem | null>(null);
+
+  // In-Dashboard Quick Buy Form State
+  const [buyNet, setBuyNet] = useState<string>("MTN");
+  const [selectedBundleId, setSelectedBundleId] = useState<string>("");
+  const [recipientPhone, setRecipientPhone] = useState<string>("");
+  const [orderSuccessMsg, setOrderSuccessMsg] = useState<string>("");
+  const [orderErrorMsg, setOrderErrorMsg] = useState<string>("");
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -60,12 +81,69 @@ function AccountPage() {
   }, []);
 
   useEffect(() => {
-    if (data?.profile) { setName(data.profile.display_name ?? ""); setPhone(data.profile.phone ?? ""); }
+    if (data?.profile) {
+      setName(data.profile.display_name ?? "");
+      setPhone(data.profile.phone ?? "");
+      if (!recipientPhone) setRecipientPhone(data.profile.phone ?? "");
+    }
   }, [data?.profile?.id]);
 
   const save = useMutation({
     mutationFn: () => saveProfile({ data: { display_name: name, phone } }),
     onSuccess: () => { setSaved(true); qc.invalidateQueries({ queryKey: ["me"] }); setTimeout(() => setSaved(false), 1800); },
+  });
+
+  const availableBundles = bundles.filter((b: any) => b.network === buyNet);
+  const activeBundle = availableBundles.find((b: any) => b.id === selectedBundleId) || availableBundles[0];
+
+  const quickBuyMut = useMutation({
+    mutationFn: async ({ payMethod }: { payMethod: "wallet" | "momo" }) => {
+      setOrderSuccessMsg("");
+      setOrderErrorMsg("");
+
+      if (!activeBundle) throw new Error("Please select a valid data bundle package.");
+      const cleanPhone = recipientPhone.replace(/[^\d]/g, "");
+      if (cleanPhone.length < 9) throw new Error("Enter a valid Ghana mobile number (e.g. 0244000000).");
+
+      if (payMethod === "wallet") {
+        if (walletBalance < Number(activeBundle.price_ghs)) {
+          throw new Error(`Insufficient wallet balance. Balance: GH₵ ${walletBalance.toFixed(2)}, Required: GH₵ ${Number(activeBundle.price_ghs).toFixed(2)}. Please top up your wallet.`);
+        }
+
+        const ordRes = await createOrderFn({
+          data: {
+            items: [{
+              id: activeBundle.id,
+              network: activeBundle.network,
+              size: activeBundle.size_label,
+              price: Number(activeBundle.price_ghs),
+              qty: 1,
+            }],
+            recipientPhone: cleanPhone,
+            email: user?.email,
+          },
+        });
+
+        await payWalletFn({ data: { orderId: ordRes.orderId, amountGhs: Number(activeBundle.price_ghs) } });
+        qc.invalidateQueries({ queryKey: ["myWallet"] });
+        return { ok: true, reference: ordRes.reference, price: Number(activeBundle.price_ghs) };
+      } else {
+        setBuyNowItem({
+          network: activeBundle.network as any,
+          size: activeBundle.size_label,
+          price: Number(activeBundle.price_ghs),
+        });
+        return { ok: true, modal: true };
+      }
+    },
+    onSuccess: (res) => {
+      if (res?.reference) {
+        setOrderSuccessMsg(`🎉 Success! Order #${res.reference} of GH₵ ${res.price.toFixed(2)} dispatched to ${recipientPhone}.`);
+      }
+    },
+    onError: (err: any) => {
+      setOrderErrorMsg(err.message || "Failed to process data purchase.");
+    },
   });
 
   const roles: string[] = data?.roles ?? [];
@@ -74,8 +152,8 @@ function AccountPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
-      <main className="mx-auto max-w-[1100px] px-4 sm:px-6 py-10 md:py-14">
-        <header className="mb-8 flex items-center gap-4">
+      <main className="mx-auto max-w-[1100px] px-4 sm:px-6 py-10 md:py-14 space-y-8">
+        <header className="flex items-center gap-4">
           <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary text-xl font-bold">
             {(name || user?.email || "?")[0]?.toUpperCase()}
           </div>
@@ -91,32 +169,128 @@ function AccountPage() {
         </header>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <section className="lg:col-span-2 rounded-2xl border border-border bg-card p-6">
-            <h2 className="mb-4 text-lg font-bold">Profile details</h2>
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : (
-              <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
-                <Field label="Full name" icon={User} value={name} onChange={setName} placeholder="Kwame Mensah" />
-                <Field label="Phone" icon={Phone} value={phone} onChange={setPhone} placeholder="0244 000 000" type="tel" />
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold">Email</label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input disabled value={user?.email ?? ""} className="w-full rounded-xl border border-border bg-muted/40 pl-10 pr-4 py-2.5 text-sm text-muted-foreground" />
+          <div className="lg:col-span-2 space-y-6">
+            {/* Customer In-Dashboard Quick Buy Widget */}
+            <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-500 font-bold text-sm">
+                  <Zap className="h-4 w-4" /> Instant In-Dashboard Data Purchaser
+                </div>
+                <span className="text-[11px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                  Instant Delivery
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                {/* Network Pills */}
+                <div className="flex gap-2">
+                  {["MTN", "Telecel", "AirtelTigo"].map((net) => (
+                    <button
+                      key={net}
+                      type="button"
+                      onClick={() => {
+                        setBuyNet(net);
+                        const first = bundles.find((b: any) => b.network === net);
+                        if (first) setSelectedBundleId(first.id);
+                      }}
+                      className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all border ${
+                        buyNet === net
+                          ? "border-amber-400 bg-amber-400/10 text-amber-400"
+                          : "border-border bg-card text-muted-foreground hover:border-foreground/20"
+                      }`}
+                    >
+                      <NetworkLogo network={net as any} className="h-4 w-4" />
+                      <span>{net}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold">Select Bundle Package</label>
+                    <select
+                      value={activeBundle?.id || ""}
+                      onChange={(e) => setSelectedBundleId(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-400"
+                    >
+                      {availableBundles.map((b: any) => (
+                        <option key={b.id} value={b.id}>
+                          {b.network} {b.size_label} — GH₵ {Number(b.price_ghs).toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Contact support to change your email.</p>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold">Recipient Phone Number</label>
+                    <input
+                      type="tel"
+                      value={recipientPhone}
+                      onChange={(e) => setRecipientPhone(e.target.value)}
+                      placeholder="0244 000 000"
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold outline-none focus:border-amber-400"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 pt-2">
-                  <button disabled={save.isPending} className="inline-flex items-center gap-2 rounded-xl gold-gradient px-4 h-10 text-sm font-bold text-primary-foreground shadow-[var(--shadow-gold)] disabled:opacity-50">
-                    <Save className="h-4 w-4" /> {save.isPending ? "Saving…" : "Save changes"}
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                  <button
+                    disabled={quickBuyMut.isPending}
+                    onClick={() => quickBuyMut.mutate({ payMethod: "wallet" })}
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl gold-gradient px-6 h-11 text-xs font-black text-primary-foreground shadow-sm hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    <span>Pay with Wallet (GH₵ {activeBundle ? Number(activeBundle.price_ghs).toFixed(2) : "0.00"})</span>
                   </button>
-                  {saved && <span className="text-xs font-semibold text-green-600">Saved ✓</span>}
-                  {save.error && <span className="text-xs text-destructive">{(save.error as Error).message}</span>}
+
+                  <button
+                    disabled={quickBuyMut.isPending}
+                    onClick={() => quickBuyMut.mutate({ payMethod: "momo" })}
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl border border-border bg-card px-6 h-11 text-xs font-bold hover:bg-muted transition-all"
+                  >
+                    <Smartphone className="h-4 w-4 text-emerald-500" />
+                    <span>Pay via Mobile Money</span>
+                  </button>
                 </div>
-              </form>
-            )}
-          </section>
+
+                {orderSuccessMsg && (
+                  <p className="text-xs font-bold text-emerald-500">{orderSuccessMsg}</p>
+                )}
+
+                {orderErrorMsg && (
+                  <p className="text-xs font-bold text-destructive">{orderErrorMsg}</p>
+                )}
+              </div>
+            </section>
+
+            {/* Profile details */}
+            <section className="rounded-2xl border border-border bg-card p-6">
+              <h2 className="mb-4 text-lg font-bold">Profile details</h2>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
+                  <Field label="Full name" icon={User} value={name} onChange={setName} placeholder="Kwame Mensah" />
+                  <Field label="Phone" icon={Phone} value={phone} onChange={setPhone} placeholder="0244 000 000" type="tel" />
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold">Email</label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input disabled value={user?.email ?? ""} className="w-full rounded-xl border border-border bg-muted/40 pl-10 pr-4 py-2.5 text-sm text-muted-foreground" />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">Contact support to change your email.</p>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <button disabled={save.isPending} className="inline-flex items-center gap-2 rounded-xl gold-gradient px-4 h-10 text-sm font-bold text-primary-foreground shadow-[var(--shadow-gold)] disabled:opacity-50">
+                      <Save className="h-4 w-4" /> {save.isPending ? "Saving…" : "Save changes"}
+                    </button>
+                    {saved && <span className="text-xs font-semibold text-green-600">Saved ✓</span>}
+                    {save.error && <span className="text-xs text-destructive">{(save.error as Error).message}</span>}
+                  </div>
+                </form>
+              )}
+            </section>
+          </div>
 
           <aside className="space-y-4">
             <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 space-y-4">
@@ -188,6 +362,12 @@ function AccountPage() {
         onClose={() => setWalletModalOpen(false)}
         userEmail={user?.email}
       />
+      {buyNowItem && (
+        <InstantBuyModal
+          item={buyNowItem}
+          onClose={() => setBuyNowItem(null)}
+        />
+      )}
       <Footer />
     </div>
   );
