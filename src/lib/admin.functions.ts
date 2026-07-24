@@ -196,9 +196,6 @@ export const adminSaveBundle = createServerFn({ method: "POST" })
       price_ghs: Number(data.price_ghs), validity: data.validity || "Non-Expiry",
       popular: !!data.popular, active: data.active !== false, sort_order: Number(data.sort_order ?? 100),
     };
-    if (data.agent_price_ghs !== undefined) {
-      payload.agent_price_ghs = Number(data.agent_price_ghs);
-    }
     if (data.id) {
       const { error } = await supabaseAdmin.from("bundles").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
@@ -1212,7 +1209,6 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
               size_label: sizeLabel,
               size_mb: sizeMb,
               price_ghs: priceGhs,
-              agent_price_ghs: agentPriceGhs,
               validity: pkg.validity || "Non-Expiry",
               popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
               active: true,
