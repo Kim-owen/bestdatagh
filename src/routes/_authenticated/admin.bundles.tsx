@@ -9,7 +9,7 @@ import {
   adminSyncProviderPackages,
 } from "@/lib/admin.functions";
 import { useState } from "react";
-import { Plus, Trash2, RefreshCw, Zap, CheckCircle2, ShieldCheck, Database, Layers, ArrowUpRight, Search } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Zap, CheckCircle2, ShieldCheck, Layers, Search, ToggleLeft, ToggleRight, Edit2, Save, X } from "lucide-react";
 import { TableRowSkeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/bundles")({ component: BundlesPage });
@@ -47,14 +47,21 @@ function BundlesPage() {
 
   const [editing, setEditing] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"store" | "provider">("store");
+  const [selectedNetwork, setSelectedNetwork] = useState<"ALL" | "MTN" | "Telecel" | "AirtelTigo">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  // Quick Inline Editing State
+  const [quickEditId, setQuickEditId] = useState<string | null>(null);
+  const [quickPrice, setQuickPrice] = useState<number>(0);
+  const [quickAgentPrice, setQuickAgentPrice] = useState<number>(0);
 
   const saveMutation = useMutation({
     mutationFn: (v: any) => save({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["adminBundles"] });
       setEditing(null);
+      setQuickEditId(null);
     },
   });
 
@@ -69,21 +76,51 @@ function BundlesPage() {
       setSyncStatusMsg(`Successfully synced ${res.syncedCount} packages from SwiftData API!`);
       qc.invalidateQueries({ queryKey: ["adminBundles"] });
       qc.invalidateQueries({ queryKey: ["adminProviderPackages"] });
-      setTimeout(() => setSyncStatusMsg(null), 5000);
+      setTimeout(() => setSyncStatusMsg(null), 6000);
     },
     onError: (err: any) => {
       setSyncStatusMsg(`Sync error: ${err.message}`);
     },
   });
 
+  const toggleActive = (bundle: any) => {
+    saveMutation.mutate({
+      ...bundle,
+      active: !bundle.active,
+    });
+  };
+
+  const startQuickEdit = (bundle: any) => {
+    setQuickEditId(bundle.id);
+    setQuickPrice(Number(bundle.price_ghs || 0));
+    setQuickAgentPrice(Number(bundle.agent_price_ghs ?? (bundle.price_ghs * 0.95)));
+  };
+
+  const saveQuickEdit = (bundle: any) => {
+    saveMutation.mutate({
+      ...bundle,
+      price_ghs: quickPrice,
+      agent_price_ghs: quickAgentPrice,
+    });
+  };
+
   const filteredStoreBundles = (storeBundles ?? []).filter((b: any) => {
     const q = searchQuery.toLowerCase();
-    return b.network.toLowerCase().includes(q) || b.size_label.toLowerCase().includes(q);
+    const matchesNet = selectedNetwork === "ALL" || b.network.toLowerCase() === selectedNetwork.toLowerCase();
+    const matchesQuery = b.network.toLowerCase().includes(q) || b.size_label.toLowerCase().includes(q);
+    return matchesNet && matchesQuery;
   });
 
   const filteredProviderPackages = (providerInfo?.packages ?? []).filter((p: any) => {
     const q = searchQuery.toLowerCase();
-    return (p.network || "").toLowerCase().includes(q) || (p.size_label || `${p.size_gb}GB`).toLowerCase().includes(q);
+    const netStr = (p.network || "").toLowerCase();
+    const matchesNet =
+      selectedNetwork === "ALL" ||
+      (selectedNetwork === "MTN" && netStr.includes("mtn")) ||
+      (selectedNetwork === "Telecel" && (netStr.includes("telecel") || netStr.includes("voda"))) ||
+      (selectedNetwork === "AirtelTigo" && (netStr.includes("at") || netStr.includes("airtel")));
+    const matchesQuery = netStr.includes(q) || (p.size_label || `${p.size_gb}GB`).toLowerCase().includes(q);
+    return matchesNet && matchesQuery;
   });
 
   return (
@@ -96,7 +133,7 @@ function BundlesPage() {
           </div>
           <h1 className="text-3xl font-black text-white font-display">Data Bundle Packages</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Sync packages in real-time from the SwiftData Gateway or customize your retail bundle prices.
+            Sync packages in real-time from SwiftData Gateway or instantly add, edit & hide retail prices.
           </p>
         </div>
 
@@ -127,7 +164,7 @@ function BundlesPage() {
         </div>
       )}
 
-      {/* Provider API Status Card */}
+      {/* Provider API Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 space-y-2 backdrop-blur-xl">
           <div className="flex items-center justify-between text-xs text-slate-400">
@@ -164,7 +201,7 @@ function BundlesPage() {
         </div>
       </div>
 
-      {/* Editing Form Modal Card */}
+      {/* Full Modal / Form Card for Custom Package */}
       {editing && (
         <div className="rounded-3xl border border-amber-500/30 bg-slate-900/90 p-6 space-y-4 animate-in fade-in shadow-2xl">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -292,40 +329,67 @@ function BundlesPage() {
         </div>
       )}
 
-      {/* Tabs & Search Filter */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/10 w-full sm:w-auto">
-          <button
-            onClick={() => setActiveTab("store")}
-            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "store"
-                ? "bg-amber-400 text-slate-950 shadow-md"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Active Store Bundles ({storeBundles?.length ?? 0})
-          </button>
-          <button
-            onClick={() => setActiveTab("provider")}
-            className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "provider"
-                ? "bg-amber-400 text-slate-950 shadow-md"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Live SwiftData API ({providerInfo?.packages?.length ?? 0})
-          </button>
-        </div>
+      {/* Tabs & Network Filters */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/10 w-full sm:w-auto">
+            <button
+              onClick={() => setActiveTab("store")}
+              className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === "store"
+                  ? "bg-amber-400 text-slate-950 shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Active Store Bundles ({storeBundles?.length ?? 0})
+            </button>
+            <button
+              onClick={() => setActiveTab("provider")}
+              className={`flex-1 sm:flex-initial px-5 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === "provider"
+                  ? "bg-amber-400 text-slate-950 shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Live SwiftData API ({providerInfo?.packages?.length ?? 0})
+            </button>
+          </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search bundles..."
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/60 pl-9 pr-4 py-2 text-xs text-white placeholder:text-slate-500 focus:border-amber-400 outline-none"
-          />
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Network Filter Pills */}
+            <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-2xl border border-white/10 text-xs">
+              {(["ALL", "MTN", "Telecel", "AirtelTigo"] as const).map((net) => (
+                <button
+                  key={net}
+                  onClick={() => setSelectedNetwork(net)}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                    selectedNetwork === net
+                      ? net === "MTN"
+                        ? "bg-amber-400 text-slate-950"
+                        : net === "Telecel"
+                        ? "bg-rose-500 text-white"
+                        : net === "AirtelTigo"
+                        ? "bg-sky-400 text-slate-950"
+                        : "bg-white text-slate-950"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {net}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative flex-1 sm:w-56">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search package..."
+                className="w-full rounded-2xl border border-white/10 bg-slate-900/60 pl-9 pr-4 py-2 text-xs text-white placeholder:text-slate-500 focus:border-amber-400 outline-none"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -341,8 +405,8 @@ function BundlesPage() {
                   <th className="p-4">Public Retail</th>
                   <th className="p-4">Agent Wholesale</th>
                   <th className="p-4">Validity</th>
-                  <th className="p-4">Badges & Status</th>
-                  <th className="p-4 text-right">Actions</th>
+                  <th className="p-4">Visibility</th>
+                  <th className="p-4 text-right">Quick Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-mono">
@@ -357,59 +421,135 @@ function BundlesPage() {
                 )}
                 {filteredStoreBundles.length === 0 && !loadingStore && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-400">No store bundles found. Click "Sync SwiftData API Packages" above to populate!</td>
+                    <td colSpan={7} className="p-8 text-center text-slate-400">
+                      No store bundles found for this filter. Click "Sync SwiftData API Packages" above to populate!
+                    </td>
                   </tr>
                 )}
-                {filteredStoreBundles.map((b: any) => (
-                  <tr key={b.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="p-4 font-bold text-white font-sans flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${
-                        b.network === "MTN" ? "bg-amber-400" : b.network === "Telecel" ? "bg-rose-500" : "bg-sky-400"
-                      }`} />
-                      <span>{b.network}</span>
-                    </td>
-                    <td className="p-4 font-extrabold text-amber-400">{b.size_label}</td>
-                    <td className="p-4 text-white font-bold">GH₵ {Number(b.price_ghs).toFixed(2)}</td>
-                    <td className="p-4 text-emerald-400 font-extrabold">
-                      GH₵ {Number(b.agent_price_ghs ?? (b.price_ghs * 0.95)).toFixed(2)}
-                    </td>
-                    <td className="p-4 text-slate-300 font-sans">{b.validity}</td>
-                    <td className="p-4 font-sans">
-                      <div className="flex items-center gap-1.5">
-                        {b.popular && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400/20 border border-amber-400/30 text-amber-400">
-                            ★ POPULAR
-                          </span>
-                        )}
-                        {b.active ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
-                            ACTIVE
-                          </span>
+                {filteredStoreBundles.map((b: any) => {
+                  const isQuickEditing = quickEditId === b.id;
+
+                  return (
+                    <tr key={b.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="p-4 font-bold text-white font-sans flex items-center gap-2">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            b.network === "MTN"
+                              ? "bg-amber-400"
+                              : b.network === "Telecel"
+                              ? "bg-rose-500"
+                              : "bg-sky-400"
+                          }`}
+                        />
+                        <span>{b.network}</span>
+                      </td>
+                      <td className="p-4 font-extrabold text-amber-400 text-sm">{b.size_label}</td>
+
+                      {/* Public Retail Price */}
+                      <td className="p-4 font-bold">
+                        {isQuickEditing ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={quickPrice}
+                            onChange={(e) => setQuickPrice(Number(e.target.value))}
+                            className="w-20 rounded-lg border border-amber-400 bg-slate-950 p-1 text-amber-400 font-mono text-xs focus:outline-none"
+                          />
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 border border-rose-500/30 text-rose-400">
-                            HIDDEN
+                          <span className="text-white font-mono">GH₵ {Number(b.price_ghs).toFixed(2)}</span>
+                        )}
+                      </td>
+
+                      {/* Agent Wholesale Price */}
+                      <td className="p-4 font-bold">
+                        {isQuickEditing ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={quickAgentPrice}
+                            onChange={(e) => setQuickAgentPrice(Number(e.target.value))}
+                            className="w-20 rounded-lg border border-emerald-400 bg-slate-950 p-1 text-emerald-400 font-mono text-xs focus:outline-none"
+                          />
+                        ) : (
+                          <span className="text-emerald-400 font-mono">
+                            GH₵ {Number(b.agent_price_ghs ?? (b.price_ghs * 0.95)).toFixed(2)}
                           </span>
                         )}
-                      </div>
-                    </td>
-                    <td className="p-4 text-right font-sans">
-                      <div className="flex items-center justify-end gap-2">
+                      </td>
+
+                      <td className="p-4 text-slate-300 font-sans">{b.validity}</td>
+
+                      {/* 1-Click Instant Active/Hidden Toggle */}
+                      <td className="p-4 font-sans">
                         <button
-                          onClick={() => setEditing(b)}
-                          className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:text-white hover:bg-white/10 text-xs font-bold"
+                          onClick={() => toggleActive(b)}
+                          disabled={saveMutation.isPending}
+                          title={b.active ? "Click to Hide from Store" : "Click to Make Active on Store"}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase transition-all ${
+                            b.active
+                              ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30"
+                              : "bg-rose-500/20 border border-rose-500/40 text-rose-400 hover:bg-rose-500/30"
+                          }`}
                         >
-                          Edit
+                          {b.active ? (
+                            <>
+                              <ToggleRight className="h-4 w-4 text-emerald-400" /> ACTIVE
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft className="h-4 w-4 text-rose-400" /> HIDDEN
+                            </>
+                          )}
                         </button>
-                        <button
-                          onClick={() => confirm("Delete this bundle package?") && deleteMutation.mutate(b.id)}
-                          className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      {/* Quick Actions */}
+                      <td className="p-4 text-right font-sans">
+                        <div className="flex items-center justify-end gap-2">
+                          {isQuickEditing ? (
+                            <>
+                              <button
+                                onClick={() => saveQuickEdit(b)}
+                                disabled={saveMutation.isPending}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl gold-gradient text-slate-950 text-xs font-black shadow-md"
+                              >
+                                <Save className="h-3.5 w-3.5" /> Save
+                              </button>
+                              <button
+                                onClick={() => setQuickEditId(null)}
+                                className="p-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => startQuickEdit(b)}
+                                className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:text-white hover:bg-white/10 text-xs font-bold flex items-center gap-1"
+                              >
+                                <Edit2 className="h-3 w-3 text-amber-400" /> Quick Price
+                              </button>
+                              <button
+                                onClick={() => setEditing(b)}
+                                className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white text-xs font-bold"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => confirm(`Delete ${b.network} ${b.size_label} bundle?`) && deleteMutation.mutate(b.id)}
+                                className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+                                title="Delete Bundle"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -454,7 +594,7 @@ function BundlesPage() {
                 )}
                 {filteredProviderPackages.length === 0 && !loadingProvider && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-400">No provider packages found.</td>
+                    <td colSpan={5} className="p-8 text-center text-slate-400">No provider packages found for this filter.</td>
                   </tr>
                 )}
                 {filteredProviderPackages.map((p: any, idx: number) => (
@@ -478,4 +618,3 @@ function BundlesPage() {
     </div>
   );
 }
-

@@ -190,9 +190,10 @@ export const adminSaveBundle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { clearBundleCache } = await import("@/lib/public-bundles.functions");
     const payload: any = {
       network: data.network, size_label: data.size_label, size_mb: Number(data.size_mb),
-      price_ghs: Number(data.price_ghs), validity: data.validity || "90 days",
+      price_ghs: Number(data.price_ghs), validity: data.validity || "Non-Expiry",
       popular: !!data.popular, active: data.active !== false, sort_order: Number(data.sort_order ?? 100),
     };
     if (data.agent_price_ghs !== undefined) {
@@ -205,6 +206,7 @@ export const adminSaveBundle = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin.from("bundles").insert(payload);
       if (error) throw new Error(error.message);
     }
+    clearBundleCache();
     return { ok: true };
   });
 
@@ -214,7 +216,9 @@ export const adminDeleteBundle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { clearBundleCache } = await import("@/lib/public-bundles.functions");
     await supabaseAdmin.from("bundles").delete().eq("id", data.id);
+    clearBundleCache();
     return { ok: true };
   });
 
@@ -1161,56 +1165,60 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getSwiftDataPackages } = await import("@/lib/swiftdata");
+    const { clearBundleCache } = await import("@/lib/public-bundles.functions");
 
     const pRes = await getSwiftDataPackages();
     if (!pRes || !pRes.packages || !Array.isArray(pRes.packages)) {
       throw new Error("No packages returned from provider API");
     }
 
+    const { data: existingBundles } = await supabaseAdmin.from("bundles").select("id, network, size_label");
+    const existingMap = new Map((existingBundles || []).map((b) => [`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, b.id]));
+
     let syncedCount = 0;
-    for (const pkg of pRes.packages) {
-      let netName = "MTN";
-      if (pkg.network === "telecel") netName = "Telecel";
-      else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
+    await Promise.all(
+      pRes.packages.map(async (pkg: any) => {
+        let netName = "MTN";
+        if (pkg.network === "telecel") netName = "Telecel";
+        else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
 
-      const sizeGb = pkg.size_gb || 1;
-      const sizeLabel = pkg.size_label || `${sizeGb}GB`;
-      const sizeMb = Math.round(sizeGb * 1024);
-      const priceGhs = Number(pkg.price_ghs || 0);
+        const sizeGb = pkg.size_gb || 1;
+        const sizeLabel = pkg.size_label || `${sizeGb}GB`;
+        const sizeMb = Math.round(sizeGb * 1024);
+        const priceGhs = Number(pkg.price_ghs || 0);
 
-      const { data: existing } = await supabaseAdmin
-        .from("bundles")
-        .select("id")
-        .eq("network", netName)
-        .eq("size_label", sizeLabel)
-        .maybeSingle();
+        const key = `${netName.toLowerCase()}_${sizeLabel.toLowerCase()}`;
+        const existingId = existingMap.get(key);
 
-      if (existing) {
-        await supabaseAdmin
-          .from("bundles")
-          .update({
-            size_mb: sizeMb,
-            price_ghs: priceGhs,
-            validity: pkg.validity || "Non-Expiry",
-            active: true,
-          })
-          .eq("id", existing.id);
-      } else {
-        await supabaseAdmin
-          .from("bundles")
-          .insert({
-            network: netName,
-            size_label: sizeLabel,
-            size_mb: sizeMb,
-            price_ghs: priceGhs,
-            validity: pkg.validity || "Non-Expiry",
-            popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
-            active: true,
-            sort_order: sizeMb,
-          });
-      }
-      syncedCount++;
-    }
+        if (existingId) {
+          await supabaseAdmin
+            .from("bundles")
+            .update({
+              size_mb: sizeMb,
+              price_ghs: priceGhs,
+              validity: pkg.validity || "Non-Expiry",
+              active: true,
+            })
+            .eq("id", existingId);
+        } else {
+          await supabaseAdmin
+            .from("bundles")
+            .insert({
+              network: netName,
+              size_label: sizeLabel,
+              size_mb: sizeMb,
+              price_ghs: priceGhs,
+              validity: pkg.validity || "Non-Expiry",
+              popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
+              active: true,
+              sort_order: sizeMb,
+            });
+        }
+        syncedCount++;
+      })
+    );
+
+    clearBundleCache();
 
     await (supabaseAdmin as any).from("admin_audit_logs").insert({
       admin_id: context.userId,
