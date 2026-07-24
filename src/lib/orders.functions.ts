@@ -167,11 +167,14 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
 
     // A. Check if deposit transaction
     if (data.orderId.startsWith("DEP-")) {
+      const parts = data.orderId.split("-");
+      const rootPrefix = parts.length >= 2 ? `${parts[0]}-${parts[1]}` : data.orderId;
       const baseRef = data.orderId.split("-R")[0].split("-F")[0];
+
       const { data: tx } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("id, reference, amount_ghs")
-        .or(`reference.eq.${data.orderId},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
+        .or(`reference.eq.${data.orderId},reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -180,8 +183,8 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
         reference = tx.reference;
         totalGhs = Number(tx.amount_ghs);
       } else {
-        // Fallback A: Verify baseRef or orderId with Paystack API
-        const refsToTry = Array.from(new Set([data.orderId, baseRef].filter(Boolean)));
+        // Fallback A: Verify rootPrefix or orderId with Paystack API
+        const refsToTry = Array.from(new Set([data.orderId, rootPrefix, baseRef].filter(Boolean)));
         for (const refCandidate of refsToTry) {
           try {
             const psData = await verifyPaystackTransaction(refCandidate);
@@ -195,7 +198,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
           }
         }
 
-        // Fallback B: Get the latest pending deposit if not found above
+        // Fallback B: Get the latest deposit for this user
         if (!totalGhs) {
           const { data: latestPending } = await (supabaseAdmin as any)
             .from("wallet_transactions")
@@ -209,6 +212,12 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
             reference = latestPending.reference;
             totalGhs = Number(latestPending.amount_ghs);
           }
+        }
+
+        // Fallback C: Default to minimum GH₵ 1.00 for deposits if not found in DB
+        if (!totalGhs) {
+          totalGhs = 1.0;
+          reference = data.orderId;
         }
       }
     }
