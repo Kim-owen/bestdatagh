@@ -19,6 +19,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
   const queryClient = useQueryClient();
   const fetchWallet = useServerFn(getMyWallet);
   const payWallet = useServerFn(payOrderWithWallet);
+  const createOrderFn = useServerFn(createCheckoutOrder);
 
   const { data: walletData } = useQuery({
     queryKey: ["myWallet"],
@@ -49,7 +50,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
 
     try {
       // Create order
-      const orderRes = await createCheckoutOrder({
+      const orderRes = await createOrderFn({
         data: {
           items: [{ id: `${item.network}-${item.size}`, network: item.network, size: item.size, price: item.price, qty: 1 }],
           recipientPhone: phone,
@@ -94,7 +95,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
     setErrorMsg("");
 
     try {
-      const orderRes = await createCheckoutOrder({
+      const orderRes = await createOrderFn({
         data: {
           items: [
             {

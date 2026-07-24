@@ -35,6 +35,9 @@ function Checkout() {
   const queryClient = useQueryClient();
   const fetchWallet = useServerFn(getMyWallet);
   const payWallet = useServerFn(payOrderWithWallet);
+  const createOrderFn = useServerFn(createCheckoutOrder);
+  const checkPhoneFn = useServerFn(checkPhoneVerification);
+  const sendPhoneOtpFn = useServerFn(sendPhoneOtp);
 
   const { data: walletData } = useQuery({
     queryKey: ["myWallet"],
@@ -73,7 +76,7 @@ function Checkout() {
     setErrorMsg("");
 
     try {
-      const orderRes = await createCheckoutOrder({
+      const orderRes = await createOrderFn({
         data: {
           items: items.map((it) => ({ id: it.id, network: it.network, size: it.size, price: it.price, qty: it.qty })),
           recipientPhone: recipientPhone,
@@ -99,7 +102,7 @@ function Checkout() {
 
     try {
       // 1. Create order with recipient number
-      const orderRes = await createCheckoutOrder({
+      const orderRes = await createOrderFn({
         data: {
           items: items.map((it) => ({
             id: it.id,
@@ -142,7 +145,7 @@ function Checkout() {
         await initiatePaymentFlow();
       } else {
         // First-time buyer -> Create order, send OTP, and navigate to dedicated /verify-otp page!
-        const orderRes = await createCheckoutOrder({
+        const orderRes = await createOrderFn({
           data: {
             items: items.map((it) => ({
               id: it.id,

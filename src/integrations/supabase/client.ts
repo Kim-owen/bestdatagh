@@ -49,9 +49,6 @@ function createSupabaseClient() {
       : "sb_publishable_E4XDyGIYN5c0P3njR1Bqyg_1xif7qHN";
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    global: {
-      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
-    },
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
