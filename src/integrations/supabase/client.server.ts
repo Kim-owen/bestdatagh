@@ -30,10 +30,11 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseAdminClient() {
+  const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const SUPABASE_URL =
-    process.env.SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    "https://vtdccqchhsbujknbpqku.supabase.co";
+    rawUrl && rawUrl.includes("vtdccqchhsbujknbpqku")
+      ? rawUrl
+      : "https://vtdccqchhsbujknbpqku.supabase.co";
 
   const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
   const SUPABASE_SERVICE_ROLE_KEY =
