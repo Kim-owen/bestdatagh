@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { listWithdrawalEvents } from "@/lib/agent.functions";
 import { Loader2, History } from "lucide-react";
 
@@ -18,11 +19,12 @@ const dot: Record<string, string> = {
 export function WithdrawalAuditLog({ withdrawalId }: { withdrawalId: string }) {
   const [events, setEvents] = useState<Event[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const listWithdrawalEventsFn = useServerFn(listWithdrawalEvents);
 
   useEffect(() => {
     (async () => {
       try {
-        const rows = await listWithdrawalEvents({ data: { withdrawalId } });
+        const rows = await listWithdrawalEventsFn({ data: { withdrawalId } });
         setEvents(rows as any);
       } catch (e: any) { setError(e?.message ?? "Failed to load audit log"); }
     })();

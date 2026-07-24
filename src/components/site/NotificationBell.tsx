@@ -1,6 +1,7 @@
 import { Bell, Check, CheckCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { listMyNotifications, markNotificationRead } from "@/lib/agent.functions";
 
 type Note = { id: string; type: string; title: string; body: string | null; link: string | null; read: boolean; created_at: string };
@@ -10,8 +11,11 @@ export function NotificationBell() {
   const [items, setItems] = useState<Note[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
+  const listMyNotificationsFn = useServerFn(listMyNotifications);
+  const markNotificationReadFn = useServerFn(markNotificationRead);
+
   async function load() {
-    try { setItems((await listMyNotifications()) as any); } catch {}
+    try { setItems((await listMyNotificationsFn()) as any); } catch {}
   }
 
   useEffect(() => {
@@ -26,11 +30,11 @@ export function NotificationBell() {
 
   async function markOne(id: string) {
     setItems(prev => prev.map(i => i.id === id ? { ...i, read: true } : i));
-    try { await markNotificationRead({ data: { id } }); } catch {}
+    try { await markNotificationReadFn({ data: { id } }); } catch {}
   }
   async function markAll() {
     setItems(prev => prev.map(i => ({ ...i, read: true })));
-    try { await markNotificationRead({ data: { all: true } }); } catch {}
+    try { await markNotificationReadFn({ data: { all: true } }); } catch {}
   }
 
   return (

@@ -74,10 +74,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const close = useCallback(() => setIsOpen(false), []);
 
   const value = useMemo<CartState>(() => {
-    const count = items.reduce((a, b) => a + b.qty, 0);
+    const count = hydrated ? items.reduce((a, b) => a + b.qty, 0) : 0;
     const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
     return { items, count, subtotal, isOpen, toast, addItem, removeItem, setQty, clear, open, close, showToast };
-  }, [items, isOpen, toast, addItem, removeItem, setQty, clear, open, close, showToast]);
+  }, [items, hydrated, isOpen, toast, addItem, removeItem, setQty, clear, open, close, showToast]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
