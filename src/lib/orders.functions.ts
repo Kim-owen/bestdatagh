@@ -384,11 +384,13 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // 1. Check if deposit transaction (starts with "DEP-")
     if (data.reference.startsWith("DEP-")) {
+      const parts = data.reference.split("-");
+      const rootPrefix = parts.length >= 2 ? `${parts[0]}-${parts[1]}` : data.reference;
       const baseRef = data.reference.split("-R")[0].split("-F")[0];
       const { data: txs } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("id, user_id, reference, amount_ghs, status")
-        .or(`reference.eq.${data.reference},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
+        .or(`reference.eq.${data.reference},reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
         .order("created_at", { ascending: false });
 
       const primaryTx = txs?.[0];
