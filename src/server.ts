@@ -59,5 +59,26 @@ async function handleRequest(request: Request, env: unknown = {}, ctx: unknown =
 
 export default eventHandler(async (event) => {
   const req = toWebRequest(event);
-  return handleRequest(req, {}, event);
+
+  let urlStr = req.url;
+  if (urlStr.includes("/__server")) {
+    urlStr = urlStr.replace("/__server", "");
+    try {
+      const urlObj = new URL(urlStr);
+      if (!urlObj.pathname || urlObj.pathname === "") {
+        urlObj.pathname = "/";
+      }
+      urlStr = urlObj.toString();
+    } catch {}
+  }
+
+  const finalReq = urlStr === req.url ? req : new Request(urlStr, {
+    method: req.method,
+    headers: req.headers,
+    body: req.body,
+    // @ts-ignore
+    duplex: req.body ? "half" : undefined,
+  });
+
+  return handleRequest(finalReq, {}, event);
 });
