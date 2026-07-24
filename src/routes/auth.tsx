@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms, registerPhoneVerifiedUser, loginPhoneVerifiedUser, checkSignupUniqueness } from "@/lib/otp.functions";
+import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms, registerPhoneVerifiedUser, loginPhoneVerifiedUser, checkSignupUniqueness, initiateEmailPasswordLoginWithOtp } from "@/lib/otp.functions";
 import { recordLoginIpSecurity } from "@/lib/security.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -161,33 +161,28 @@ function Field({
   );
 }
 
-/* ============ Login Form with SMS OTP Verification ============ */
+/* ============ Login Form (Email & Password + Verified Phone SMS OTP) ============ */
 function LoginForm({ next }: { next?: string }) {
   const nav = useNavigate();
-  const sendOtpFn = useServerFn(sendPhoneOtp);
+  const initLoginOtpFn = useServerFn(initiateEmailPasswordLoginWithOtp);
   const verifyOtpFn = useServerFn(verifyPhoneOtp);
-  const loginUserFn = useServerFn(loginPhoneVerifiedUser);
   const recordLoginIpFn = useServerFn(recordLoginIpSecurity);
 
-  const [loginMode, setLoginMode] = useState<"OTP" | "PASSWORD">("OTP");
+  const [step, setStep] = useState<"CREDENTIALS" | "OTP">("CREDENTIALS");
 
-  // Phone OTP State
-  const [phone, setPhone] = useState("");
-  const [otpStep, setOtpStep] = useState<"PHONE" | "VERIFY">("PHONE");
-  const [otpCode, setOtpCode] = useState("");
-  const [maskedPhone, setMaskedPhone] = useState("");
-  const [resendCooldown, setResendCooldown] = useState(0);
-
-  // Email/Password State
+  // Credentials State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // OTP State
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [maskedPhone, setMaskedPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const cleanPhone = phone.replace(/[^\d]/g, "");
-  const validPhone = cleanPhone.length === 9 || cleanPhone.length === 10;
 
   useEffect(() => {
     let timer: any = null;
@@ -197,30 +192,35 @@ function LoginForm({ next }: { next?: string }) {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
-  // Step 1: Send SMS OTP
-  async function handleSendLoginOtp(e: React.FormEvent) {
+  // Step 1: Verify Email & Password and send SMS OTP to verified phone number
+  async function handleInitiateLogin(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-
-    if (!validPhone) {
-      return setErr("Please enter a valid Ghana phone number (e.g. 0244 000 000).");
-    }
-
     setBusy(true);
+
     try {
-      const res = await sendOtpFn({ data: { phone: cleanPhone } });
+      // 1. Verify credentials against Supabase Auth
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (authErr) throw new Error(authErr.message);
+
+      // Sign out transiently until 2FA OTP verification is complete
+      await supabase.auth.signOut();
+
+      // 2. Dispatch SMS OTP code to user's registered phone number
+      const res = await initLoginOtpFn({ data: { email } });
+      setVerifiedPhone(res.phone);
       setMaskedPhone(res.maskedPhone);
-      setOtpStep("VERIFY");
+      setStep("OTP");
       setResendCooldown(30);
     } catch (error: any) {
-      setErr(error.message || "Failed to send SMS verification code.");
+      setErr(error.message || "Failed to verify login credentials.");
     } finally {
       setBusy(false);
     }
   }
 
-  // Step 2: Verify SMS OTP & Sign In Instantly
-  async function handleVerifyAndLogin(e: React.FormEvent) {
+  // Step 2: Verify 6-digit SMS OTP & Complete Sign In
+  async function handleVerifyOtpAndLogin(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
 
@@ -231,18 +231,11 @@ function LoginForm({ next }: { next?: string }) {
 
     setBusy(true);
     try {
-      // 1. Verify OTP code
-      await verifyOtpFn({ data: { phone: cleanPhone, otpCode: code } });
+      // 1. Verify SMS OTP against verified phone number
+      await verifyOtpFn({ data: { phone: verifiedPhone, otpCode: code } });
 
-      // 2. Resolve credentials for phone-verified user
-      const userRes = await loginUserFn({ data: { phone: cleanPhone } });
-
-      // 3. Sign in to Supabase Session
-      const { error: authErr } = await supabase.auth.signInWithPassword({
-        email: userRes.email,
-        password: userRes.password,
-      });
-
+      // 2. Authenticate session
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
       if (authErr) throw new Error(authErr.message);
 
       // Record IP Security
@@ -258,137 +251,19 @@ function LoginForm({ next }: { next?: string }) {
     }
   }
 
-  // Password Login Fallback
-  async function handlePasswordLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) return setErr(error.message);
-
-    try {
-      await recordLoginIpFn({});
-    } catch {}
-
-    nav({ to: (next as any) || "/account" });
-  }
-
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-black font-display">Welcome Back</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {loginMode === "OTP"
-            ? "Log in securely using your Phone Number & SMS OTP."
-            : "Sign in with your Email and Password."}
+          {step === "CREDENTIALS"
+            ? "Sign in with your Email and Password."
+            : "Enter the SMS OTP code sent to your verified phone number."}
         </p>
       </div>
 
-      {loginMode === "OTP" ? (
-        otpStep === "PHONE" ? (
-          <form onSubmit={handleSendLoginOtp} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-bold">Phone Number (MoMo)</label>
-              <Field
-                icon={Smartphone}
-                type="tel"
-                placeholder="0244 000 000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                We'll send a 6-digit SMS verification code to this phone number.
-              </p>
-            </div>
-
-            {err && (
-              <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{err}</span>
-              </div>
-            )}
-
-            <button
-              disabled={busy || !validPhone}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
-            >
-              {busy ? "Sending SMS OTP..." : "Send SMS Verification Code"} <ArrowRight className="h-4 w-4" />
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyAndLogin} className="space-y-4">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-primary">SMS Code Sent</span>
-                <button
-                  type="button"
-                  onClick={() => setOtpStep("PHONE")}
-                  className="text-[11px] text-muted-foreground underline hover:text-foreground"
-                >
-                  Change Number
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Enter the 6-digit OTP code sent to <strong>{maskedPhone}</strong>
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-bold">6-Digit Verification Code</label>
-              <Field
-                icon={KeyRound}
-                type="text"
-                maxLength={6}
-                placeholder="123456"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                required
-              />
-            </div>
-
-            {err && (
-              <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{err}</span>
-              </div>
-            )}
-
-            <button
-              disabled={busy || otpCode.length !== 6}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
-            >
-              {busy ? "Verifying & Signing In..." : "Verify & Log In Instantly"} <ArrowRight className="h-4 w-4" />
-            </button>
-
-            <div className="text-center pt-1">
-              <button
-                type="button"
-                disabled={resendCooldown > 0 || busy}
-                onClick={async () => {
-                  if (resendCooldown > 0 || busy) return;
-                  setErr(null);
-                  setBusy(true);
-                  try {
-                    const res = await sendOtpFn({ data: { phone: cleanPhone } });
-                    setMaskedPhone(res.maskedPhone);
-                    setResendCooldown(30);
-                  } catch (e: any) {
-                    setErr(e.message || "Failed to resend SMS code.");
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                className="text-xs font-bold text-primary hover:underline disabled:opacity-50"
-              >
-                {resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : "Resend Verification Code"}
-              </button>
-            </div>
-          </form>
-        )
-      ) : (
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
+      {step === "CREDENTIALS" ? (
+        <form onSubmit={handleInitiateLogin} className="space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-bold">Email Address</label>
             <Field
@@ -442,26 +317,79 @@ function LoginForm({ next }: { next?: string }) {
             disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
           >
-            {busy ? "Signing In…" : "Sign In to Account"} <ArrowRight className="h-4 w-4" />
+            {busy ? "Verifying Credentials..." : "Continue to Sign In"} <ArrowRight className="h-4 w-4" />
           </button>
         </form>
-      )}
+      ) : (
+        <form onSubmit={handleVerifyOtpAndLogin} className="space-y-4">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-primary">SMS OTP Code Sent</span>
+              <button
+                type="button"
+                onClick={() => setStep("CREDENTIALS")}
+                className="text-[11px] text-muted-foreground underline hover:text-foreground"
+              >
+                Back to Login
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              We sent a 6-digit verification code to your verified phone number <strong>{maskedPhone}</strong>
+            </p>
+          </div>
 
-      {/* Mode Switcher */}
-      <div className="pt-2 text-center border-t border-border">
-        <button
-          type="button"
-          onClick={() => {
-            setErr(null);
-            setLoginMode(loginMode === "OTP" ? "PASSWORD" : "OTP");
-          }}
-          className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {loginMode === "OTP"
-            ? "Log in with Password instead →"
-            : "← Log in with Phone SMS OTP instead"}
-        </button>
-      </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold">6-Digit Verification Code</label>
+            <Field
+              icon={KeyRound}
+              type="text"
+              maxLength={6}
+              placeholder="123456"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              required
+            />
+          </div>
+
+          {err && (
+            <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{err}</span>
+            </div>
+          )}
+
+          <button
+            disabled={busy || otpCode.length !== 6}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+          >
+            {busy ? "Verifying OTP & Logging In..." : "Verify OTP & Complete Sign In"} <ArrowRight className="h-4 w-4" />
+          </button>
+
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              disabled={resendCooldown > 0 || busy}
+              onClick={async () => {
+                if (resendCooldown > 0 || busy) return;
+                setErr(null);
+                setBusy(true);
+                try {
+                  const res = await initLoginOtpFn({ data: { email } });
+                  setMaskedPhone(res.maskedPhone);
+                  setResendCooldown(30);
+                } catch (e: any) {
+                  setErr(e.message || "Failed to resend SMS code.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="text-xs font-bold text-primary hover:underline disabled:opacity-50"
+            >
+              {resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : "Resend Verification Code"}
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

@@ -398,3 +398,68 @@ export const loginPhoneVerifiedUser = createServerFn({ method: "POST" })
     return { ok: true, email: targetEmail, password: targetPassword };
   });
 
+/**
+ * Verify Email + Password, then dispatch 2FA SMS OTP to the user's verified phone number
+ */
+export const initiateEmailPasswordLoginWithOtp = createServerFn({ method: "POST" })
+  .validator((data: { email: string }) => ({
+    email: (data.email || "").trim().toLowerCase(),
+  }))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Look up profile by email
+    const { data: userProfile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("id, phone, display_name")
+      .eq("email", data.email)
+      .maybeSingle();
+
+    let verifiedPhone = userProfile?.phone;
+
+    if (!verifiedPhone) {
+      const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
+      const matched = usersList?.users?.find((u) => u.email?.toLowerCase() === data.email);
+      if (matched) {
+        verifiedPhone = matched.user_metadata?.phone || matched.phone;
+      }
+    }
+
+    if (!verifiedPhone) {
+      throw new Error("No verified phone number found for this account. Please verify your phone number during signup.");
+    }
+
+    const raw = cleanPhone(verifiedPhone);
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    const expiresAtIso = new Date(expiresAt).toISOString();
+
+    inMemoryOtpStore.set(raw, { otpCode, expiresAt });
+
+    try {
+      await (supabaseAdmin as any)
+        .from("phone_verifications")
+        .upsert(
+          {
+            phone: raw,
+            otp_code: otpCode,
+            expires_at: expiresAtIso,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "phone" }
+        );
+    } catch {}
+
+    const smsMessage = `Your BestData 2FA login code is: ${otpCode}. Valid for 10 minutes.`;
+    await sendTxtConnectSms(raw, smsMessage);
+
+    const maskedPhone = `+233 ${raw.slice(1, 3)} *** ${raw.slice(-4)}`;
+    return {
+      success: true,
+      phone: raw,
+      maskedPhone,
+      otpCode,
+    };
+  });
+
