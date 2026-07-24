@@ -176,7 +176,7 @@ export const adminSetRole = createServerFn({ method: "POST" })
 
 export const adminListBundles = createServerFn({ method: "GET" })
   .handler(async () => {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://vtdccqchhsbujknbpqku.supabase.co";
+    const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
     const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await supa.from("bundles").select("*").order("network").order("sort_order");
@@ -187,7 +187,7 @@ export const adminListBundles = createServerFn({ method: "GET" })
 export const adminSaveBundle = createServerFn({ method: "POST" })
   .inputValidator((d: any) => d)
   .handler(async ({ data }) => {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://vtdccqchhsbujknbpqku.supabase.co";
+    const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
     const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { clearBundleCache } = await import("@/lib/public-bundles.functions");
@@ -210,7 +210,7 @@ export const adminSaveBundle = createServerFn({ method: "POST" })
 export const adminDeleteBundle = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => ({ id: String(d.id) }))
   .handler(async ({ data }) => {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://vtdccqchhsbujknbpqku.supabase.co";
+    const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
     const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { clearBundleCache } = await import("@/lib/public-bundles.functions");
@@ -1164,7 +1164,7 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
       throw new Error("No packages returned from provider API");
     }
 
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://vtdccqchhsbujknbpqku.supabase.co";
+    const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
     const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
