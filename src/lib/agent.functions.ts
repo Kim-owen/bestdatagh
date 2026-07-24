@@ -231,7 +231,7 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
 
     // 2. REJECT & OPTIONAL REFUND TO AGENT WALLET
     if (data.status === "rejected" && data.refundToWallet) {
-      const { data: wRecord } = await supabaseAdmin
+      const { data: wRecord } = await (supabaseAdmin as any)
         .from("wallets")
         .select("balance_ghs")
         .eq("user_id", withdrawal.user_id)
@@ -241,13 +241,13 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
       const refundAmt = Number(withdrawal.amount_ghs);
       const newBal = oldBal + refundAmt;
 
-      await supabaseAdmin.from("wallets").upsert({
+      await (supabaseAdmin as any).from("wallets").upsert({
         user_id: withdrawal.user_id,
         balance_ghs: newBal,
         updated_at: new Date().toISOString(),
       });
 
-      await supabaseAdmin.from("wallet_transactions").insert({
+      await (supabaseAdmin as any).from("wallet_transactions").insert({
         user_id: withdrawal.user_id,
         amount_ghs: refundAmt,
         type: "refund",
@@ -277,7 +277,7 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     // Record audit log event
-    await supabaseAdmin.from("withdrawal_events").insert({
+    await (supabaseAdmin as any).from("withdrawal_events").insert({
       withdrawal_id: data.id,
       event_type: `admin_${data.status}`,
       actor_user_id: context.userId,
@@ -382,7 +382,7 @@ export const sweepCommissionToWallet = createServerFn({ method: "POST" })
     if (wErr) throw new Error(wErr.message);
 
     // 3. Credit wallet balance
-    const { data: wallet } = await supabaseAdmin
+    const { data: wallet } = await (supabaseAdmin as any)
       .from("wallets")
       .select("balance_ghs")
       .eq("user_id", context.userId)
@@ -391,13 +391,13 @@ export const sweepCommissionToWallet = createServerFn({ method: "POST" })
     const currentBal = Number(wallet?.balance_ghs || 0);
     const newBal = Number((currentBal + data.amount_ghs).toFixed(2));
 
-    const { error: balErr } = await supabaseAdmin
+    const { error: balErr } = await (supabaseAdmin as any)
       .from("wallets")
       .upsert({ user_id: context.userId, balance_ghs: newBal }, { onConflict: "user_id" });
     if (balErr) throw new Error(balErr.message);
 
     // 4. Record wallet transaction
-    await supabaseAdmin.from("wallet_transactions").insert({
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: context.userId,
       amount_ghs: data.amount_ghs,
       type: "commission_sweep",

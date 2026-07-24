@@ -45,7 +45,7 @@ function PaymentMomoPage() {
     queryFn: () => checkStatusFn({ data: { reference } }),
   });
 
-  const order = pollData?.order;
+  const order = pollData?.order as any;
   const firstItem = order?.order_items?.[0];
   const recipientPhone = firstItem?.recipient_phone || "";
   const bundleSize = firstItem?.size_label || "Data Bundle";

@@ -3,6 +3,7 @@ import { Check, Loader2, X, Lock, ShieldCheck } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import type { Network } from "@/lib/cart";
 import { createCheckoutOrder } from "@/lib/orders.functions";
+import { InAppPaymentModal } from "@/components/site/InAppPaymentModal";
 
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

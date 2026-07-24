@@ -175,11 +175,11 @@ export function InAppPaymentModal({
 
               <div className="flex items-center gap-3 text-xs">
                 <div className={`grid h-6 w-6 place-items-center rounded-full font-bold text-[10px] ${
-                  orderState === "delivered" ? "bg-emerald-500 text-slate-950" : "bg-white/10 text-slate-400"
+                  (orderState as string) === "delivered" ? "bg-emerald-500 text-slate-950" : "bg-white/10 text-slate-400"
                 }`}>
-                  {orderState === "delivered" ? <CheckCircle2 className="h-4 w-4" /> : "3"}
+                  {(orderState as string) === "delivered" ? <CheckCircle2 className="h-4 w-4" /> : "3"}
                 </div>
-                <span className={orderState === "delivered" ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                <span className={(orderState as string) === "delivered" ? "text-emerald-400 font-bold" : "text-slate-400"}>
                   Automated Data Delivery
                 </span>
               </div>

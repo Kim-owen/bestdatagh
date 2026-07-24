@@ -97,7 +97,7 @@ function AdminShell() {
           to: "/admin/orders",
           label: "Live Orders & Retry",
           icon: ShoppingBag,
-          badge: stats?.pendingOrders ? stats.pendingOrders : undefined,
+          badge: (stats as any)?.pendingOrders ? (stats as any).pendingOrders : undefined,
           badgeColor: "bg-destructive",
         },
         { to: "/admin/users", label: "Users & Roles", icon: Users },
@@ -173,7 +173,7 @@ function AdminShell() {
                 </div>
                 {g.items.map((it) => {
                   const Icon = it.icon;
-                  const active = it.exact ? path === it.to : path.startsWith(it.to);
+                  const active = (it as any).exact ? path === it.to : path.startsWith(it.to);
                   return (
                     <Link
                       key={it.to}
@@ -269,7 +269,7 @@ function AdminShell() {
                 </div>
                 {g.items.map((it) => {
                   const Icon = it.icon;
-                  const active = it.exact ? path === it.to : path.startsWith(it.to);
+                  const active = (it as any).exact ? path === it.to : path.startsWith(it.to);
                   return (
                     <Link
                       key={it.to}

@@ -333,9 +333,9 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
           const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
           await sendOrderDeliveredSms(item.recipient_phone, order.reference, item.size_label, item.network).catch(() => {});
 
-          await supabaseAdmin.from("admin_audit_logs").insert({
-            admin_id: context.user.id,
-            admin_email: context.user.email,
+          await (supabaseAdmin as any).from("admin_audit_logs").insert({
+            admin_id: context.userId,
+            admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
             action: "PREVENTED_DUPLICATE_RETRY",
             target_type: "order",
             target_id: order.id,
@@ -395,9 +395,9 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     }
 
     // Audit log
-    await supabaseAdmin.from("admin_audit_logs").insert({
-      admin_id: context.user.id,
-      admin_email: context.user.email,
+    await (supabaseAdmin as any).from("admin_audit_logs").insert({
+      admin_id: context.userId,
+      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
       action: "RETRY_ORDER_FULFILLMENT",
       target_type: "order",
       target_id: order.id,
@@ -494,7 +494,7 @@ export const adminGetSiteSettings = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.from("site_settings").select("*");
+    const { data, error } = await (supabaseAdmin as any).from("site_settings").select("*");
     if (error) return {};
     const settings: Record<string, string> = {};
     (data || []).forEach((row: any) => {
@@ -511,7 +511,7 @@ export const adminSaveSiteSettings = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const entries = Object.entries(data);
     for (const [key, value] of entries) {
-      await supabaseAdmin.from("site_settings").upsert({ key, value: String(value) }, { onConflict: "key" });
+      await (supabaseAdmin as any).from("site_settings").upsert({ key, value: String(value) }, { onConflict: "key" });
     }
     return { ok: true };
   });
@@ -555,7 +555,7 @@ export const adminGetHeroSlides = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
+    const { data } = await (supabaseAdmin as any).from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
 
     if (!data || !data.value) return DEFAULT_HERO_SLIDES;
     try {
@@ -573,14 +573,14 @@ export const adminSaveHeroSlides = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const jsonStr = JSON.stringify(data);
-    await supabaseAdmin.from("site_settings").upsert({ key: "hero_slides", value: jsonStr }, { onConflict: "key" });
+    await (supabaseAdmin as any).from("site_settings").upsert({ key: "hero_slides", value: jsonStr }, { onConflict: "key" });
     return { ok: true };
   });
 
 export const getPublicHeroSlides = createServerFn({ method: "GET" })
   .handler(async () => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
+    const { data } = await (supabaseAdmin as any).from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
 
     if (!data || !data.value) return DEFAULT_HERO_SLIDES;
     try {
@@ -597,7 +597,7 @@ export const adminListAuditLogs = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin
+    const { data } = await (supabaseAdmin as any)
       .from("admin_audit_logs")
       .select("*")
       .order("created_at", { ascending: false })
@@ -622,8 +622,8 @@ export const adminSendBroadcastSms = createServerFn({ method: "POST" })
       const { data: agents } = await supabaseAdmin.from("agent_applications").select("phone").eq("status", "approved");
       phoneNumbers = (agents || []).map((a) => a.phone);
     } else {
-      const { data: orders } = await supabaseAdmin.from("orders").select("phone").limit(500);
-      phoneNumbers = Array.from(new Set((orders || []).map((o) => o.phone)));
+      const { data: orderItems } = await supabaseAdmin.from("order_items").select("recipient_phone").limit(500);
+      phoneNumbers = Array.from(new Set((orderItems || []).map((o) => o.recipient_phone).filter(Boolean)));
     }
 
     if (phoneNumbers.length === 0) {
@@ -641,9 +641,9 @@ export const adminSendBroadcastSms = createServerFn({ method: "POST" })
     }
 
     // Log action
-    await supabaseAdmin.from("admin_audit_logs").insert({
-      admin_id: context.user.id,
-      admin_email: context.user.email,
+    await (supabaseAdmin as any).from("admin_audit_logs").insert({
+      admin_id: context.userId,
+      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
       action: "BROADCAST_SMS_SENT",
       target_type: "broadcast",
       details: { audience: data.audience, totalCount: phoneNumbers.length, successCount },
@@ -660,8 +660,8 @@ export const adminGetSecurityFlags = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Fetch unverified phone numbers, rapid order retries, and high value orders
-    const { data: unverified } = await supabaseAdmin.from("phone_verifications").select("*").order("created_at", { ascending: false }).limit(20);
-    const { data: highValueOrders } = await supabaseAdmin.from("orders").select("*").gte("amount_paid", 500).order("created_at", { ascending: false }).limit(20);
+    const { data: unverified } = await (supabaseAdmin as any).from("phone_verifications").select("*").order("created_at", { ascending: false }).limit(20);
+    const { data: highValueOrders } = await supabaseAdmin.from("orders").select("*").gte("total_ghs", 500).order("created_at", { ascending: false }).limit(20);
 
     return {
       unverifiedVerifications: unverified || [],
@@ -679,14 +679,14 @@ export const adminReconcilePaystack = createServerFn({ method: "GET" })
 
     const { data: orders } = await supabaseAdmin
       .from("orders")
-      .select("id, reference, amount_paid, status, created_at, phone")
+      .select("id, reference, total_ghs, status, created_at")
       .order("created_at", { ascending: false })
       .limit(50);
 
     // Flag mismatched or unverified references
-    const reconciled = (orders || []).map((o) => ({
+    const reconciled = (orders || []).map((o: any) => ({
       ...o,
-      paystackStatus: o.status === "completed" ? "success" : o.status === "failed" ? "failed" : "abandoned",
+      paystackStatus: o.status === "delivered" || o.status === "paid" ? "success" : o.status === "failed" ? "failed" : "abandoned",
       reconciled: true,
     }));
 
@@ -700,7 +700,7 @@ export const adminGetProfitAnalytics = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: orders } = await supabaseAdmin.from("orders").select("network, amount_paid, status, created_at");
+    const { data: orders } = await supabaseAdmin.from("orders").select("total_ghs, status, created_at, order_items(network)");
 
     const networkStats: Record<string, { revenue: number; cost: number; profit: number; count: number }> = {
       MTN: { revenue: 0, cost: 0, profit: 0, count: 0 },
@@ -708,11 +708,12 @@ export const adminGetProfitAnalytics = createServerFn({ method: "GET" })
       AirtelTigo: { revenue: 0, cost: 0, profit: 0, count: 0 },
     };
 
-    (orders || []).forEach((o) => {
-      const net = o.network || "MTN";
+    (orders || []).forEach((o: any) => {
+      const firstItem = o.order_items?.[0];
+      const net = firstItem?.network || "MTN";
       if (!networkStats[net]) networkStats[net] = { revenue: 0, cost: 0, profit: 0, count: 0 };
-      if (o.status === "completed") {
-        const rev = Number(o.amount_paid || 0);
+      if (o.status === "delivered" || o.status === "paid") {
+        const rev = Number(o.total_ghs || 0);
         const cost = rev * 0.88; // Estimated 88% reseller cost
         networkStats[net].revenue += rev;
         networkStats[net].cost += cost;
@@ -730,7 +731,7 @@ export const adminListSupportTickets = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("support_tickets").select("*").order("created_at", { ascending: false });
+    const { data } = await (supabaseAdmin as any).from("support_tickets").select("*").order("created_at", { ascending: false });
     return data || [];
   });
 
@@ -740,7 +741,7 @@ export const adminUpdateTicketStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("support_tickets").update({ status: data.status, updated_at: new Date().toISOString() }).eq("id", data.ticketId);
+    await (supabaseAdmin as any).from("support_tickets").update({ status: data.status, updated_at: new Date().toISOString() }).eq("id", data.ticketId);
     return { ok: true };
   });
 
@@ -770,14 +771,14 @@ export const adminListWallets = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const [{ data: wallets }, { data: transactions }, { data: profiles }] = await Promise.all([
-      supabaseAdmin.from("wallets").select("*").order("updated_at", { ascending: false }).limit(100),
-      supabaseAdmin.from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(100),
+      (supabaseAdmin as any).from("wallets").select("*").order("updated_at", { ascending: false }).limit(100),
+      (supabaseAdmin as any).from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(100),
       supabaseAdmin.from("profiles").select("id, display_name, phone"),
     ]);
 
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
-    const enrichedWallets = (wallets || []).map((w) => {
+    const enrichedWallets = (wallets || []).map((w: any) => {
       const p = profileMap.get(w.user_id);
       return {
         ...w,
@@ -786,7 +787,7 @@ export const adminListWallets = createServerFn({ method: "GET" })
       };
     });
 
-    const totalBalance = (wallets || []).reduce((acc, curr) => acc + Number(curr.balance_ghs || 0), 0);
+    const totalBalance = (wallets || []).reduce((acc: number, curr: any) => acc + Number(curr.balance_ghs || 0), 0);
 
     return {
       wallets: enrichedWallets,
@@ -802,7 +803,7 @@ export const adminAdjustUserWallet = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: curWallet } = await supabaseAdmin
+    const { data: curWallet } = await (supabaseAdmin as any)
       .from("wallets")
       .select("balance_ghs")
       .eq("user_id", data.userId)
@@ -814,12 +815,12 @@ export const adminAdjustUserWallet = createServerFn({ method: "POST" })
 
     if (newBal < 0) throw new Error("Wallet balance cannot go below GH₵ 0.00");
 
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from("wallets")
       .upsert({ user_id: data.userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
 
     const ref = `ADM-ADJ-${Date.now()}`;
-    await supabaseAdmin.from("wallet_transactions").insert({
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: data.userId,
       amount_ghs: adjustment,
       type: data.type === "credit" ? "deposit" : "refund",
@@ -829,9 +830,9 @@ export const adminAdjustUserWallet = createServerFn({ method: "POST" })
     });
 
     // Audit log
-    await supabaseAdmin.from("admin_audit_logs").insert({
-      admin_id: context.user.id,
-      admin_email: context.user.email,
+    await (supabaseAdmin as any).from("admin_audit_logs").insert({
+      admin_id: context.userId,
+      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
       action: `WALLET_${data.type.toUpperCase()}`,
       target_type: "user_wallet",
       target_id: data.userId,
@@ -949,9 +950,9 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
       syncedCount++;
     }
 
-    await supabaseAdmin.from("admin_audit_logs").insert({
-      admin_id: context.user.id,
-      admin_email: context.user.email,
+    await (supabaseAdmin as any).from("admin_audit_logs").insert({
+      admin_id: context.userId,
+      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
       action: "SYNC_PROVIDER_PACKAGES",
       target_type: "bundles",
       details: { syncedCount },

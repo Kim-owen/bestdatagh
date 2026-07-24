@@ -86,7 +86,7 @@ function UnifiedPaymentPage() {
   });
 
   const isDeposit = reference.startsWith("DEP-") || Boolean(pollData?.isDeposit);
-  const order = pollData?.order;
+  const order = pollData?.order as any;
   const currentStatus = pollData?.status || order?.status || "pending";
   const firstItem = order?.order_items?.[0];
   const recipientPhone = firstItem?.recipient_phone || (user?.email ? "" : "");
@@ -107,11 +107,12 @@ function UnifiedPaymentPage() {
     }
   }, [networkName]);
 
-  // Clear cart when order is delivered
+  // Clear cart & refetch wallet when order/deposit completes
   useEffect(() => {
-    if (currentStatus === "delivered" || currentStatus === "completed") {
+    if (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid") {
       clear();
       queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+      queryClient.refetchQueries({ queryKey: ["myWallet"] });
     }
   }, [currentStatus, clear, queryClient]);
 
@@ -278,58 +279,77 @@ function UnifiedPaymentPage() {
       <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-10 md:py-16 w-full">
         <div className="mx-auto max-w-2xl space-y-8">
 
-          {/* Top Reference Badge */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-white/10 p-5 rounded-3xl backdrop-blur-xl shadow-xl">
-            <div>
-              <div className="flex items-center gap-2 text-xs text-amber-400 font-bold uppercase tracking-widest mb-1">
-                <Sparkles className="h-3.5 w-3.5" /> Paystack Instant Checkout
+          {/* Top Reference & Status Header Badge */}
+          <div className="relative overflow-hidden rounded-3xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/70 via-slate-900/90 to-slate-950/90 p-6 backdrop-blur-xl shadow-2xl space-y-3">
+            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-400 mb-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span>Payment Verified & Live Sync Active</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black text-white font-display flex items-center gap-2 tracking-tight">
+                  Reference: <span className="font-mono text-amber-400">{reference}</span>
+                </h1>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black text-white font-display flex items-center gap-2">
-                Order #{reference}
-              </h1>
-            </div>
 
-            <button
-              onClick={copyRef}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-mono font-bold text-slate-300 transition-all w-fit"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-slate-400" />}
-              <span>{copied ? "Copied!" : "Copy Reference"}</span>
-            </button>
+              <button
+                onClick={copyRef}
+                type="button"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/20 text-xs font-mono font-black text-white transition-all w-fit shadow-md active:scale-95"
+              >
+                {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4 text-amber-400" />}
+                <span>{copied ? "Reference Copied!" : "Copy Reference"}</span>
+              </button>
+            </div>
           </div>
 
           {/* MAIN PAYMENT HUB CARD */}
-          <div className="relative rounded-[32px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
+          <div className="relative rounded-[36px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
             {/* 1. DEPOSIT SUCCESS CARD 🎉 */}
             {isDeposit && (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid") ? (
-              <div className="space-y-6 text-center animate-in fade-in py-2">
-                <div className="relative mx-auto h-20 w-20 grid place-items-center rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.35)]">
-                  <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
+              <div className="space-y-8 text-center animate-in fade-in py-4">
+                <div className="relative mx-auto h-24 w-24 grid place-items-center">
+                  <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
+                  <div className="relative grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-tr from-emerald-600 to-emerald-400 text-slate-950 shadow-[0_0_50px_rgba(16,185,129,0.45)]">
+                    <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1 text-[11px] font-black text-emerald-400 uppercase tracking-widest">
-                    <Sparkles className="h-3.5 w-3.5" /> Deposit Successful & Credited
+                <div className="space-y-2 max-w-md mx-auto">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-4 py-1.5 text-xs font-black text-emerald-400 uppercase tracking-widest">
+                    <Sparkles className="h-4 w-4 text-amber-400" /> Wallet Deposited & Credited
                   </div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-white font-display">Wallet Deposited Successfully!</h2>
-                  <p className="text-xs text-slate-300">
-                    <span className="text-emerald-400 font-bold font-mono">GH₵ {totalGhs.toFixed(2)}</span> has been credited to your Bestdata Wallet.
+                  <h2 className="text-3xl sm:text-4xl font-black text-white font-display tracking-tight">Deposit Successful!</h2>
+                  <p className="text-sm text-slate-300">
+                    <span className="text-emerald-400 font-extrabold font-mono text-base">GH₵ {totalGhs.toFixed(2)}</span> has been credited to your Bestdata Wallet.
                   </p>
                 </div>
 
                 {/* Receipt Card */}
-                <div className="rounded-3xl border border-white/10 bg-slate-900/90 p-6 space-y-4 text-xs font-mono shadow-xl max-w-md mx-auto text-left">
+                <div className="rounded-3xl border border-white/15 bg-slate-900/90 p-6 space-y-4 text-xs font-mono shadow-2xl max-w-md mx-auto text-left">
+                  <div className="flex justify-between items-center text-slate-300 border-b border-white/10 pb-3">
+                    <span className="text-slate-400 font-sans">Transaction Type</span>
+                    <span className="font-extrabold text-white font-sans flex items-center gap-1.5">
+                      <Wallet className="h-4 w-4 text-emerald-400" /> Wallet Top Up
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-400">Deposit Reference</span>
-                    <span className="font-bold text-white">{reference}</span>
+                    <span className="font-bold text-white font-mono">{reference}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
-                    <span className="text-slate-400">Amount Deposited</span>
-                    <span className="font-bold text-emerald-400 font-mono">GH₵ {totalGhs.toFixed(2)}</span>
+                    <span className="text-slate-400">Amount Paid</span>
+                    <span className="font-bold text-emerald-400 font-mono text-sm">GH₵ {totalGhs.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-white/10 pt-3 text-slate-300">
-                    <span className="text-slate-400">Updated Wallet Balance</span>
-                    <span className="font-bold text-amber-400 font-mono text-sm">GH₵ {walletBalance.toFixed(2)}</span>
+                    <span className="text-slate-400 font-sans">Updated Wallet Balance</span>
+                    <span className="font-black text-amber-400 font-mono text-base bg-amber-400/10 border border-amber-400/30 px-3 py-1 rounded-xl">
+                      GH₵ {walletBalance.toFixed(2)}
+                    </span>
                   </div>
                 </div>
 
@@ -344,6 +364,7 @@ function UnifiedPaymentPage() {
                   </Link>
                   <Link
                     to="/buy-data"
+                    search={{ network: "MTN" }}
                     className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 py-4 text-xs font-bold text-white hover:bg-white/10 transition-all"
                   >
                     <span>Buy Data Bundles</span>
@@ -354,11 +375,14 @@ function UnifiedPaymentPage() {
               <div className="space-y-8 animate-in fade-in">
                 {/* Top Success Icon */}
                 <div className="text-center space-y-3">
-                  <div className="relative mx-auto h-20 w-20 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10 animate-bounce">
-                    <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
+                  <div className="relative mx-auto h-24 w-24 grid place-items-center">
+                    <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
+                    <div className="relative grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-tr from-emerald-600 to-emerald-400 text-slate-950 shadow-[0_0_50px_rgba(16,185,129,0.45)]">
+                      <CheckCircle2 className="h-10 w-10 stroke-[2.5]" />
+                    </div>
                   </div>
-                  <h2 className="text-3xl font-black text-white font-display">
-                    {currentStatus === "delivered" ? "Payment & Delivery Complete! 🎉" : "Payment Successful!"}
+                  <h2 className="text-3xl sm:text-4xl font-black text-white font-display tracking-tight">
+                    {currentStatus === "delivered" ? "Payment & Delivery Complete! 🎉" : "Payment Confirmed!"}
                   </h2>
                   <p className="text-sm text-slate-300 max-w-md mx-auto">
                     {currentStatus === "delivered" 
@@ -368,12 +392,12 @@ function UnifiedPaymentPage() {
                 </div>
 
                 {/* Progress Stepper Bar (1 - 2 - 3) */}
-                <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-6">
+                <div className="rounded-3xl border border-white/15 bg-slate-900/80 p-6 shadow-xl">
                   <div className="relative flex items-center justify-between">
                     {/* Connecting Track Line */}
-                    <div className="absolute top-1/2 left-8 right-8 h-1 bg-slate-800 -translate-y-1/2 -z-0">
+                    <div className="absolute top-1/2 left-8 right-8 h-1.5 bg-slate-800 -translate-y-1/2 -z-0 rounded-full">
                       <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-all duration-700 rounded-full shadow-[0_0_12px_rgba(52,211,153,0.5)]"
+                        className="h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-emerald-400 transition-all duration-700 rounded-full shadow-[0_0_12px_rgba(52,211,153,0.5)]"
                         style={{
                           width: currentStatus === "delivered" ? "100%" : currentStatus === "processing" ? "66%" : "33%",
                         }}
@@ -382,24 +406,24 @@ function UnifiedPaymentPage() {
 
                     {/* Step 1: Payment Verified */}
                     <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                      <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
-                        <Check className="h-5 w-5 stroke-[3]" />
+                      <div className="h-11 w-11 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                        <Check className="h-6 w-6 stroke-[3]" />
                       </div>
-                      <span className="text-[11px] font-bold text-emerald-400">Payment Verified</span>
+                      <span className="text-[11px] font-extrabold text-emerald-400">Payment Verified</span>
                     </div>
 
                     {/* Step 2: Order Processing */}
                     <div className="relative z-10 flex flex-col items-center gap-2 text-center">
                       {currentStatus === "delivered" ? (
-                        <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
-                          <Check className="h-5 w-5 stroke-[3]" />
+                        <div className="h-11 w-11 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                          <Check className="h-6 w-6 stroke-[3]" />
                         </div>
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-400/30 animate-pulse">
-                          <Loader2 className="h-5 w-5 animate-spin" />
+                        <div className="h-11 w-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-400/30 animate-pulse">
+                          <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
                       )}
-                      <span className={`text-[11px] font-bold ${currentStatus === "delivered" ? "text-emerald-400" : "text-amber-400"}`}>
+                      <span className={`text-[11px] font-extrabold ${currentStatus === "delivered" ? "text-emerald-400" : "text-amber-400"}`}>
                         Order Processing
                       </span>
                     </div>
@@ -407,15 +431,15 @@ function UnifiedPaymentPage() {
                     {/* Step 3: Delivery Confirmation */}
                     <div className="relative z-10 flex flex-col items-center gap-2 text-center">
                       {currentStatus === "delivered" ? (
-                        <div className="h-10 w-10 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
-                          <Check className="h-5 w-5 stroke-[3]" />
+                        <div className="h-11 w-11 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30">
+                          <Check className="h-6 w-6 stroke-[3]" />
                         </div>
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-slate-800 text-slate-400 border border-white/10 flex items-center justify-center font-bold text-xs">
+                        <div className="h-11 w-11 rounded-2xl bg-slate-800 text-slate-400 border border-white/10 flex items-center justify-center font-black text-xs">
                           3
                         </div>
                       )}
-                      <span className={`text-[11px] font-bold ${currentStatus === "delivered" ? "text-emerald-400" : "text-slate-500"}`}>
+                      <span className={`text-[11px] font-extrabold ${currentStatus === "delivered" ? "text-emerald-400" : "text-slate-500"}`}>
                         Delivery Confirmation
                       </span>
                     </div>
@@ -427,7 +451,7 @@ function UnifiedPaymentPage() {
                   {/* Top Order ID Row */}
                   <div className="flex items-center justify-between border-b border-white/10 pb-4">
                     <div>
-                      <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">ORDER ID</div>
+                      <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">ORDER REFERENCE</div>
                       <div className="text-lg font-black text-white font-mono flex items-center gap-2 mt-0.5">
                         <span>{reference}</span>
                       </div>
@@ -447,13 +471,13 @@ function UnifiedPaymentPage() {
                     <div className="flex justify-between items-center text-slate-300">
                       <span className="text-slate-400">Payment Method</span>
                       <span className="font-bold text-white font-sans flex items-center gap-1.5">
-                        <CreditCard className="h-3.5 w-3.5 text-amber-400" /> Paystack
+                        <CreditCard className="h-3.5 w-3.5 text-amber-400" /> Paystack Direct MoMo
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center text-slate-300">
-                      <span className="text-slate-400">Recipient Phone</span>
-                      <span className="font-bold text-white">{recipientPhone}</span>
+                      <span className="text-slate-400">Recipient Line</span>
+                      <span className="font-bold text-white font-mono">{recipientPhone}</span>
                     </div>
 
                     <div className="flex justify-between items-center text-slate-300">
@@ -472,11 +496,11 @@ function UnifiedPaymentPage() {
                     <div className="flex justify-between items-center border-t border-white/10 pt-3">
                       <span className="text-slate-400">Status</span>
                       {currentStatus === "delivered" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.3)]">
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.3)]">
                           ✓ Delivered
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-sky-500/20 border border-sky-500/40 text-sky-400 animate-pulse shadow-[0_0_10px_rgba(56,189,248,0.3)]">
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-extrabold bg-sky-500/20 border border-sky-500/40 text-sky-400 animate-pulse shadow-[0_0_12px_rgba(56,189,248,0.3)]">
                           • Processing
                         </span>
                       )}
@@ -488,7 +512,7 @@ function UnifiedPaymentPage() {
                 <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-4 space-y-2 text-xs font-mono">
                   <div className="flex items-center justify-between text-slate-400 border-b border-white/5 pb-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                      <Zap className="h-3 w-3" /> Live Provider API Gateway Sync
+                      <Zap className="h-3 w-3" /> Live Gateway Sync Logs
                     </span>
                     <span className="flex items-center gap-1 text-[10px] text-emerald-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" /> Realtime
@@ -497,7 +521,7 @@ function UnifiedPaymentPage() {
                   <div className="space-y-1.5 pt-1 text-[11px]">
                     <div className="text-emerald-400 flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 shrink-0" />
-                      <span>[Paystack]: Payment verified & order queued</span>
+                      <span>[Paystack Gateway]: MoMo charge confirmed & reference verified</span>
                     </div>
                     {currentStatus === "delivered" ? (
                       <div className="text-emerald-400 flex items-center gap-2">
@@ -528,7 +552,7 @@ function UnifiedPaymentPage() {
                         : "Payment confirmed! Order is processing."}
                     </div>
                     <div className="text-slate-300 text-[11px]">
-                      Keep your Order ID (<span className="font-mono text-amber-400 font-bold">{reference}</span>) safely so you can track your order later. Tap to copy.
+                      Keep your Order Reference (<span className="font-mono text-amber-400 font-bold">{reference}</span>) safely so you can track your order later. Tap to copy.
                     </div>
                   </div>
                 </div>
@@ -537,6 +561,7 @@ function UnifiedPaymentPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <Link
                     to="/buy-data"
+                    search={{ network: "MTN" }}
                     className="flex items-center justify-center gap-2 rounded-2xl gold-gradient py-4 text-xs font-black text-primary-foreground shadow-xl hover:scale-[1.02] active:scale-[.98] transition-all"
                   >
                     <span>Buy Another Bundle</span>

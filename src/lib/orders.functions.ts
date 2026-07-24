@@ -167,7 +167,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
 
     // A. Check if deposit transaction
     if (data.orderId.startsWith("DEP-")) {
-      const { data: tx } = await supabaseAdmin
+      const { data: tx } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("reference, amount_ghs")
         .eq("reference", data.orderId)
@@ -344,7 +344,7 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // 1. Check if deposit transaction (starts with "DEP-")
     if (data.reference.startsWith("DEP-")) {
-      const { data: tx } = await supabaseAdmin
+      const { data: tx } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("id, user_id, reference, amount_ghs, status")
         .eq("reference", data.reference)
@@ -367,23 +367,27 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
           if (verifyRes.data?.status === "success") {
             const paidGhs = verifyRes.data.amount / 100;
 
-            if (tx.user_id) {
-              const { data: curWallet } = await supabaseAdmin
+            // Atomically update status from pending -> completed to avoid duplicate crediting
+            const { data: updatedTx } = await (supabaseAdmin as any)
+              .from("wallet_transactions")
+              .update({ status: "completed", amount_ghs: paidGhs })
+              .eq("id", tx.id)
+              .eq("status", "pending")
+              .select()
+              .maybeSingle();
+
+            if (updatedTx && tx.user_id) {
+              const { data: curWallet } = await (supabaseAdmin as any)
                 .from("wallets")
                 .select("balance_ghs")
                 .eq("user_id", tx.user_id)
                 .maybeSingle();
 
               const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
-              await supabaseAdmin
+              await (supabaseAdmin as any)
                 .from("wallets")
                 .upsert({ user_id: tx.user_id, balance_ghs: newBal, updated_at: new Date().toISOString() });
             }
-
-            await supabaseAdmin
-              .from("wallet_transactions")
-              .update({ status: "completed" })
-              .eq("id", tx.id);
 
             return {
               status: "delivered",

@@ -5,13 +5,15 @@ import { initializePaystackTransaction } from "@/lib/paystack";
 export const getMyWallet = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     const [{ data: wallet }, { data: transactions }] = await Promise.all([
-      context.supabase
+      (supabaseAdmin as any)
         .from("wallets")
         .select("balance_ghs")
         .eq("user_id", context.userId)
         .maybeSingle(),
-      context.supabase
+      (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("*")
         .eq("user_id", context.userId)
@@ -35,10 +37,9 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const reference = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    const userEmail = (context.claims?.email as string) || `user-${context.userId}@bestdatagh.com`;
 
     // Save pending deposit transaction in database
-    await supabaseAdmin.from("wallet_transactions").insert({
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: context.userId,
       amount_ghs: data.amountGhs,
       type: "deposit",
@@ -47,22 +48,9 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
       description: `Wallet Deposit (GH₵ ${data.amountGhs.toFixed(2)})`,
     });
 
-    const paystackRes = await initializePaystackTransaction({
-      email: userEmail,
-      amountGhs: data.amountGhs,
-      reference,
-      callbackUrl: data.callbackUrl || `${process.env.APP_URL || "https://ghana-data-hub-gold.vercel.app"}/account`,
-      metadata: {
-        type: "wallet_deposit",
-        user_id: context.userId,
-      },
-    });
-
     return {
       reference,
       amountGhs: data.amountGhs,
-      authorizationUrl: paystackRes.data?.authorization_url || null,
-      accessCode: paystackRes.data?.access_code || null,
     };
   });
 
@@ -73,7 +61,7 @@ export const payOrderWithWallet = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1. Check wallet balance
-    const { data: wallet } = await supabaseAdmin
+    const { data: wallet } = await (supabaseAdmin as any)
       .from("wallets")
       .select("balance_ghs")
       .eq("user_id", context.userId)
@@ -86,13 +74,13 @@ export const payOrderWithWallet = createServerFn({ method: "POST" })
 
     // 2. Deduct wallet
     const newBalance = currentBalance - data.amountGhs;
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from("wallets")
       .upsert({ user_id: context.userId, balance_ghs: newBalance, updated_at: new Date().toISOString() });
 
     // 3. Record transaction
     const txRef = `WLT-PAY-${Date.now()}`;
-    await supabaseAdmin.from("wallet_transactions").insert({
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: context.userId,
       amount_ghs: -data.amountGhs,
       type: "purchase",
@@ -116,14 +104,14 @@ export const verifyWalletDeposit = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1. Check if already credited
-    const { data: existingTx } = await supabaseAdmin
+    const { data: existingTx } = await (supabaseAdmin as any)
       .from("wallet_transactions")
       .select("id, amount_ghs")
       .eq("reference", data.reference)
       .maybeSingle();
 
     if (existingTx) {
-      const { data: curWallet } = await supabaseAdmin
+      const { data: curWallet } = await (supabaseAdmin as any)
         .from("wallets")
         .select("balance_ghs")
         .eq("user_id", context.userId)
@@ -141,7 +129,7 @@ export const verifyWalletDeposit = createServerFn({ method: "POST" })
     const paidGhs = paystackRes.data.amount / 100;
 
     // 3. Fetch & credit wallet
-    const { data: curWallet } = await supabaseAdmin
+    const { data: curWallet } = await (supabaseAdmin as any)
       .from("wallets")
       .select("balance_ghs")
       .eq("user_id", context.userId)
@@ -149,11 +137,11 @@ export const verifyWalletDeposit = createServerFn({ method: "POST" })
 
     const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
 
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from("wallets")
       .upsert({ user_id: context.userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
 
-    await supabaseAdmin.from("wallet_transactions").insert({
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: context.userId,
       amount_ghs: paidGhs,
       type: "deposit",

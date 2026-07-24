@@ -498,7 +498,7 @@ function MobileBottomDock({ onOpenWallet }: { onOpenWallet: () => void }) {
           const active = item.to ? pathname === item.to : false;
           const Icon = item.icon;
 
-          if (item.isWallet) {
+          if ((item as any).isWallet) {
             return (
               <button
                 key="wallet-dock"
@@ -513,7 +513,7 @@ function MobileBottomDock({ onOpenWallet }: { onOpenWallet: () => void }) {
             );
           }
 
-          if (item.isCart) {
+          if ((item as any).isCart) {
             return (
               <button
                 key="cart-dock"

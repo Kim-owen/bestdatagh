@@ -60,7 +60,7 @@ export const checkPhoneVerification = createServerFn({ method: "POST" })
     }
 
     try {
-      const { data: record, error } = await supabaseAdmin
+      const { data: record, error } = await (supabaseAdmin as any)
         .from("phone_verifications")
         .select("phone, verified_at")
         .eq("phone", data.phone)
@@ -98,7 +98,7 @@ export const sendPhoneOtp = createServerFn({ method: "POST" })
 
     // Attempt DB upsert (ignore if table is missing)
     try {
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from("phone_verifications")
         .upsert(
           {
@@ -143,7 +143,7 @@ export const verifyPhoneOtp = createServerFn({ method: "POST" })
     // Try reading DB
     let dbRecord: any = null;
     try {
-      const { data: rec } = await supabaseAdmin
+      const { data: rec } = await (supabaseAdmin as any)
         .from("phone_verifications")
         .select("phone, otp_code, expires_at, verified_at")
         .eq("phone", data.phone)
@@ -182,7 +182,7 @@ export const verifyPhoneOtp = createServerFn({ method: "POST" })
 
     // Mark as verified in DB
     try {
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from("phone_verifications")
         .update({
           verified_at: new Date().toISOString(),

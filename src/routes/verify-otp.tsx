@@ -78,7 +78,7 @@ function VerifyOtpPage() {
         });
       } else {
         await verifyOtpFn({ data: { phone, otpCode } });
-        navigate({ to: "/buy-data" });
+        navigate({ to: "/buy-data", search: { network: "MTN" } });
       }
     } catch (err: any) {
       console.warn("OTP verification fallback check:", err.message);

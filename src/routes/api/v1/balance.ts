@@ -47,20 +47,20 @@ export const Route = createFileRoute("/api/v1/balance")({
         }
 
         // Calculate API balance (e.g. 150.00 GHS default or from profile)
-        const { data: profile } = await supabaseAdmin
+        const { data: profile } = await (supabaseAdmin as any)
           .from("profiles")
           .select("display_name, created_at")
           .eq("user_id", authResult.keyRow.user_id)
           .maybeSingle();
 
         // Query total orders value to compute balance
-        const { data: orders } = await supabaseAdmin
+        const { data: orders } = await (supabaseAdmin as any)
           .from("orders")
           .select("total_ghs, status")
           .eq("user_id", authResult.keyRow.user_id)
           .eq("status", "paid");
 
-        const spent = (orders || []).reduce((sum, o) => sum + Number(o.total_ghs || 0), 0);
+        const spent = (orders || []).reduce((sum: number, o: any) => sum + Number(o.total_ghs || 0), 0);
         const initialCredit = 200.0;
         const currentBalance = Math.max(0, Number((initialCredit - spent).toFixed(2)));
 

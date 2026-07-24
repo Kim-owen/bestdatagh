@@ -5,7 +5,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useCart } from "@/lib/cart";
 import { createCheckoutOrder, verifyOrderPayment } from "@/lib/orders.functions";
-import { checkPhoneVerification } from "@/lib/otp.functions";
+import { checkPhoneVerification, sendPhoneOtp } from "@/lib/otp.functions";
 import { OtpVerificationModal } from "@/components/site/OtpVerificationModal";
 import { InAppPaymentModal } from "@/components/site/InAppPaymentModal";
 
@@ -31,6 +31,7 @@ export const Route = createFileRoute("/checkout")({
 
 function Checkout() {
   const { user } = useAuth();
+  const { items, subtotal, clear, removeItem, setQty } = useCart();
   const queryClient = useQueryClient();
   const fetchWallet = useServerFn(getMyWallet);
   const payWallet = useServerFn(payOrderWithWallet);
@@ -50,7 +51,14 @@ function Checkout() {
   const [status, setStatus] = useState<"idle" | "verifying_phone" | "processing" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [paymentModalData, setPaymentModalData] = useState<any>(null);
+  const phone = recipientPhone;
   const navigate = useNavigate();
+
+  const handleOtpVerified = () => {
+    setOtpModalOpen(false);
+  };
 
   const activePaymentPhone = samePhone ? recipientPhone : paymentPhone;
   const validRecipientPhone = /^\d{9,10}$/.test(recipientPhone.replace(/\s+/g, ""));

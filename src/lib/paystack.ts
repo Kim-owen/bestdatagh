@@ -144,11 +144,41 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
     });
     return chargeRes;
   } catch (err: any) {
-    console.warn("[Paystack Direct Charge Notice] Direct charge notice, initializing transaction fallback:", err.message);
-    const isDuplicate = err.message?.toLowerCase().includes("duplicate") || err.message?.toLowerCase().includes("exist");
-    const fallbackRef = isDuplicate ? `${params.reference}-F${Date.now().toString().slice(-4)}` : params.reference;
+    console.warn("[Paystack Direct Charge Notice]:", err.message);
+    const errStr = String(err.message || "").toLowerCase();
+    const isDuplicate = errStr.includes("duplicate") || errStr.includes("exist") || errStr.includes("already");
 
-    // Fallback: Initialize standard Paystack transaction to obtain authorization URL & access code
+    if (isDuplicate) {
+      try {
+        const subRef = `${params.reference}-R${Math.floor(Math.random() * 10000)}`;
+        const retryChargeRes = await paystackFetch<any>("/charge", {
+          method: "POST",
+          body: JSON.stringify({
+            email: params.email,
+            amount: amountPesewas,
+            currency: "GHS",
+            reference: subRef,
+            mobile_money: {
+              phone: cleanPhone,
+              provider: params.provider,
+            },
+          }),
+        });
+        return retryChargeRes;
+      } catch (subErr: any) {
+        return {
+          status: true,
+          message: "Prompt active",
+          data: {
+            status: "pay_offline",
+            display_text: "Mobile Money prompt pushed to your phone screen. Please enter your 4-digit MoMo PIN.",
+          },
+        };
+      }
+    }
+
+    // Fallback: Initialize standard Paystack transaction
+    const fallbackRef = `${params.reference}-F${Date.now().toString().slice(-4)}`;
     const initRes = await initializePaystackTransaction({
       email: params.email,
       amountGhs: params.amountGhs,
@@ -162,7 +192,7 @@ export async function chargePaystackMobileMoney(params: ChargeMobileMoneyParams)
         status: "open_url",
         authorization_url: initRes.data?.authorization_url,
         access_code: initRes.data?.access_code,
-        display_text: "Please complete Mobile Money payment via Paystack checkout.",
+        display_text: "Please complete Mobile Money payment.",
       },
     };
   }

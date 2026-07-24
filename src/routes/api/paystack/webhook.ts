@@ -39,40 +39,65 @@ export const Route = createFileRoute("/api/paystack/webhook")({
 
                 // A. Handle Wallet Deposit
                 if (reference.startsWith("DEP-") || metadata.type === "wallet_deposit") {
-                  const userId = metadata.user_id;
-                  if (userId) {
-                    // Check if already credited
-                    const { data: existingTx } = await supabaseAdmin
+                  // Standardize base reference if sub-reference was used
+                  const baseRef = reference.split("-R")[0].split("-F")[0];
+                  
+                  const { data: existingTx } = await (supabaseAdmin as any)
+                    .from("wallet_transactions")
+                    .select("id, user_id, status")
+                    .or(`reference.eq.${reference},reference.eq.${baseRef}`)
+                    .maybeSingle();
+
+                  const targetUserId = existingTx?.user_id || metadata.user_id;
+
+                  if (existingTx && existingTx.status !== "completed") {
+                    // Atomically lock and update status from pending -> completed
+                    const { data: updatedTx } = await (supabaseAdmin as any)
                       .from("wallet_transactions")
-                      .select("id")
-                      .eq("reference", reference)
+                      .update({ status: "completed", amount_ghs: paidGhs })
+                      .eq("id", existingTx.id)
+                      .eq("status", "pending")
+                      .select()
                       .maybeSingle();
 
-                    if (!existingTx) {
-                      // Fetch current wallet
-                      const { data: curWallet } = await supabaseAdmin
+                    if (updatedTx && targetUserId) {
+                      const { data: curWallet } = await (supabaseAdmin as any)
                         .from("wallets")
                         .select("balance_ghs")
-                        .eq("user_id", userId)
+                        .eq("user_id", targetUserId)
                         .maybeSingle();
 
                       const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
 
-                      await supabaseAdmin
+                      await (supabaseAdmin as any)
                         .from("wallets")
-                        .upsert({ user_id: userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+                        .upsert({ user_id: targetUserId, balance_ghs: newBal, updated_at: new Date().toISOString() });
 
-                      await supabaseAdmin.from("wallet_transactions").insert({
-                        user_id: userId,
-                        amount_ghs: paidGhs,
-                        type: "deposit",
-                        reference,
-                        status: "completed",
-                        description: `Paystack Deposit (${reference})`,
-                      });
-
-                      console.log(`Paystack Webhook: Wallet deposit ${reference} credited GH₵ ${paidGhs} to user ${userId}.`);
+                      console.log(`Paystack Webhook: Wallet deposit ${reference} credited GH₵ ${paidGhs} to user ${targetUserId}.`);
                     }
+                  } else if (!existingTx && targetUserId) {
+                    const { data: curWallet } = await (supabaseAdmin as any)
+                      .from("wallets")
+                      .select("balance_ghs")
+                      .eq("user_id", targetUserId)
+                      .maybeSingle();
+
+                    const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+
+                    await (supabaseAdmin as any)
+                      .from("wallets")
+                      .upsert({ user_id: targetUserId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+
+                    await (supabaseAdmin as any).from("wallet_transactions").insert({
+                      user_id: targetUserId,
+                      amount_ghs: paidGhs,
+                      type: "deposit",
+                      reference,
+                      status: "completed",
+                      description: `Paystack Deposit (${reference})`,
+                    });
+
+                    console.log(`Paystack Webhook: New wallet deposit ${reference} created & credited GH₵ ${paidGhs} to user ${targetUserId}.`);
                   }
                 } else {
                   // B. Handle Standard Order Payment
@@ -129,7 +154,7 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                   .eq("id", withdrawal.id);
 
                 // Insert withdrawal audit event
-                await supabaseAdmin.from("withdrawal_events").insert({
+                await (supabaseAdmin as any).from("withdrawal_events").insert({
                   withdrawal_id: withdrawal.id,
                   event_type: isSuccess ? "payout_completed" : "payout_failed",
                   actor_user_id: withdrawal.user_id,
