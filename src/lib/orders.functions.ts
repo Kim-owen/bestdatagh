@@ -11,7 +11,7 @@ export interface CartItemInput {
 }
 
 export const createCheckoutOrder = createServerFn({ method: "POST" })
-  .validator((data: { items: CartItemInput[]; recipientPhone: string; email?: string; callbackUrl?: string }) => {
+  .validator((data: { items: CartItemInput[]; recipientPhone: string; email?: string; callbackUrl?: string; userId?: string }) => {
     if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
       throw new Error("Cart is empty");
     }
@@ -24,6 +24,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       recipientPhone: cleanPhone,
       email: data.email?.trim() || `customer-${cleanPhone}@bestdatagh.com`,
       callbackUrl: data.callbackUrl || `${process.env.APP_URL || "https://ghana-data-hub-gold.vercel.app"}/checkout/verify`,
+      userId: data.userId || undefined,
     };
   })
   .handler(async ({ data }) => {
@@ -73,6 +74,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       .from("orders")
       .insert({
         reference,
+        user_id: data.userId || null,
         customer_phone: data.recipientPhone,
         customer_email: data.email,
         total_ghs: formattedTotal,

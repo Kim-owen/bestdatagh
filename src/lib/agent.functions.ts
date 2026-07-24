@@ -15,12 +15,34 @@ export const getAgentDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAgent(context);
-    const { data: orders, error } = await context.supabase
+
+    // Fetch agent phone and email from profile to match guest agent purchases
+    const { data: prof } = await context.supabase
+      .from("profiles")
+      .select("phone, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+
+    const phone = prof?.phone?.trim() || "";
+    const email = prof?.email?.trim() || "";
+
+    let query = context.supabase
       .from("orders")
-      .select("id, reference, total_ghs, status, source, created_at, order_items(id, network, size_label, recipient_phone, unit_price_ghs, quantity, status)")
-      .eq("user_id", context.userId)
+      .select("id, reference, total_ghs, status, source, created_at, order_items(id, network, size_label, recipient_phone, unit_price_ghs, quantity, status)");
+
+    if (phone || email) {
+      const filters = [`user_id.eq.${context.userId}`];
+      if (phone) filters.push(`customer_phone.eq.${phone}`);
+      if (email) filters.push(`customer_email.eq.${email}`);
+      query = query.or(filters.join(","));
+    } else {
+      query = query.eq("user_id", context.userId);
+    }
+
+    const { data: orders, error } = await query
       .order("created_at", { ascending: false })
       .limit(100);
+
     if (error) throw new Error(error.message);
 
     const rate = AGENT_DISCOUNT_PCT / 100;

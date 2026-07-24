@@ -112,6 +112,7 @@ function Checkout() {
             qty: it.qty,
           })),
           recipientPhone: recipientPhone,
+          userId: user?.id,
         },
       });
 
@@ -155,6 +156,7 @@ function Checkout() {
               qty: it.qty,
             })),
             recipientPhone: recipientPhone,
+            userId: user?.id,
           },
         });
 

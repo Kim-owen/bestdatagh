@@ -54,6 +54,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
         data: {
           items: [{ id: `${item.network}-${item.size}`, network: item.network, size: item.size, price: item.price, qty: 1 }],
           recipientPhone: phone,
+          userId: user?.id,
         },
       });
 
@@ -107,6 +108,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
             },
           ],
           recipientPhone: phone,
+          userId: user?.id,
         },
       });
 
