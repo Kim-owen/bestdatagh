@@ -438,7 +438,7 @@ export const getAgentStorefront = createServerFn({ method: "GET" })
 
 export const saveAgentStorefront = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { store_name: string; slug: string; whatsapp_phone?: string; notice_text?: string; prices?: Record<string, number> }) => d)
+  .inputValidator((d: { store_name: string; slug: string; whatsapp_phone?: string; notice_text?: string; city_region?: string; is_listed_in_directory?: boolean; prices?: Record<string, number> }) => d)
   .handler(async ({ data, context }) => {
     await assertAgent(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -455,6 +455,8 @@ export const saveAgentStorefront = createServerFn({ method: "POST" })
           slug: cleanSlug,
           whatsapp_phone: data.whatsapp_phone || null,
           notice_text: data.notice_text || null,
+          city_region: data.city_region || "Accra, Ghana",
+          is_listed_in_directory: data.is_listed_in_directory ?? true,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }
