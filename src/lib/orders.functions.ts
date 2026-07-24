@@ -369,18 +369,17 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
         for (const ref of refsToTry) {
           try {
             const verifyRes = await verifyPaystackTransaction(ref);
-            if (verifyRes.data?.status === "success") {
-              const paidGhs = verifyRes.data.amount / 100;
+            const pStatus = (verifyRes.data?.status || "").toLowerCase();
+            if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+              const paidGhs = (verifyRes.data?.amount || 0) / 100 || Number(tx.amount_ghs);
 
-              // Atomically update status to completed to avoid duplicate crediting
-              const { data: updatedTx } = await (supabaseAdmin as any)
+              // Update status to completed
+              await (supabaseAdmin as any)
                 .from("wallet_transactions")
                 .update({ status: "completed", amount_ghs: paidGhs })
-                .eq("id", tx.id)
-                .select()
-                .maybeSingle();
+                .eq("id", tx.id);
 
-              if (updatedTx && tx.user_id) {
+              if (tx.user_id) {
                 const { data: curWallet } = await (supabaseAdmin as any)
                   .from("wallets")
                   .select("balance_ghs")
@@ -418,8 +417,23 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
         try {
           const verifyRes = await verifyPaystackTransaction(data.reference);
           const paidGhs = (verifyRes.data?.amount || 0) / 100;
+          const pStatus = (verifyRes.data?.status || "").toLowerCase();
 
-          if (verifyRes.data?.status === "success") {
+          if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+            const targetUserId = verifyRes.data?.metadata?.user_id;
+            if (targetUserId) {
+              const { data: curWallet } = await (supabaseAdmin as any)
+                .from("wallets")
+                .select("balance_ghs")
+                .eq("user_id", targetUserId)
+                .maybeSingle();
+
+              const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+              await (supabaseAdmin as any)
+                .from("wallets")
+                .upsert({ user_id: targetUserId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+            }
+
             return {
               status: "delivered",
               isDeposit: true,

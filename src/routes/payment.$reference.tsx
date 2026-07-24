@@ -72,7 +72,7 @@ function UnifiedPaymentPage() {
   const [resolvingName, setResolvingName] = useState(false);
   const [showPaystackModal, setShowPaystackModal] = useState(false);
 
-  // Poll order status every 3 seconds
+  // Poll order status every 1 second for ultra-fast automatic verification
   const { data: pollData, refetch: refetchPollStatus } = useQuery({
     queryKey: ["pollOrderStatus", reference],
     queryFn: () => checkStatusFn({ data: { reference } }),
@@ -81,7 +81,7 @@ function UnifiedPaymentPage() {
       if (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid" || currentStatus === "success" || currentStatus === "failed") {
         return false; // Stop polling when done
       }
-      return 3000;
+      return 1000;
     },
   });
 
@@ -977,8 +977,8 @@ function UnifiedPaymentPage() {
                 {/* 4-Step Progress Stepper */}
                 <div className="rounded-3xl border border-white/10 bg-slate-900/50 p-6 space-y-4">
                   <div className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center justify-between border-b border-white/10 pb-3">
-                    <span>Order Fulfillment Stepper</span>
-                    <span className="text-amber-400 font-mono text-[10px]">Polling Live (3s)</span>
+                    <span>{isDeposit ? "Wallet Deposit Stepper" : "Order Fulfillment Stepper"}</span>
+                    <span className="text-amber-400 font-mono text-[10px]">Polling Live (1s)</span>
                   </div>
 
                   <div className="space-y-3 text-xs">
@@ -988,8 +988,12 @@ function UnifiedPaymentPage() {
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-white">1. Order Created & Recipient Configured</div>
-                        <div className="text-[10px] text-slate-400">Recipient line: {recipientPhone}</div>
+                        <div className="font-bold text-white">
+                          {isDeposit ? "1. Deposit Request Initialized" : "1. Order Created & Recipient Configured"}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {isDeposit ? `Deposit Amount: GH₵ ${totalGhs.toFixed(2)}` : `Recipient line: ${recipientPhone}`}
+                        </div>
                       </div>
                     </div>
 
@@ -1024,8 +1028,12 @@ function UnifiedPaymentPage() {
                         4
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-400">4. Bundle Delivered to Phone</div>
-                        <div className="text-[10px] text-slate-500">Instant SMS confirmation sent to line</div>
+                        <div className="font-bold text-slate-400">
+                          {isDeposit ? "4. Wallet Credited" : "4. Bundle Delivered to Phone"}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {isDeposit ? "Instant credit to Bestdata Wallet balance" : "Instant SMS confirmation sent to line"}
+                        </div>
                       </div>
                     </div>
                   </div>
