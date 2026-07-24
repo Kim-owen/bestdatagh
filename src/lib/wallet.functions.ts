@@ -6,8 +6,19 @@ export const getMyWallet = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { verifyPaystackTransaction, checkPaystackChargeStatus, listRecentPaystackTransactions } = await import("@/lib/paystack");
 
-    // 1. Auto-reconcile any pending deposits for THIS user specifically
+    // 1. Fetch user's profile to get email & phone for bank-grade ledger cross-verification
+    const { data: userProfile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("email, phone")
+      .eq("id", context.userId)
+      .maybeSingle();
+
+    const userEmail = userProfile?.email?.toLowerCase();
+    const userPhone = userProfile?.phone?.replace(/[^\d]/g, "");
+
+    // 2. Auto-reconcile all pending local deposit records for THIS user
     try {
       const { data: pendingTxs } = await (supabaseAdmin as any)
         .from("wallet_transactions")
@@ -16,10 +27,9 @@ export const getMyWallet = createServerFn({ method: "GET" })
         .eq("type", "deposit")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (pendingTxs && pendingTxs.length > 0) {
-        const { verifyPaystackTransaction, checkPaystackChargeStatus } = await import("@/lib/paystack");
         for (const tx of pendingTxs) {
           try {
             let pStatus = "";
@@ -41,7 +51,8 @@ export const getMyWallet = createServerFn({ method: "GET" })
               await (supabaseAdmin as any)
                 .from("wallet_transactions")
                 .update({ status: "completed", amount_ghs: paidGhs, updated_at: new Date().toISOString() })
-                .eq("id", tx.id);
+                .eq("id", tx.id)
+                .eq("user_id", context.userId);
             }
           } catch (txErr) {
             console.warn("Pending deposit check notice:", txErr);
@@ -49,25 +60,66 @@ export const getMyWallet = createServerFn({ method: "GET" })
         }
       }
     } catch (reconcileErr) {
-      console.warn("Wallet getMyWallet auto-reconciliation warning:", reconcileErr);
+      console.warn("Wallet pending deposit check warning:", reconcileErr);
     }
 
-    // 3. Fetch all user transactions & recalculate exact balance
+    // 3. Bank-Grade Paystack Live Account Sweep: Catch any deposits paid directly on Paystack
+    try {
+      if (userEmail || userPhone) {
+        const recentRes = await listRecentPaystackTransactions({ status: "success" });
+        const liveTxs = (recentRes?.data || []) as any[];
+
+        for (const pTx of liveTxs) {
+          const ref = pTx.reference || "";
+          if (!ref.startsWith("DEP-")) continue;
+
+          const pEmail = (pTx.customer?.email || "").toLowerCase();
+          const pPhone = (pTx.authorization?.mobile_money_number || "").replace(/[^\d]/g, "");
+
+          const isUserMatch = (userEmail && pEmail === userEmail) || (userPhone && pPhone.endsWith(userPhone.slice(-9)));
+          if (!isUserMatch) continue;
+
+          const paidGhs = Number(pTx.amount || 0) / 100;
+          if (paidGhs <= 0) continue;
+
+          // Upsert into wallet_transactions locked to context.userId
+          await (supabaseAdmin as any)
+            .from("wallet_transactions")
+            .upsert(
+              {
+                user_id: context.userId,
+                amount_ghs: paidGhs,
+                type: "deposit",
+                reference: ref,
+                status: "completed",
+                description: `Paystack Deposit (GH₵ ${paidGhs.toFixed(2)})`,
+                created_at: pTx.paid_at || pTx.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "reference" }
+            );
+        }
+      }
+    } catch (paystackSweepErr) {
+      console.warn("Paystack live account sweep warning:", paystackSweepErr);
+    }
+
+    // 4. Fetch all user transactions & calculate exact bank ledger balance
     const { data: transactions } = await (supabaseAdmin as any)
       .from("wallet_transactions")
       .select("*")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     const allTxs = transactions || [];
     const completedTxs = allTxs.filter((t: any) => t.status === "completed" || t.status === "paid" || t.status === "delivered");
     const calculatedBal = completedTxs.reduce((acc: number, t: any) => acc + Number(t.amount_ghs || 0), 0);
 
-    // Sync balance with wallets table
+    // Sync calculated balance with wallets table
     await (supabaseAdmin as any)
       .from("wallets")
-      .upsert({ user_id: context.userId, balance_ghs: calculatedBal, updated_at: new Date().toISOString() });
+      .upsert({ user_id: context.userId, balance_ghs: Math.max(0, calculatedBal), updated_at: new Date().toISOString() });
 
     return {
       balanceGhs: Math.max(0, calculatedBal),
