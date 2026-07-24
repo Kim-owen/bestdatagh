@@ -516,3 +516,68 @@ export const getPublicStorefrontBySlug = createServerFn({ method: "POST" })
       bundles: agentBundles,
     };
   });
+
+/* ============ FIND AGENT DIRECTORY & MENTOR REFERRALS ============ */
+export const listPublicAgentMentors = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: stores }, { data: profiles }, { data: customPrices }, { data: bundles }] = await Promise.all([
+      (supabaseAdmin as any)
+        .from("agent_store_settings")
+        .select("*")
+        .eq("is_listed_in_directory", true)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin.from("profiles").select("id, display_name, phone"),
+      (supabaseAdmin as any).from("agent_custom_prices").select("*"),
+      supabaseAdmin.from("bundles").select("id, name, data_gb, price_ghs, network").eq("active", true).limit(6),
+    ]);
+
+    const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+    const enrichedMentors = (stores || []).map((store: any) => {
+      const p = profileMap.get(store.user_id);
+      const agentPrices = (customPrices || []).filter((cp: any) => cp.user_id === store.user_id);
+      return {
+        ...store,
+        displayName: p?.display_name || store.store_name,
+        phone: p?.phone || store.whatsapp_phone || "N/A",
+        customPricesCount: agentPrices.length,
+      };
+    });
+
+    return {
+      mentors: enrichedMentors,
+      featuredBundles: bundles || [],
+    };
+  });
+
+export const joinAgentNetwork = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { mentorUserId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.mentorUserId === context.userId) {
+      throw new Error("You cannot join your own sub-agent network.");
+    }
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({ mentor_user_id: data.mentorUserId } as any)
+      .eq("id", context.userId);
+
+    const { data: store } = await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .select("total_sub_agents")
+      .eq("user_id", data.mentorUserId)
+      .maybeSingle();
+
+    const currentCount = Number(store?.total_sub_agents || 0);
+    await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .update({ total_sub_agents: currentCount + 1 })
+      .eq("user_id", data.mentorUserId);
+
+    return { ok: true, message: "Successfully joined Master Agent network!" };
+  });

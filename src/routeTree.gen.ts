@@ -19,6 +19,7 @@ import { Route as BuyDataRouteImport } from './routes/buy-data'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as DevelopersRouteImport } from './routes/developers'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as FindAgentRouteImport } from './routes/find-agent'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as TrackOrderRouteImport } from './routes/track-order'
@@ -108,6 +109,11 @@ const DevelopersRoute = DevelopersRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FindAgentRoute = FindAgentRouteImport.update({
+  id: '/find-agent',
+  path: '/find-agent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewsRoute = ReviewsRouteImport.update({
@@ -344,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
+  '/find-agent': typeof FindAgentRoute
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
@@ -396,6 +403,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
+  '/find-agent': typeof FindAgentRoute
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
@@ -449,6 +457,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
+  '/find-agent': typeof FindAgentRoute
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
@@ -503,6 +512,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/developers'
     | '/faq'
+    | '/find-agent'
     | '/reviews'
     | '/support'
     | '/track-order'
@@ -555,6 +565,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/developers'
     | '/faq'
+    | '/find-agent'
     | '/reviews'
     | '/support'
     | '/track-order'
@@ -607,6 +618,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/developers'
     | '/faq'
+    | '/find-agent'
     | '/reviews'
     | '/support'
     | '/track-order'
@@ -661,6 +673,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRouteWithChildren
   DevelopersRoute: typeof DevelopersRoute
   FaqRoute: typeof FaqRoute
+  FindAgentRoute: typeof FindAgentRoute
   ReviewsRoute: typeof ReviewsRoute
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
@@ -749,6 +762,13 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/find-agent': {
+      id: '/find-agent'
+      path: '/find-agent'
+      fullPath: '/find-agent'
+      preLoaderRoute: typeof FindAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reviews': {
@@ -1147,6 +1167,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRouteWithChildren,
   DevelopersRoute: DevelopersRoute,
   FaqRoute: FaqRoute,
+  FindAgentRoute: FindAgentRoute,
   ReviewsRoute: ReviewsRoute,
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,

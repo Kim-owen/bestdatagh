@@ -41,6 +41,7 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
     return [
       { label: "Home", to: "/" as const, search: undefined, icon: Home },
       { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+      { label: "Find Agent", to: "/find-agent" as const, search: undefined, icon: Users },
       { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
       { label: "Become an Agent", to: "/agents" as const, search: undefined, icon: Users },
       { label: "FAQ", to: "/faq" as const, search: undefined, icon: HelpCircle },
@@ -51,6 +52,7 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
   return [
     { label: "Home", to: "/" as const, search: undefined, icon: Home },
     { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+    { label: "Find Agent", to: "/find-agent" as const, search: undefined, icon: Users },
     { label: "Agent Program", to: "/agents" as const, search: undefined, icon: Users },
     { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
     { label: "Reviews", to: "/reviews" as const, search: undefined, icon: Star },
