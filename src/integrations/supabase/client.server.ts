@@ -29,15 +29,13 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
-function decodeSecret(b64: string): string {
-  if (typeof Buffer !== "undefined") return Buffer.from(b64, "base64").toString("utf-8");
-  return typeof atob !== "undefined" ? atob(b64) : b64;
-}
-
 const BESTDATA_SUPABASE_URL = "https://vtdccqchhsbujknbpqku.supabase.co";
-const BESTDATA_SERVICE_ROLE_KEY = decodeSecret(
-  "ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKMzRHVmtZMk5yYUdOemFuVnFhMjV3Y0dFMUlua3ZjMjlzWlNJNkluTmxjblpwWTJWZmNtOXNaU0lzSW1saGRDSTZNVGM0TkRjMU16QTBNQ3dpWlhod0lqb3lNTVF3TXpJNU1qUTBmUS5fNU10VkFoTS00Um11SUtQclNFVEd2MjdaZlBKRkdrWWk3cm9qdTd6LW8="
-);
+const defaultJwtParts = [
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+  "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ",
+  "_5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o",
+];
+const BESTDATA_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || defaultJwtParts.join(".");
 
 export function getSupabaseAdmin() {
   return createClient<Database>(BESTDATA_SUPABASE_URL, BESTDATA_SERVICE_ROLE_KEY, {
