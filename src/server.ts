@@ -1,4 +1,4 @@
-import { eventHandler, getRequestURL, getRequestHeaders } from "h3";
+import { eventHandler, getRequestURL, getRequestHeaders, readRawBody } from "h3";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -19,10 +19,10 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(response: Response, isServerFn: boolean): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) return response;
+  if (isServerFn || contentType.includes("application/json")) return response;
 
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
@@ -43,13 +43,22 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
-async function handleRequest(request: Request, env: unknown = {}, ctx: unknown = {}): Promise<Response> {
+async function handleRequest(request: Request, isServerFn: boolean, env: unknown = {}, ctx: unknown = {}): Promise<Response> {
   try {
     const handler = await getServerEntry();
     const response = await handler.fetch(request, env, ctx);
-    return await normalizeCatastrophicSsrResponse(response);
-  } catch (error) {
-    console.error(error);
+    return await normalizeCatastrophicSsrResponse(response, isServerFn);
+  } catch (error: any) {
+    console.error("SSR / ServerFn handler error:", error);
+    if (isServerFn) {
+      return new Response(
+        JSON.stringify({ error: error?.message || "Internal Server Error" }),
+        {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        }
+      );
+    }
     return new Response(renderErrorPage(), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },
@@ -68,15 +77,28 @@ export default eventHandler(async (event) => {
   urlObj.pathname = pathname;
   const fullUrl = urlObj.toString();
   const headers = getRequestHeaders(event) as any;
-  const method = event.method || event.node?.req?.method || "GET";
+  const method = (event.method || event.node?.req?.method || "GET").toUpperCase();
+  const isServerFn = pathname.includes("/_serverFn") || pathname.includes("/_server");
+
+  let body: any = undefined;
+  if (method !== "GET" && method !== "HEAD") {
+    try {
+      const raw = await readRawBody(event, false);
+      if (raw) {
+        body = raw;
+      }
+    } catch (e) {
+      console.error("Failed to read request raw body:", e);
+    }
+  }
 
   const req = new Request(fullUrl, {
     method,
     headers,
-    body: method !== "GET" && method !== "HEAD" ? (event.node?.req as any) : undefined,
+    body,
     // @ts-ignore
-    duplex: method !== "GET" && method !== "HEAD" ? "half" : undefined,
+    duplex: body ? "half" : undefined,
   });
 
-  return handleRequest(req, {}, event);
+  return handleRequest(req, isServerFn, {}, event);
 });
