@@ -262,3 +262,61 @@ export const registerPhoneVerifiedUser = createServerFn({ method: "POST" })
     return { ok: true, userId: newUser.user.id };
   });
 
+/**
+ * Log in or auto-register phone-verified user via SMS OTP
+ */
+export const loginPhoneVerifiedUser = createServerFn({ method: "POST" })
+  .validator((data: { phone: string }) => ({
+    phone: cleanPhone(data.phone),
+  }))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const clean = data.phone;
+    const formattedPhone = clean.startsWith("0") ? `+233${clean.slice(1)}` : `+233${clean}`;
+    const syntheticEmail = `user-${clean}@bestdatagh.com`;
+    const syntheticPassword = `OtpPass-${clean}-#2026!Sec`;
+
+    // Check if profile exists by phone number or synthetic email
+    const { data: existingProfile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("id, phone")
+      .or(`phone.eq.${data.phone},phone.eq.${formattedPhone}`)
+      .maybeSingle();
+
+    let targetEmail = syntheticEmail;
+    let targetPassword = syntheticPassword;
+
+    if (existingProfile) {
+      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(existingProfile.id);
+      if (userData?.user?.email) {
+        targetEmail = userData.user.email;
+      }
+      await supabaseAdmin.auth.admin.updateUserById(existingProfile.id, {
+        password: syntheticPassword,
+        email_confirm: true,
+      });
+    } else {
+      const { error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: syntheticEmail,
+        password: syntheticPassword,
+        email_confirm: true,
+        user_metadata: {
+          display_name: `Member (${clean})`,
+          phone: formattedPhone,
+          phone_verified: true,
+        },
+      });
+
+      if (createErr && !createErr.message.includes("already registered")) {
+        throw new Error(createErr.message);
+      }
+
+      try {
+        await sendWelcomeSms(data.phone, `Member (${clean})`);
+      } catch {}
+    }
+
+    return { ok: true, email: targetEmail, password: targetPassword };
+  });
+
