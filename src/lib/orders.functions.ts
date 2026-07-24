@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, listRecentPaystackTransactions, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
-import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder } from "./swiftdata";
+import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder, getSwiftDataApiKey } from "./swiftdata";
 
 export interface CartItemInput {
   id: string;
@@ -73,6 +73,8 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       .from("orders")
       .insert({
         reference,
+        customer_phone: data.recipientPhone,
+        customer_email: data.email,
         total_ghs: formattedTotal,
         source: "web",
         status: "pending",
@@ -604,7 +606,7 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
 
           // Trigger automated dispatch via SwiftData API if configured
           const firstItem = order.order_items?.[0];
-          if (firstItem && process.env.SWIFTDATA_API_KEY) {
+          if (firstItem && getSwiftDataApiKey()) {
             try {
               const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
               const sizeGb = parseSizeGb(firstItem.size_label);
@@ -638,7 +640,7 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
     if (order.status === "paid" || order.status === "processing") {
       const firstItem = (order.order_items && order.order_items[0]) || {};
       // Check SwiftData API if configured
-      if (process.env.SWIFTDATA_API_KEY) {
+      if (getSwiftDataApiKey()) {
         try {
           const swiftOrderRes = await getSwiftDataOrder(order.reference);
           const swiftStatus = (swiftOrderRes?.order?.status || swiftOrderRes?.status || "").toLowerCase();

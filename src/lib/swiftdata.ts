@@ -1,7 +1,12 @@
 const defaultSwiftDataKey = ["sk_live_", "8287bd0fea81423b", "a46250f3d7a6fa41"].join("");
 
 const SWIFTDATA_BASE_URL = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
-const SWIFTDATA_API_KEY = process.env.SWIFTDATA_API_KEY || defaultSwiftDataKey;
+
+export function getSwiftDataApiKey(): string {
+  return process.env.SWIFTDATA_API_KEY || defaultSwiftDataKey;
+}
+
+const SWIFTDATA_API_KEY = getSwiftDataApiKey();
 
 export type SwiftDataNetwork = "yello" | "at_ishare" | "at_bigtime" | "telecel";
 
