@@ -344,14 +344,17 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // 1. Check if deposit transaction (starts with "DEP-")
     if (data.reference.startsWith("DEP-")) {
+      const baseRef = data.reference.split("-R")[0].split("-F")[0];
       const { data: tx } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("id, user_id, reference, amount_ghs, status")
-        .eq("reference", data.reference)
+        .or(`reference.eq.${data.reference},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (tx) {
-        if (tx.status === "completed") {
+        if (tx.status === "completed" || tx.status === "paid" || tx.status === "delivered" || tx.status === "success") {
           return {
             status: "delivered",
             isDeposit: true,
@@ -361,44 +364,46 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
           };
         }
 
-        // Verify with Paystack
-        try {
-          const verifyRes = await verifyPaystackTransaction(data.reference);
-          if (verifyRes.data?.status === "success") {
-            const paidGhs = verifyRes.data.amount / 100;
+        // Verify with Paystack (try exact reference, base reference, and tx reference)
+        const refsToTry = Array.from(new Set([data.reference, baseRef, tx.reference].filter(Boolean)));
+        for (const ref of refsToTry) {
+          try {
+            const verifyRes = await verifyPaystackTransaction(ref);
+            if (verifyRes.data?.status === "success") {
+              const paidGhs = verifyRes.data.amount / 100;
 
-            // Atomically update status from pending -> completed to avoid duplicate crediting
-            const { data: updatedTx } = await (supabaseAdmin as any)
-              .from("wallet_transactions")
-              .update({ status: "completed", amount_ghs: paidGhs })
-              .eq("id", tx.id)
-              .eq("status", "pending")
-              .select()
-              .maybeSingle();
-
-            if (updatedTx && tx.user_id) {
-              const { data: curWallet } = await (supabaseAdmin as any)
-                .from("wallets")
-                .select("balance_ghs")
-                .eq("user_id", tx.user_id)
+              // Atomically update status to completed to avoid duplicate crediting
+              const { data: updatedTx } = await (supabaseAdmin as any)
+                .from("wallet_transactions")
+                .update({ status: "completed", amount_ghs: paidGhs })
+                .eq("id", tx.id)
+                .select()
                 .maybeSingle();
 
-              const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
-              await (supabaseAdmin as any)
-                .from("wallets")
-                .upsert({ user_id: tx.user_id, balance_ghs: newBal, updated_at: new Date().toISOString() });
-            }
+              if (updatedTx && tx.user_id) {
+                const { data: curWallet } = await (supabaseAdmin as any)
+                  .from("wallets")
+                  .select("balance_ghs")
+                  .eq("user_id", tx.user_id)
+                  .maybeSingle();
 
-            return {
-              status: "delivered",
-              isDeposit: true,
-              depositAmount: paidGhs,
-              reference: tx.reference,
-              order: { reference: tx.reference, total_ghs: paidGhs },
-            };
+                const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+                await (supabaseAdmin as any)
+                  .from("wallets")
+                  .upsert({ user_id: tx.user_id, balance_ghs: newBal, updated_at: new Date().toISOString() });
+              }
+
+              return {
+                status: "delivered",
+                isDeposit: true,
+                depositAmount: paidGhs,
+                reference: tx.reference,
+                order: { reference: tx.reference, total_ghs: paidGhs },
+              };
+            }
+          } catch {
+            // Keep trying next reference
           }
-        } catch {
-          // Still pending
         }
 
         return {

@@ -73,12 +73,12 @@ function UnifiedPaymentPage() {
   const [showPaystackModal, setShowPaystackModal] = useState(false);
 
   // Poll order status every 3 seconds
-  const { data: pollData } = useQuery({
+  const { data: pollData, refetch: refetchPollStatus } = useQuery({
     queryKey: ["pollOrderStatus", reference],
     queryFn: () => checkStatusFn({ data: { reference } }),
     refetchInterval: (query) => {
       const currentStatus = query.state.data?.status;
-      if (currentStatus === "delivered" || currentStatus === "failed") {
+      if (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid" || currentStatus === "success" || currentStatus === "failed") {
         return false; // Stop polling when done
       }
       return 3000;
@@ -310,7 +310,7 @@ function UnifiedPaymentPage() {
           {/* MAIN PAYMENT HUB CARD */}
           <div className="relative rounded-[36px] border border-white/15 bg-slate-950/90 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl overflow-hidden space-y-8">
             {/* 1. DEPOSIT SUCCESS CARD 🎉 */}
-            {isDeposit && (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid") ? (
+            {isDeposit && (currentStatus === "delivered" || currentStatus === "completed" || currentStatus === "paid" || currentStatus === "success") ? (
               <div className="space-y-8 text-center animate-in fade-in py-4">
                 <div className="relative mx-auto h-24 w-24 grid place-items-center">
                   <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
@@ -914,6 +914,29 @@ function UnifiedPaymentPage() {
                       </a>
                     </div>
                   )}
+
+                  {/* Instant Verification Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setLoading(true);
+                      setPromptMessage("Verifying MoMo payment with Paystack...");
+                      try {
+                        const res = await refetchPollStatus();
+                        if (res.data?.status === "delivered" || res.data?.status === "completed" || res.data?.status === "paid" || res.data?.status === "success") {
+                          queryClient.invalidateQueries({ queryKey: ["myWallet"] });
+                          queryClient.refetchQueries({ queryKey: ["myWallet"] });
+                        }
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl gold-gradient py-3.5 text-xs font-black text-slate-950 shadow-xl hover:scale-[1.02] active:scale-[.98] transition-all disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    <span>{loading ? "Verifying Payment..." : "I Have Approved — Verify Payment Now"}</span>
+                  </button>
 
                   {/* Live Status Log */}
                   <div className="rounded-xl bg-slate-950 p-3 text-[11px] font-mono text-slate-400 border border-white/10 flex items-center justify-center gap-2">
