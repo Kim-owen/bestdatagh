@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/otp.functions";
+import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms } from "@/lib/otp.functions";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -250,6 +250,7 @@ function SignupForm({ next }: { next?: string }) {
   const nav = useNavigate();
   const sendOtpFn = useServerFn(sendPhoneOtp);
   const verifyOtpFn = useServerFn(verifyPhoneOtp);
+  const triggerWelcomeSmsFn = useServerFn(triggerWelcomeSms);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -353,6 +354,13 @@ function SignupForm({ next }: { next?: string }) {
       });
 
       if (error) throw error;
+
+      // 3. Send Welcome SMS with WhatsApp Channel Link
+      try {
+        await triggerWelcomeSmsFn({ data: { phone: cleanPhone, name } });
+      } catch (smsErr) {
+        console.warn("Welcome SMS dispatch notice:", smsErr);
+      }
 
       setOk(true);
       setTimeout(() => nav({ to: (next as any) || "/" }), 1200);

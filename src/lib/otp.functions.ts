@@ -205,3 +205,25 @@ export async function sendOrderDeliveredSms(phone: string, reference: string, si
   return sendTxtConnectSms(phone, message);
 }
 
+/**
+ * Send Welcome SMS Notification with WhatsApp Channel Link
+ */
+export async function sendWelcomeSms(toPhone: string, name: string) {
+  if (!toPhone) return null;
+  const firstName = name ? name.trim().split(" ")[0] : "Valued Member";
+  const message = `🎉 Welcome to BestData, ${firstName}! Your account is now active. Join our official WhatsApp channel for exclusive deals & instant updates: https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E`;
+  return sendTxtConnectSms(toPhone, message);
+}
+
+export const triggerWelcomeSms = createServerFn({ method: "POST" })
+  .validator((data: { phone: string; name: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      await sendWelcomeSms(data.phone, data.name);
+      return { ok: true };
+    } catch (err: any) {
+      console.warn("[Welcome SMS Notice]:", err.message);
+      return { ok: false };
+    }
+  });
+
