@@ -861,7 +861,7 @@ export const adminListWallets = createServerFn({ method: "GET" })
 
     // Auto reconcile Paystack deposits when admin views wallets
     try {
-      await adminReconcileAllPaystackDeposits({ context });
+      await adminReconcileAllPaystackDeposits();
     } catch {}
 
     const [{ data: wallets }, { data: transactions }, { data: profiles }] = await Promise.all([
