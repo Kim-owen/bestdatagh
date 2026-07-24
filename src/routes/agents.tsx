@@ -6,10 +6,11 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useAuth } from "@/lib/auth";
 import { listActiveBundles } from "@/lib/public-bundles.functions";
-import { getMyProfile, applyForAgent, getAgentActivationFee, AGENT_DISCOUNT_PCT } from "@/lib/profile.functions";
+import { getMyProfile, applyForAgent, getAgentActivationFee, verifyAgentActivationPayment, AGENT_DISCOUNT_PCT } from "@/lib/profile.functions";
 import { getPublicHeroSlides } from "@/lib/admin.functions";
 import { useCart, type Network } from "@/lib/cart";
 import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantBuyModal";
+import { InAppPaymentModal } from "@/components/site/InAppPaymentModal";
 import { Store, TrendingUp, Percent, Users, ArrowRight, CheckCircle2, Clock, XCircle, Zap, Plus, Play, Pause, ChevronLeft, ChevronRight, Shield, Sparkles } from "lucide-react";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
 
@@ -332,9 +333,13 @@ function ApplyPanel({ status }: { status?: string }) {
   const qc = useQueryClient();
   const submit = useServerFn(applyForAgent);
   const fetchFee = useServerFn(getAgentActivationFee);
+  const verifyPaymentFn = useServerFn(verifyAgentActivationPayment);
 
   const { data: feeData } = useQuery({ queryKey: ["agentActivationFee"], queryFn: () => fetchFee() });
   const activationFee = feeData?.feeGhs || 50;
+
+  const [momoModalOpen, setMomoModalOpen] = useState(false);
+  const [activeRef, setActiveRef] = useState<string | null>(null);
 
   const [f, setF] = useState({
     full_name: "",
@@ -349,7 +354,17 @@ function ApplyPanel({ status }: { status?: string }) {
   });
 
   const mut = useMutation({
-    mutationFn: () => submit({ data: f }),
+    mutationFn: async () => {
+      if (f.payWithWallet) {
+        return await submit({ data: f });
+      } else {
+        const res = await submit({ data: { ...f, payWithWallet: false } });
+        const ref = `AGNT-ACT-${Date.now()}`;
+        setActiveRef(ref);
+        setMomoModalOpen(true);
+        return res;
+      }
+    },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["me"] });
       if (res?.feePaid) {
@@ -357,6 +372,19 @@ function ApplyPanel({ status }: { status?: string }) {
       }
     },
   });
+
+  const handleMomoPaymentSuccess = async () => {
+    if (!activeRef) return;
+    try {
+      await verifyPaymentFn({ data: { reference: activeRef } });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      window.location.href = "/agent";
+    } catch (err: any) {
+      console.error("Agent Activation Verification error:", err);
+    } finally {
+      setMomoModalOpen(false);
+    }
+  };
 
   if (status === "approved") return null;
   if (status === "pending") {
@@ -500,12 +528,23 @@ function ApplyPanel({ status }: { status?: string }) {
               disabled={mut.isPending}
               className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl gold-gradient px-8 py-4 text-xs font-black text-slate-950 shadow-[0_4px_20px_-2px_hsl(48_100%_50%_/_0.5)] hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
             >
-              {mut.isPending ? "Processing..." : `Submit & Activate Agent Account (GH₵ ${activationFee.toFixed(2)})`} <ArrowRight className="h-4 w-4" />
+              {mut.isPending ? "Processing..." : `Submit & Pay Activation Fee (GH₵ ${activationFee.toFixed(2)})`} <ArrowRight className="h-4 w-4" />
             </button>
             {mut.error && <span className="text-xs font-bold text-destructive">{(mut.error as Error).message}</span>}
           </div>
         </form>
       </div>
+
+      {activeRef && (
+        <InAppPaymentModal
+          isOpen={momoModalOpen}
+          onClose={() => setMomoModalOpen(false)}
+          reference={activeRef}
+          amountGhs={activationFee}
+          recipientPhone={f.phone}
+          onSuccess={handleMomoPaymentSuccess}
+        />
+      )}
     </section>
   );
 }

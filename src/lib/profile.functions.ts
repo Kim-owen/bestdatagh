@@ -183,7 +183,135 @@ export const applyForAgent = createServerFn({ method: "POST" })
         },
         { onConflict: "user_id" }
       );
+
+      // Fetch Admin Configured WhatsApp Channel Link
+      const { data: channelConfig } = await (supabaseAdmin as any)
+        .from("system_configs")
+        .select("value")
+        .eq("key", "whatsapp_channel_link")
+        .maybeSingle();
+
+      const channelLink = channelConfig?.value || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
+      const firstName = data.full_name ? data.full_name.split(" ")[0] : "Agent";
+
+      // Send Welcome SMS
+      const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+      const welcomeMsg = `🎉 Congratulations ${firstName}! Your BestData Agent account is now ACTIVATED! Your store link: bestdatagh.com/store/${slug}. Join official WhatsApp Channel for updates: ${channelLink}`;
+      try {
+        await sendTxtConnectSms(data.phone, welcomeMsg);
+      } catch (smsErr) {
+        console.warn("Agent Welcome SMS notice:", smsErr);
+      }
     }
 
     return { ok: true, feePaid, activationFee, status: appStatus };
+  });
+
+/* ============ ADMIN SYSTEM CONFIGS & PAYMENT VERIFICATION ============ */
+export const getWhatsappChannelLink = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("system_configs")
+      .select("value")
+      .eq("key", "whatsapp_channel_link")
+      .maybeSingle();
+
+    const link = data?.value || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
+    return { channelLink: link };
+  });
+
+export const updateWhatsappChannelLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { channelLink: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", context.userId);
+    const isAdmin = (roles || []).some((r: any) => r.role === "admin");
+    if (!isAdmin) throw new Error("Unauthorized: Admin access required.");
+
+    const link = data.channelLink.trim();
+    await (supabaseAdmin as any)
+      .from("system_configs")
+      .upsert({ key: "whatsapp_channel_link", value: link, updated_at: new Date().toISOString() });
+
+    return { ok: true, channelLink: link };
+  });
+
+export const verifyAgentActivationPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { reference: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { verifyPaystackTransaction } = await import("@/lib/paystack");
+    const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+
+    const psRes = await verifyPaystackTransaction(data.reference);
+    if (!psRes?.status || psRes?.data?.status !== "success") {
+      throw new Error(`Agent activation payment pending or failed. Status: ${psRes?.data?.status || "unknown"}`);
+    }
+
+    const { data: app } = await (supabaseAdmin as any)
+      .from("agent_applications")
+      .select("*")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    if (!app) throw new Error("Agent application record not found.");
+
+    if (app.activation_fee_paid && app.status === "approved") {
+      return { ok: true, alreadyApproved: true };
+    }
+
+    // Approve application
+    await (supabaseAdmin as any)
+      .from("agent_applications")
+      .update({
+        activation_fee_paid: true,
+        status: "approved",
+        fee_payment_ref: data.reference,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", context.userId);
+
+    // Promote to agent
+    await (supabaseAdmin as any)
+      .from("user_roles")
+      .upsert({ user_id: context.userId, role: "agent" }, { onConflict: "user_id,role" });
+
+    // Provision store
+    const storeName = app.business_name || `${app.full_name}'s Data Hub`;
+    const baseSlug = storeName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+    const slug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    await (supabaseAdmin as any).from("agent_store_settings").upsert(
+      {
+        user_id: context.userId,
+        store_name: storeName,
+        slug,
+        whatsapp_phone: app.phone,
+        is_listed_in_directory: app.is_mentor_requested,
+        city_region: app.region,
+      },
+      { onConflict: "user_id" }
+    );
+
+    // Get Channel link & send Welcome SMS
+    const { data: channelConfig } = await (supabaseAdmin as any)
+      .from("system_configs")
+      .select("value")
+      .eq("key", "whatsapp_channel_link")
+      .maybeSingle();
+
+    const channelLink = channelConfig?.value || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
+    const firstName = app.full_name ? app.full_name.split(" ")[0] : "Agent";
+
+    const welcomeMsg = `🎉 Congratulations ${firstName}! Your BestData Agent account is now ACTIVATED! Your store link: bestdatagh.com/store/${slug}. Join official WhatsApp Channel for updates: ${channelLink}`;
+    try {
+      await sendTxtConnectSms(app.phone, welcomeMsg);
+    } catch (smsErr) {
+      console.warn("Agent Welcome SMS notice:", smsErr);
+    }
+
+    return { ok: true, slug };
   });
