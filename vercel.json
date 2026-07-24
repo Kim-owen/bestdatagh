@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "buildCommand": "vite build && nitro build --preset vercel-serverless",
+  "outputDirectory": ".vercel/output",
+  "framework": null
+}
