@@ -1185,20 +1185,24 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
         const sizeGb = pkg.size_gb || 1;
         const sizeLabel = pkg.size_label || `${sizeGb}GB`;
         const sizeMb = Math.round(sizeGb * 1024);
-        const priceGhs = Number(pkg.price_ghs || 0);
+        const priceGhs = Number(pkg.price ?? pkg.price_ghs ?? 0);
+        const agentPriceGhs = Number((priceGhs * 0.93).toFixed(2));
 
         const key = `${netName.toLowerCase()}_${sizeLabel.toLowerCase()}`;
         const existingId = existingMap.get(key);
 
         if (existingId) {
+          const updateData: any = {
+            size_mb: sizeMb,
+            validity: pkg.validity || "Non-Expiry",
+            active: true,
+          };
+          if (priceGhs > 0) {
+            updateData.price_ghs = priceGhs;
+          }
           await supabaseAdmin
             .from("bundles")
-            .update({
-              size_mb: sizeMb,
-              price_ghs: priceGhs,
-              validity: pkg.validity || "Non-Expiry",
-              active: true,
-            })
+            .update(updateData)
             .eq("id", existingId);
         } else {
           await supabaseAdmin
@@ -1208,6 +1212,7 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
               size_label: sizeLabel,
               size_mb: sizeMb,
               price_ghs: priceGhs,
+              agent_price_ghs: agentPriceGhs,
               validity: pkg.validity || "Non-Expiry",
               popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
               active: true,

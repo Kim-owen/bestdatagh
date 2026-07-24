@@ -606,7 +606,7 @@ function BundlesPage() {
                       </span>
                     </td>
                     <td className="p-4 text-amber-400 font-extrabold">{p.size_label || `${p.size_gb}GB`}</td>
-                    <td className="p-4 text-emerald-400 font-bold">GH₵ {Number(p.price_ghs || 0).toFixed(2)}</td>
+                    <td className="p-4 text-emerald-400 font-bold">GH₵ {Number(p.price ?? p.price_ghs ?? 0).toFixed(2)}</td>
                     <td className="p-4 text-slate-400 font-sans">{p.validity || "Non-Expiry"}</td>
                   </tr>
                 ))}

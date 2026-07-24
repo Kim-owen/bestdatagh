@@ -32,7 +32,7 @@ export const listActiveBundles = createServerFn({ method: "GET" }).handler(async
   });
   const { data, error } = await supa
     .from("bundles")
-    .select("id,network,size_label,size_mb,price_ghs,agent_price_ghs,validity,popular,sort_order")
+    .select("id,network,size_label,size_mb,price_ghs,validity,popular,sort_order")
     .eq("active", true)
     .order("network")
     .order("sort_order");
