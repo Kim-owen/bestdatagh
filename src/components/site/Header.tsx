@@ -99,6 +99,7 @@ export function Header() {
     queryKey: ["myWallet"],
     queryFn: () => fetchWallet(),
     enabled: !!user,
+    refetchInterval: 10000,
   });
 
   const walletBalance = walletData?.balanceGhs || 0;
