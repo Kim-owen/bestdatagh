@@ -228,6 +228,60 @@ export const triggerWelcomeSms = createServerFn({ method: "POST" })
   });
 
 /**
+ * Verify strict uniqueness for Phone, Email, and Name before signup
+ */
+export const checkSignupUniqueness = createServerFn({ method: "POST" })
+  .validator((data: { phone?: string; email?: string; name?: string }) => data)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Phone Uniqueness Check
+    if (data.phone) {
+      const raw = cleanPhone(data.phone);
+      const formattedIntl = raw.startsWith("0") ? `+233${raw.slice(1)}` : `+233${raw}`;
+      const { data: phoneMatch } = await (supabaseAdmin as any)
+        .from("profiles")
+        .select("id, phone")
+        .or(`phone.eq.${raw},phone.eq.${formattedIntl}`)
+        .maybeSingle();
+
+      if (phoneMatch) {
+        throw new Error(`The phone number (${raw}) is already registered to an existing account. Please log in instead.`);
+      }
+    }
+
+    // 2. Email Uniqueness Check
+    if (data.email && data.email.trim()) {
+      const cleanEmail = data.email.trim().toLowerCase();
+      const { data: emailMatch } = await (supabaseAdmin as any)
+        .from("profiles")
+        .select("id")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+
+      if (emailMatch) {
+        throw new Error(`The email address (${cleanEmail}) is already registered. Please log in instead.`);
+      }
+    }
+
+    // 3. Display / Business Name Uniqueness Check
+    if (data.name && data.name.trim().length >= 3) {
+      const cleanName = data.name.trim();
+      const { data: nameMatch } = await (supabaseAdmin as any)
+        .from("profiles")
+        .select("id, display_name")
+        .ilike("display_name", cleanName)
+        .maybeSingle();
+
+      if (nameMatch) {
+        throw new Error(`An account with the name "${cleanName}" already exists. Please choose a unique display name.`);
+      }
+    }
+
+    return { unique: true };
+  });
+
+/**
  * Register phone-verified user with instant auto email confirmation (bypasses email links)
  */
 export const registerPhoneVerifiedUser = createServerFn({ method: "POST" })
@@ -237,6 +291,30 @@ export const registerPhoneVerifiedUser = createServerFn({ method: "POST" })
 
     const clean = data.phone.replace(/[^\d]/g, "");
     const formattedPhone = clean.startsWith("0") ? `+233${clean.slice(1)}` : `+233${clean}`;
+
+    // Enforce strict uniqueness check before user creation
+    const raw = cleanPhone(data.phone);
+    const { data: phoneMatch } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("id")
+      .or(`phone.eq.${raw},phone.eq.${formattedPhone}`)
+      .maybeSingle();
+
+    if (phoneMatch) {
+      throw new Error(`The phone number (${data.phone}) is already registered. Please log in instead.`);
+    }
+
+    if (data.name && data.name.trim().length >= 3) {
+      const { data: nameMatch } = await (supabaseAdmin as any)
+        .from("profiles")
+        .select("id")
+        .ilike("display_name", data.name.trim())
+        .maybeSingle();
+
+      if (nameMatch) {
+        throw new Error(`An account with the name "${data.name.trim()}" already exists. Please choose a unique name.`);
+      }
+    }
 
     // Auto-confirm user email instantly since phone is SMS OTP verified
     const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms, registerPhoneVerifiedUser, loginPhoneVerifiedUser } from "@/lib/otp.functions";
+import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms, registerPhoneVerifiedUser, loginPhoneVerifiedUser, checkSignupUniqueness } from "@/lib/otp.functions";
 import { recordLoginIpSecurity } from "@/lib/security.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -472,6 +472,7 @@ function SignupForm({ next }: { next?: string }) {
   const sendOtpFn = useServerFn(sendPhoneOtp);
   const verifyOtpFn = useServerFn(verifyPhoneOtp);
   const registerUserFn = useServerFn(registerPhoneVerifiedUser);
+  const checkUniquenessFn = useServerFn(checkSignupUniqueness);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -511,11 +512,14 @@ function SignupForm({ next }: { next?: string }) {
       return setErr("Passwords do not match. Please verify your entries.");
     }
     if (!validPhone) {
-      return setErr("Please enter a valid Ghanaian phone number (e.g. 24 123 4567).");
+      return setErr("Please enter a valid Ghanaian phone number (e.g. 0244 000 000).");
     }
 
     setBusy(true);
     try {
+      // Enforce strict uniqueness check (Phone, Email, Name)
+      await checkUniquenessFn({ data: { phone: cleanPhone, email, name } });
+
       const res = await sendOtpFn({ data: { phone: cleanPhone } });
       setMaskedPhone(res.maskedPhone);
       setStep("OTP");
