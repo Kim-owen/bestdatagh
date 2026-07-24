@@ -20,8 +20,25 @@ async function getServerEntry(): Promise<ServerEntry> {
 }
 
 async function normalizeCatastrophicSsrResponse(response: Response, isServerFn: boolean): Promise<Response> {
-  if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
+
+  // If this is a server function call (_serverFn) and returned an error with non-JSON response:
+  if (isServerFn && response.status >= 400 && !contentType.includes("application/json")) {
+    const errorText = await response.clone().text();
+    console.error(`Server function returned non-JSON error (${response.status}):`, errorText);
+    
+    // Strip HTML tags if any exist to present clean error text
+    const cleanMessage = errorText.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return new Response(
+      JSON.stringify({ error: cleanMessage || `Server function request failed (${response.status})` }),
+      {
+        status: response.status,
+        headers: { "content-type": "application/json" },
+      }
+    );
+  }
+
+  if (response.status < 500) return response;
   if (isServerFn || contentType.includes("application/json")) return response;
 
   const body = await response.clone().text();

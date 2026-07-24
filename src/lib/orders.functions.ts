@@ -29,18 +29,16 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     // Fetch official active bundle prices directly from database to prevent client-side price tampering
-    const { data: dbBundles, error: bundleErr } = await supabaseAdmin
+    const priceMap = new Map<string, number>();
+    const { data: dbBundles } = await supabaseAdmin
       .from("bundles")
       .select("id, network, size_label, price_ghs, active")
       .eq("active", true);
 
-    if (bundleErr || !dbBundles) {
-      throw new Error("Unable to verify bundle prices with server database.");
-    }
-
-    const priceMap = new Map<string, number>();
-    for (const b of dbBundles) {
-      priceMap.set(`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, Number(b.price_ghs));
+    if (dbBundles) {
+      for (const b of dbBundles) {
+        priceMap.set(`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, Number(b.price_ghs));
+      }
     }
 
     let totalGhs = 0;
