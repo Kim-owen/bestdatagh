@@ -71,6 +71,8 @@ function UnifiedPaymentPage() {
   const [resolvedAccountName, setResolvedAccountName] = useState<string | null>(null);
   const [resolvingName, setResolvingName] = useState(false);
   const [showPaystackModal, setShowPaystackModal] = useState(false);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
 
   // Poll order status every 1 second for ultra-fast automatic verification
   const { data: pollData, refetch: refetchPollStatus } = useQuery({
@@ -121,21 +123,25 @@ function UnifiedPaymentPage() {
 
   // Live resolve MoMo Account Name via Paystack Bank Resolve API
   useEffect(() => {
+    let isMounted = true;
     if (validPayerPhone && selectedNetwork) {
       setResolvingName(true);
       resolveNameFn({ data: { phone: activePayerPhone, network: selectedNetwork } })
         .then((res) => {
-          setResolvedAccountName(res.accountName);
+          if (isMounted) setResolvedAccountName(res.accountName);
         })
         .catch(() => {
-          setResolvedAccountName(null);
+          if (isMounted) setResolvedAccountName(null);
         })
         .finally(() => {
-          setResolvingName(false);
+          if (isMounted) setResolvingName(false);
         });
     } else {
       setResolvedAccountName(null);
     }
+    return () => {
+      isMounted = false;
+    };
   }, [activePayerPhone, selectedNetwork, validPayerPhone]);
 
   // Dynamically load Paystack Popup JS v2
@@ -148,9 +154,6 @@ function UnifiedPaymentPage() {
       document.body.appendChild(script);
     }
   }, []);
-
-  const [authUrl, setAuthUrl] = useState<string | null>(null);
-  const [autoTriggered, setAutoTriggered] = useState(false);
 
   // Core MoMo Charge Execution
   const executeMoMoCharge = async (phoneToCharge: string, netToCharge: string) => {

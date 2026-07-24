@@ -38,19 +38,25 @@ function AccountPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("reference") || params.get("trxref");
       if (ref && ref.startsWith("DEP-")) {
         verifyDepositFn({ data: { reference: ref } })
           .then(() => {
-            qc.invalidateQueries({ queryKey: ["myWallet"] });
-            qc.invalidateQueries({ queryKey: ["me"] });
-            window.history.replaceState({}, document.title, window.location.pathname);
+            if (isMounted) {
+              qc.invalidateQueries({ queryKey: ["myWallet"] });
+              qc.invalidateQueries({ queryKey: ["me"] });
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
           })
           .catch(console.error);
       }
     }
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
