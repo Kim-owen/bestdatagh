@@ -6,7 +6,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useAuth } from "@/lib/auth";
 import { listActiveBundles } from "@/lib/public-bundles.functions";
-import { getMyProfile, applyForAgent, AGENT_DISCOUNT_PCT } from "@/lib/profile.functions";
+import { getMyProfile, applyForAgent, getAgentActivationFee, AGENT_DISCOUNT_PCT } from "@/lib/profile.functions";
 import { getPublicHeroSlides } from "@/lib/admin.functions";
 import { useCart, type Network } from "@/lib/cart";
 import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantBuyModal";
@@ -331,47 +331,178 @@ function SignUpCTA() {
 function ApplyPanel({ status }: { status?: string }) {
   const qc = useQueryClient();
   const submit = useServerFn(applyForAgent);
-  const [f, setF] = useState({ full_name: "", phone: "", region: "", monthly_volume: "", note: "" });
+  const fetchFee = useServerFn(getAgentActivationFee);
+
+  const { data: feeData } = useQuery({ queryKey: ["agentActivationFee"], queryFn: () => fetchFee() });
+  const activationFee = feeData?.feeGhs || 50;
+
+  const [f, setF] = useState({
+    full_name: "",
+    phone: "",
+    business_name: "",
+    region: "Greater Accra",
+    sales_channel: "WhatsApp / Social Media",
+    monthly_volume: "GH₵ 2,000 - GH₵ 5,000",
+    is_mentor_requested: true,
+    note: "",
+    payWithWallet: true,
+  });
+
   const mut = useMutation({
     mutationFn: () => submit({ data: f }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["me"] });
+      if (res?.feePaid) {
+        window.location.href = "/agent";
+      }
+    },
   });
 
   if (status === "approved") return null;
   if (status === "pending") {
     return (
       <section className="mx-auto max-w-[860px] px-4 sm:px-6 py-14">
-        <div className="rounded-3xl border border-amber-300/40 bg-amber-500/5 p-8">
-          <div className="flex items-center gap-3"><Clock className="h-5 w-5 text-amber-500" /><h2 className="text-xl font-extrabold">Your application is under review</h2></div>
-          <p className="mt-2 text-sm text-muted-foreground">Our team usually approves new agents within 24 hours. You'll get an email once you're activated.</p>
+        <div className="rounded-3xl border border-amber-300/40 bg-amber-500/5 p-8 text-center space-y-3">
+          <Clock className="mx-auto h-10 w-10 text-amber-400" />
+          <h2 className="text-xl font-extrabold text-white">Your Agent Application is Pending Review</h2>
+          <p className="text-sm text-slate-300 max-w-md mx-auto">
+            Our team is reviewing your details. Activation fee: <strong>GH₵ {activationFee.toFixed(2)}</strong>. You will receive an SMS alert upon approval!
+          </p>
         </div>
       </section>
     );
   }
+
   return (
-    <section className="mx-auto max-w-[860px] px-4 sm:px-6 py-14">
-      <div className="rounded-3xl border border-border bg-card p-6 md:p-8">
+    <section className="mx-auto max-w-[920px] px-4 sm:px-6 py-14">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/90 p-6 md:p-10 shadow-2xl space-y-8 backdrop-blur-xl">
         {status === "rejected" && (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            <XCircle className="h-4 w-4" /> Your previous application was rejected. You can update your details and re-submit.
+          <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs font-bold text-destructive">
+            <XCircle className="h-4 w-4 shrink-0" /> Your previous application was rejected. Please review and update your information below.
           </div>
         )}
-        <h2 className="text-2xl font-extrabold">Agent application</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Tell us a bit about your reselling business.</p>
-        <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input label="Full name" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} required />
-          <Input label="Phone (MoMo)" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} required type="tel" placeholder="0244 000 000" />
-          <Input label="Region" value={f.region} onChange={(v) => setF({ ...f, region: v })} required placeholder="Greater Accra" />
-          <Input label="Estimated monthly volume" value={f.monthly_volume} onChange={(v) => setF({ ...f, monthly_volume: v })} placeholder="e.g. GHS 2,000" />
-          <div className="md:col-span-2">
-            <label className="mb-1.5 block text-xs font-semibold">Anything else?</label>
-            <textarea rows={4} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30" placeholder="Where you sell from, existing customers, etc." />
+
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/10 border border-amber-400/20 px-3.5 py-1 text-xs font-black text-amber-400 mb-2">
+            <Sparkles className="h-3.5 w-3.5" /> BestData Wholesale Partner Account
           </div>
-          <div className="md:col-span-2 flex items-center gap-3">
-            <button disabled={mut.isPending} className="inline-flex items-center gap-2 rounded-xl gold-gradient px-5 h-11 text-sm font-bold text-primary-foreground shadow-[var(--shadow-gold)] disabled:opacity-50">
-              {mut.isPending ? "Submitting…" : "Submit application"} <ArrowRight className="h-4 w-4" />
+          <h2 className="text-2xl md:text-3xl font-black text-white font-display">Reseller & Mentor Application</h2>
+          <p className="mt-1 text-xs md:text-sm text-slate-400">
+            Tell us about your reselling business. Unlock up to 10% wholesale discount, your custom store link, and sub-agent mentorship features.
+          </p>
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Full Name *" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} required placeholder="e.g. Kwame Mensah" />
+            <Input label="Phone (MoMo Number) *" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} required type="tel" placeholder="0244 000 000" />
+            <Input label="Store / Business Name *" value={f.business_name} onChange={(v) => setF({ ...f, business_name: v })} required placeholder="e.g. Kwame Data Express" />
+            
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-300">Region / City *</label>
+              <select
+                value={f.region}
+                onChange={(e) => setF({ ...f, region: e.target.value })}
+                className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-xs font-bold text-white outline-none focus:border-amber-400"
+              >
+                <option value="Greater Accra">Greater Accra</option>
+                <option value="Ashanti (Kumasi)">Ashanti (Kumasi)</option>
+                <option value="Western (Takoradi)">Western (Takoradi)</option>
+                <option value="Northern (Tamale)">Northern (Tamale)</option>
+                <option value="Central (Cape Coast)">Central (Cape Coast)</option>
+                <option value="Eastern (Koforidua)">Eastern (Koforidua)</option>
+                <option value="Volta (Ho)">Volta (Ho)</option>
+                <option value="Other Region">Other Region</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-300">Primary Sales Channel</label>
+              <select
+                value={f.sales_channel}
+                onChange={(e) => setF({ ...f, sales_channel: e.target.value })}
+                className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-xs font-bold text-white outline-none focus:border-amber-400"
+              >
+                <option value="WhatsApp / Social Media">WhatsApp / Telegram Groups / Social Media</option>
+                <option value="Campus Sales">University / College Campus</option>
+                <option value="Retail Shop">Physical Retail Shop / Container</option>
+                <option value="Online Store">Personal Website / App</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-300">Estimated Monthly Volume</label>
+              <select
+                value={f.monthly_volume}
+                onChange={(e) => setF({ ...f, monthly_volume: e.target.value })}
+                className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-xs font-bold text-white outline-none focus:border-amber-400"
+              >
+                <option value="GH₵ 500 - GH₵ 2,000">GH₵ 500 – GH₵ 2,000 / month</option>
+                <option value="GH₵ 2,000 - GH₵ 5,000">GH₵ 2,000 – GH₵ 5,000 / month</option>
+                <option value="GH₵ 5,000 - GH₵ 10,000">GH₵ 5,000 – GH₵ 10,000 / month</option>
+                <option value="GH₵ 10,000+">GH₵ 10,000+ / month (VIP Master)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Master Agent / Mentor Toggle */}
+          <div
+            onClick={() => setF({ ...f, is_mentor_requested: !f.is_mentor_requested })}
+            className={`cursor-pointer rounded-2xl border p-4 transition-all flex items-center justify-between gap-4 ${
+              f.is_mentor_requested ? "border-amber-400 bg-amber-400/10" : "border-white/10 bg-black/40 hover:border-white/20"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl gold-gradient flex items-center justify-center text-slate-950 font-black">
+                ⭐
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold text-white">Apply as Master Agent Mentor (/find-agent)</h4>
+                <p className="text-[11px] text-slate-400">List my store publicly so new resellers can join my sub-agent network.</p>
+              </div>
+            </div>
+            <input type="checkbox" checked={f.is_mentor_requested} readOnly className="h-5 w-5 accent-amber-400 rounded" />
+          </div>
+
+          {/* Additional Notes */}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-300">Additional Information / Business Location</label>
+            <textarea
+              rows={3}
+              value={f.note}
+              onChange={(e) => setF({ ...f, note: e.target.value })}
+              className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-xs font-medium text-white outline-none focus:border-amber-400 placeholder:text-slate-600"
+              placeholder="e.g. Selling from Legon Campus hall 3 & WhatsApp group of 500 members."
+            />
+          </div>
+
+          {/* Application Fee Card */}
+          <div className="rounded-2xl border border-amber-500/20 bg-slate-950 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-0.5 text-center sm:text-left">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Required Agent Activation Fee</span>
+              <h4 className="text-xl font-black text-white">GH₵ {activationFee.toFixed(2)}</h4>
+              <p className="text-[11px] text-slate-400">One-time registration fee to activate wholesale pricing & storefront tools.</p>
+            </div>
+
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-200 cursor-pointer bg-white/5 border border-white/10 px-3.5 py-2 rounded-xl hover:bg-white/10 transition-all">
+              <input
+                type="checkbox"
+                checked={f.payWithWallet}
+                onChange={(e) => setF({ ...f, payWithWallet: e.target.checked })}
+                className="h-4 w-4 accent-amber-400"
+              />
+              <span>Deduct from my BestData Wallet (Instant Activation)</span>
+            </label>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
+            <button
+              disabled={mut.isPending}
+              className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl gold-gradient px-8 py-4 text-xs font-black text-slate-950 shadow-[0_4px_20px_-2px_hsl(48_100%_50%_/_0.5)] hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
+            >
+              {mut.isPending ? "Processing..." : `Submit & Activate Agent Account (GH₵ ${activationFee.toFixed(2)})`} <ArrowRight className="h-4 w-4" />
             </button>
-            {mut.error && <span className="text-xs text-destructive">{(mut.error as Error).message}</span>}
+            {mut.error && <span className="text-xs font-bold text-destructive">{(mut.error as Error).message}</span>}
           </div>
         </form>
       </div>

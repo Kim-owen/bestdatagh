@@ -150,15 +150,32 @@ function AccountPage() {
               </Link>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Quick links</h3>
+            <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Dashboard Menu</h3>
               <div className="grid gap-2">
-                <QLink to="/account/transactions" icon={Wallet} label="Wallet & Transaction History" />
-                <QLink to="/track-order" icon={ShoppingBag} label="My orders" />
-                <QLink to="/account/api-keys" icon={KeyRound} label="API keys" />
-                <QLink to="/agents" icon={Store} label={isAgent ? "Agent store" : "Become an agent"} />
-                {isAdmin && <QLink to="/admin" icon={ShieldCheck} label="Admin panel" />}
+                <QLink to="/account/transactions" icon={Wallet} label="Wallet & Statements" />
+                <QLink to="/track-order" icon={ShoppingBag} label="Track My Data Orders" />
+                {isAgent && <QLink to="/agent" icon={Store} label="Agent Workspace" />}
+                {(isAgent || isAdmin) && <QLink to="/account/api-keys" icon={KeyRound} label="API Keys" />}
+                {isAdmin && <QLink to="/admin" icon={ShieldCheck} label="Admin Panel" />}
               </div>
+
+              {!isAgent && (
+                <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-black text-amber-400">
+                    <Store className="h-4 w-4" /> BestData Agent Program
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Want up to 10% off data bundle prices & your own custom store?
+                  </p>
+                  <Link
+                    to="/agents"
+                    className="inline-flex items-center justify-center gap-1.5 w-full rounded-xl gold-gradient py-2 text-xs font-black text-slate-950 shadow-sm hover:scale-[1.02] transition-all"
+                  >
+                    <span>Apply to Become an Agent →</span>
+                  </Link>
+                </div>
+              )}
             </div>
             <button onClick={() => signOut()} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/5 px-4 h-11 text-sm font-bold text-destructive hover:bg-destructive/10">
               <LogOut className="h-4 w-4" /> Sign out

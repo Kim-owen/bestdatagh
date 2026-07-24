@@ -31,6 +31,7 @@ import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as CheckoutVerifyRouteImport } from './routes/checkout.verify'
 import { Route as PaymentMomoReferenceRouteImport } from './routes/payment-momo.$reference'
 import { Route as PaymentReferenceRouteImport } from './routes/payment.$reference'
+import { Route as StoreSlugRouteImport } from './routes/store.$slug'
 import { Route as AuthenticatedAccountApiKeysRouteImport } from './routes/_authenticated/account.api-keys'
 import { Route as AuthenticatedAccountTransactionsRouteImport } from './routes/_authenticated/account.transactions'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -169,6 +170,11 @@ const PaymentMomoReferenceRoute = PaymentMomoReferenceRouteImport.update({
 const PaymentReferenceRoute = PaymentReferenceRouteImport.update({
   id: '/payment/$reference',
   path: '/payment/$reference',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoreSlugRoute = StoreSlugRouteImport.update({
+  id: '/store/$slug',
+  path: '/store/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAccountApiKeysRoute =
@@ -362,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/checkout/verify': typeof CheckoutVerifyRoute
   '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
+  '/store/$slug': typeof StoreSlugRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/account/transactions': typeof AuthenticatedAccountTransactionsRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
@@ -414,6 +421,7 @@ export interface FileRoutesByTo {
   '/checkout/verify': typeof CheckoutVerifyRoute
   '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
+  '/store/$slug': typeof StoreSlugRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/account/transactions': typeof AuthenticatedAccountTransactionsRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
@@ -469,6 +477,7 @@ export interface FileRoutesById {
   '/checkout/verify': typeof CheckoutVerifyRoute
   '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
+  '/store/$slug': typeof StoreSlugRoute
   '/_authenticated/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
   '/_authenticated/account/transactions': typeof AuthenticatedAccountTransactionsRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
@@ -524,6 +533,7 @@ export interface FileRouteTypes {
     | '/checkout/verify'
     | '/payment-momo/$reference'
     | '/payment/$reference'
+    | '/store/$slug'
     | '/account/api-keys'
     | '/account/transactions'
     | '/admin/agents'
@@ -576,6 +586,7 @@ export interface FileRouteTypes {
     | '/checkout/verify'
     | '/payment-momo/$reference'
     | '/payment/$reference'
+    | '/store/$slug'
     | '/account/api-keys'
     | '/account/transactions'
     | '/admin/agents'
@@ -630,6 +641,7 @@ export interface FileRouteTypes {
     | '/checkout/verify'
     | '/payment-momo/$reference'
     | '/payment/$reference'
+    | '/store/$slug'
     | '/_authenticated/account/api-keys'
     | '/_authenticated/account/transactions'
     | '/_authenticated/admin/agents'
@@ -680,6 +692,7 @@ export interface RootRouteChildren {
   VerifyOtpRoute: typeof VerifyOtpRoute
   PaymentMomoReferenceRoute: typeof PaymentMomoReferenceRoute
   PaymentReferenceRoute: typeof PaymentReferenceRoute
+  StoreSlugRoute: typeof StoreSlugRoute
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
   ApiV1BalanceRoute: typeof ApiV1BalanceRoute
   ApiV1BuyDataRoute: typeof ApiV1BuyDataRoute
@@ -846,6 +859,13 @@ declare module '@tanstack/react-router' {
       path: '/payment/$reference'
       fullPath: '/payment/$reference'
       preLoaderRoute: typeof PaymentReferenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/store/$slug': {
+      id: '/store/$slug'
+      path: '/store/$slug'
+      fullPath: '/store/$slug'
+      preLoaderRoute: typeof StoreSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/account/api-keys': {
@@ -1174,6 +1194,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyOtpRoute: VerifyOtpRoute,
   PaymentMomoReferenceRoute: PaymentMomoReferenceRoute,
   PaymentReferenceRoute: PaymentReferenceRoute,
+  StoreSlugRoute: StoreSlugRoute,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
   ApiV1BalanceRoute: ApiV1BalanceRoute,
   ApiV1BuyDataRoute: ApiV1BuyDataRoute,
