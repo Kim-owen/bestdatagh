@@ -365,6 +365,8 @@ function LoginForm({ next }: { next?: string }) {
             <Field
               icon={KeyRound}
               type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
               maxLength={6}
               placeholder="123456"
               value={otpCode}
@@ -374,17 +376,18 @@ function LoginForm({ next }: { next?: string }) {
           </div>
 
           {err && (
-            <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{err}</span>
+            <div className="flex items-start gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive break-words leading-relaxed">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span className="flex-1">{err}</span>
             </div>
           )}
 
           <button
             disabled={busy || otpCode.length !== 6}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-3 sm:px-4 py-3.5 text-[11px] sm:text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
           >
-            {busy ? "Verifying OTP & Logging In..." : "Verify OTP & Complete Sign In"} <ArrowRight className="h-4 w-4" />
+            <span className="truncate">{busy ? "Verifying OTP..." : "Verify OTP & Sign In"}</span>
+            <ArrowRight className="h-4 w-4 shrink-0" />
           </button>
 
           <div className="text-center pt-1">
@@ -549,6 +552,7 @@ function SignupForm({ next }: { next?: string }) {
             <input
               type="text"
               inputMode="numeric"
+              autoComplete="one-time-code"
               maxLength={6}
               placeholder="123456"
               value={otpCode}
@@ -561,9 +565,9 @@ function SignupForm({ next }: { next?: string }) {
         </div>
 
         {err && (
-          <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{err}</span>
+          <div className="flex items-start gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive break-words leading-relaxed">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span className="flex-1">{err}</span>
           </div>
         )}
 
@@ -576,9 +580,10 @@ function SignupForm({ next }: { next?: string }) {
 
         <button
           disabled={busy || otpCode.trim().length !== 6}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-slate-950 shadow-lg hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-3 sm:px-4 py-3.5 text-[11px] sm:text-xs font-extrabold text-slate-950 shadow-lg hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
         >
-          {busy ? "Verifying Code…" : "Confirm Code & Create Account"} <ArrowRight className="h-4 w-4 stroke-[3]" />
+          <span className="truncate">{busy ? "Verifying Code…" : "Confirm Code & Create Account"}</span>
+          <ArrowRight className="h-4 w-4 shrink-0 stroke-[3]" />
         </button>
 
         <div className="flex items-center justify-between text-xs font-semibold pt-1">
