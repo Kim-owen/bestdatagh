@@ -8,7 +8,7 @@ import { smartTrackOrders } from "@/lib/orders.functions";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
 import {
   Search, CheckCircle2, Clock, XCircle, Share2, Printer, Download,
-  Smartphone, ShieldCheck, Sparkles, FileText, ShoppingBag
+  Smartphone, ShieldCheck, Sparkles, FileText, ShoppingBag, Copy, Check
 } from "lucide-react";
 
 export const Route = createFileRoute("/track-order")({
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/track-order")({
 function TrackOrder() {
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
-  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const trackFn = useServerFn(smartTrackOrders);
 
@@ -41,6 +41,28 @@ function TrackOrder() {
       setOrders(data);
     },
   });
+
+  const handleCopyReceiptText = (ord: any) => {
+    const itemStr = (ord.items || [])
+      .map((it: any) => `• ${it.network} ${it.size_label} -> ${it.recipient_phone} (GH₵ ${Number(it.price_ghs || 0).toFixed(2)})`)
+      .join("\n");
+
+    const msg = `🧾 *BESTDATA GHANA - OFFICIAL RECEIPT*\n` +
+      `-----------------------------------\n` +
+      `*Order Ref:* ${ord.reference}\n` +
+      `*Date:* ${new Date(ord.created_at).toLocaleString()}\n` +
+      `*Status:* ${ord.status.toUpperCase()}\n\n` +
+      `*Purchased Items:*\n${itemStr}\n\n` +
+      `*Total Paid:* GH₵ ${Number(ord.total_ghs || 0).toFixed(2)}\n` +
+      `-----------------------------------\n` +
+      `Thank you for choosing BestData Ghana! (bestdatagh.com)`;
+
+    try {
+      navigator.clipboard.writeText(msg);
+      setCopiedId(ord.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
+  };
 
   const handleShareWhatsapp = (ord: any) => {
     const itemStr = (ord.items || [])
@@ -267,7 +289,24 @@ function TrackOrder() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => handleCopyReceiptText(ord)}
+                          className="flex items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:bg-white/10 transition-all"
+                        >
+                          {copiedId === ord.id ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 text-emerald-400" />
+                              <span className="text-emerald-400 font-black">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5 text-slate-400" />
+                              <span>Copy Text</span>
+                            </>
+                          )}
+                        </button>
+
                         <button
                           onClick={() => handleShareWhatsapp(ord)}
                           className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all"
