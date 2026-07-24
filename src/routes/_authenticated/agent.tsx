@@ -40,6 +40,9 @@ type TabType = "overview" | "storefront" | "pricing" | "customers" | "withdrawal
 
 function AgentDashboard() {
   const nav = useNavigate();
+  const getAgentDashboardFn = useServerFn(getAgentDashboard);
+  const listMyWithdrawalsFn = useServerFn(listMyWithdrawals);
+  const getMyProfileFn = useServerFn(getMyProfile);
   const verifyDepositFn = useServerFn(verifyWalletDeposit);
   const [data, setData] = useState<Data | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -53,7 +56,7 @@ function AgentDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   async function refresh() {
-    const [d, w] = await Promise.all([getAgentDashboard(), listMyWithdrawals()]);
+    const [d, w] = await Promise.all([getAgentDashboardFn(), listMyWithdrawalsFn()]);
     setData(d);
     setWithdrawals(w as any);
   }
@@ -76,7 +79,7 @@ function AgentDashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const prof = await getMyProfile();
+        const prof = await getMyProfileFn();
         const roles = prof.roles ?? [];
         if (!roles.includes("agent") && !roles.includes("admin")) { nav({ to: "/agents" }); return; }
         await refresh();
