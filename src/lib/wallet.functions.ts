@@ -86,7 +86,7 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const reference = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-    // Save pending deposit transaction in database
+    // Save pending deposit transaction locked to context.userId
     await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: context.userId,
       amount_ghs: data.amountGhs,
@@ -146,19 +146,24 @@ export const payOrderWithWallet = createServerFn({ method: "POST" })
 
 export const verifyWalletDeposit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { reference: string }) => d)
+  .inputValidator((d: { reference: string }) => ({
+    reference: d.reference.trim(),
+  }))
   .handler(async ({ data, context }) => {
     const { verifyPaystackTransaction } = await import("@/lib/paystack");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Check if already credited
-    const { data: existingTx } = await (supabaseAdmin as any)
+    // 1. Fetch pending transaction belonging STRICTLY to context.userId
+    const { data: pendingTx } = await (supabaseAdmin as any)
       .from("wallet_transactions")
-      .select("id, amount_ghs")
+      .select("*")
       .eq("reference", data.reference)
       .maybeSingle();
 
-    if (existingTx) {
+    if (pendingTx && pendingTx.status === "completed") {
+      if (pendingTx.user_id !== context.userId) {
+        throw new Error("Unauthorized: Deposit reference belongs to another user.");
+      }
       const { data: curWallet } = await (supabaseAdmin as any)
         .from("wallets")
         .select("balance_ghs")
@@ -168,37 +173,83 @@ export const verifyWalletDeposit = createServerFn({ method: "POST" })
       return { ok: true, balanceGhs: Number(curWallet?.balance_ghs || 0), alreadyVerified: true };
     }
 
-    // 2. Verify with Paystack API
-    const paystackRes = await verifyPaystackTransaction(data.reference);
-    if (paystackRes.data.status !== "success") {
-      throw new Error(`Deposit status is ${paystackRes.data.status}`);
+    if (pendingTx && pendingTx.user_id !== context.userId) {
+      throw new Error("Unauthorized: You cannot claim another user's deposit reference.");
     }
 
-    const paidGhs = paystackRes.data.amount / 100;
+    // 2. Verify with Paystack Live API
+    const paystackRes = await verifyPaystackTransaction(data.reference);
+    if (!paystackRes?.status || paystackRes?.data?.status !== "success") {
+      throw new Error(`Deposit status is ${paystackRes?.data?.status || "unverified"}`);
+    }
 
-    // 3. Fetch & credit wallet
-    const { data: curWallet } = await (supabaseAdmin as any)
-      .from("wallets")
-      .select("balance_ghs")
-      .eq("user_id", context.userId)
-      .maybeSingle();
+    const paidGhs = (paystackRes.data.amount || 0) / 100;
+    if (paidGhs <= 0) throw new Error("Invalid payment amount from Paystack.");
 
-    const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+    const psUserId = paystackRes.data.metadata?.user_id;
+    if (psUserId && psUserId !== context.userId) {
+      throw new Error("Unauthorized: Paystack metadata user mismatch.");
+    }
+
+    // 3. ATOMIC LOCK: Update status from 'pending' to 'completed'
+    if (pendingTx) {
+      const { data: updated, error: updateErr } = await (supabaseAdmin as any)
+        .from("wallet_transactions")
+        .update({
+          status: "completed",
+          amount_ghs: paidGhs,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pendingTx.id)
+        .eq("user_id", context.userId)
+        .eq("status", "pending")
+        .select("*")
+        .maybeSingle();
+
+      if (updateErr || !updated) {
+        const { data: curWallet } = await (supabaseAdmin as any)
+          .from("wallets")
+          .select("balance_ghs")
+          .eq("user_id", context.userId)
+          .maybeSingle();
+        return { ok: true, balanceGhs: Number(curWallet?.balance_ghs || 0), alreadyVerified: true };
+      }
+    } else {
+      const { error: insertErr } = await (supabaseAdmin as any)
+        .from("wallet_transactions")
+        .insert({
+          user_id: context.userId,
+          amount_ghs: paidGhs,
+          type: "deposit",
+          reference: data.reference,
+          status: "completed",
+          description: `Paystack Deposit (GH₵ ${paidGhs.toFixed(2)})`,
+        });
+
+      if (insertErr) {
+        const { data: curWallet } = await (supabaseAdmin as any)
+          .from("wallets")
+          .select("balance_ghs")
+          .eq("user_id", context.userId)
+          .maybeSingle();
+        return { ok: true, balanceGhs: Number(curWallet?.balance_ghs || 0), alreadyVerified: true };
+      }
+    }
+
+    // 4. Recalculate true wallet balance safely
+    const { data: allUserTxs } = await (supabaseAdmin as any)
+      .from("wallet_transactions")
+      .select("amount_ghs, status")
+      .eq("user_id", context.userId);
+
+    const completedTxs = (allUserTxs || []).filter((t: any) => t.status === "completed" || t.status === "paid");
+    const exactBal = completedTxs.reduce((acc: number, t: any) => acc + Number(t.amount_ghs || 0), 0);
 
     await (supabaseAdmin as any)
       .from("wallets")
-      .upsert({ user_id: context.userId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+      .upsert({ user_id: context.userId, balance_ghs: Math.max(0, exactBal), updated_at: new Date().toISOString() });
 
-    await (supabaseAdmin as any).from("wallet_transactions").insert({
-      user_id: context.userId,
-      amount_ghs: paidGhs,
-      type: "deposit",
-      reference: data.reference,
-      status: "completed",
-      description: `Paystack Deposit (${data.reference})`,
-    });
-
-    return { ok: true, balanceGhs: newBal, alreadyVerified: false };
+    return { ok: true, balanceGhs: Math.max(0, exactBal), alreadyVerified: false };
   });
 
 /* ============ BANKING SECURITY: WALLET PIN & PROTECTION ============ */
