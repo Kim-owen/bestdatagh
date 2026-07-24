@@ -109,11 +109,12 @@ export function parsePaystackGatewayResponse(res: {
     (res.gateway_response || "").toLowerCase().replace(/\s+/g, "_") ||
     "unknown";
 
-  const approved =
+  const approved = Boolean(
     res.status === "success" ||
     code === "approved" ||
     res.gateway_response?.toLowerCase().includes("approved") ||
-    res.gateway_response?.toLowerCase().includes("successful");
+    res.gateway_response?.toLowerCase().includes("successful")
+  );
 
   const message =
     PAYSTACK_GATEWAY_MESSAGES[code] ||

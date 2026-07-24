@@ -417,6 +417,7 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
       for (const ref of refsToTry) {
         try {
           let pStatus = "";
+          let paidGhs = Number(primaryTx?.amount_ghs || 0);
           let verifyData: any = null;
           try {
             const chargeCheck = await checkPaystackChargeStatus(ref);
