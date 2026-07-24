@@ -38,11 +38,14 @@ function createSupabaseAdminClient() {
 
   const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
   const SUPABASE_SERVICE_ROLE_KEY =
-    rawKey && rawKey.startsWith("eyJ")
+    rawKey && (rawKey.startsWith("eyJ") || rawKey.startsWith("sb_"))
       ? rawKey
       : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    global: {
+      fetch: createSupabaseFetch(SUPABASE_SERVICE_ROLE_KEY),
+    },
     auth: {
       storage: undefined,
       persistSession: false,

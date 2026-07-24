@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const TXTCONNECT_API_KEY = process.env.TXTCONNECT_API_KEY || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
 const TXTCONNECT_SENDER_ID = process.env.TXTCONNECT_SENDER_ID || "BestData";

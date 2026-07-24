@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, listRecentPaystackTransactions, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
 import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder } from "./swiftdata";
 
@@ -28,6 +27,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Fetch official active bundle prices directly from database to prevent client-side price tampering
     const priceMap = new Map<string, number>();
     const { data: dbBundles } = await supabaseAdmin
@@ -106,6 +106,7 @@ export const verifyOrderPayment = createServerFn({ method: "POST" })
     return { reference: data.reference.trim() };
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // 1. Find local order by reference
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("orders")
@@ -160,6 +161,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
     return { orderId: data.orderId, phone: cleanPhone, provider };
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let reference = data.orderId;
     let totalGhs = 0;
 
@@ -301,6 +303,7 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
 export const createPaymentRequestInvoice = createServerFn({ method: "POST" })
   .validator((data: { orderId: string; phone: string }) => data)
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("id, reference, total_ghs, order_items(network, size_label)")
@@ -573,6 +576,7 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
     }
 
     // 2. Standard order check
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone)")
