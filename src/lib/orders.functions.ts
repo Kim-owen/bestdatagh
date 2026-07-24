@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
+import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, listRecentPaystackTransactions, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
 import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder } from "./swiftdata";
 
 export interface CartItemInput {
@@ -426,6 +426,57 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
         } catch {
           // Keep trying next reference candidate
         }
+      }
+
+      // Layer 3 Fallback: Global recent successful transactions lookup on Paystack
+      try {
+        const recentRes = await listRecentPaystackTransactions({ status: "success" });
+        const txList = (recentRes?.data || []) as any[];
+        const expectedPesewas = Math.round(Number(primaryTx?.amount_ghs || 0) * 100);
+
+        const matchedPsTx = txList.find((pt: any) => {
+          const ptRef = String(pt.reference || "").toLowerCase();
+          const bRef = baseRef.toLowerCase();
+          const isRefMatch = ptRef.includes(bRef) || bRef.includes(ptRef);
+          const isAmtMatch = expectedPesewas > 0 && Math.abs(pt.amount - expectedPesewas) < 5;
+          return isRefMatch || isAmtMatch;
+        });
+
+        if (matchedPsTx) {
+          const paidGhs = (matchedPsTx.amount || 0) / 100 || Number(primaryTx?.amount_ghs || 0);
+          const targetTx = primaryTx || { id: null, user_id: null, amount_ghs: paidGhs };
+
+          if (targetTx.id) {
+            await (supabaseAdmin as any)
+              .from("wallet_transactions")
+              .update({ status: "completed", amount_ghs: paidGhs })
+              .eq("id", targetTx.id);
+          }
+
+          const targetUserId = targetTx.user_id;
+          if (targetUserId) {
+            const { data: curWallet } = await (supabaseAdmin as any)
+              .from("wallets")
+              .select("balance_ghs")
+              .eq("user_id", targetUserId)
+              .maybeSingle();
+
+            const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+            await (supabaseAdmin as any)
+              .from("wallets")
+              .upsert({ user_id: targetUserId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+          }
+
+          return {
+            status: "delivered",
+            isDeposit: true,
+            depositAmount: paidGhs,
+            reference: matchedPsTx.reference || data.reference,
+            order: { reference: matchedPsTx.reference || data.reference, total_ghs: paidGhs },
+          };
+        }
+      } catch {
+        // Ignore fallback error
       }
 
       return {

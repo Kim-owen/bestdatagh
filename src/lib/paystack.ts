@@ -221,6 +221,20 @@ export async function checkPaystackChargeStatus(reference: string) {
 }
 
 /**
+ * List recent successful Paystack transactions for fallback verification
+ */
+export async function listRecentPaystackTransactions(params?: { customer?: string; status?: string }) {
+  const query = new URLSearchParams();
+  if (params?.customer) query.set("customer", params.customer);
+  if (params?.status) query.set("status", params.status);
+  query.set("per_page", "20");
+
+  return paystackFetch<any>(`/transaction?${query.toString()}`, {
+    method: "GET",
+  });
+}
+
+/**
  * Create a Mobile Money Transfer Recipient for agent payouts
  */
 export async function createPaystackTransferRecipient(params: CreateRecipientParams) {
