@@ -54,6 +54,75 @@ export interface InitiateTransferParams {
   reason?: string;
 }
 
+export const PAYSTACK_ISO_CODES: Record<string, string> = {
+  "00": "approved",
+  "000": "approved",
+  "01": "refer_to_card_issuer",
+  "02": "refer_to_card_issuer_special",
+  "03": "invalid_merchant",
+  "04": "pickup_card",
+  "05": "do_not_honor",
+  "06": "processing_error",
+  "12": "invalid_transaction",
+  "13": "invalid_amount",
+  "14": "invalid_account_number",
+  "17": "customer_cancellation",
+  "31": "bank_not_supported",
+  "38": "pin_tries_exceeded",
+  "51": "insufficient_funds",
+  "55": "invalid_pin",
+  "59": "suspected_fraud",
+  "61": "daily_limit_exceeded",
+  "68": "response_received_too_late",
+  "75": "pin_tries_exceeded",
+  "91": "issuer_or_switch_inoperative",
+  "96": "system_malfunction",
+  "97": "transaction_timeout",
+  "911": "transaction_timeout",
+  "912": "bank_unavailable",
+};
+
+export const PAYSTACK_GATEWAY_MESSAGES: Record<string, string> = {
+  approved: "Payment approved successfully.",
+  insufficient_funds: "Insufficient funds in your MoMo wallet or card account.",
+  invalid_pin: "Incorrect MoMo PIN entered. Please re-enter carefully.",
+  pin_tries_exceeded: "PIN attempt limit exceeded for this account.",
+  customer_cancellation: "Payment request cancelled on phone screen.",
+  transaction_timeout: "Payment request timed out. Please respond quickly when prompted.",
+  issuer_or_switch_inoperative: "Network switch or telecom gateway is temporarily offline.",
+  bank_unavailable: "Payment gateway bank is temporarily unavailable.",
+  daily_limit_exceeded: "Daily MoMo / transaction limit exceeded.",
+  invalid_account_number: "Invalid phone number or wallet account number.",
+  invalid_amount: "Invalid payment amount specified.",
+  system_malfunction: "Network payment error. Please try again shortly.",
+};
+
+export function parsePaystackGatewayResponse(res: {
+  gateway_response?: string;
+  response_code?: string;
+  gateway_response_code?: string;
+  status?: string;
+}): { approved: boolean; code: string; message: string } {
+  const code =
+    res.gateway_response_code ||
+    (res.response_code ? PAYSTACK_ISO_CODES[res.response_code] : undefined) ||
+    (res.gateway_response || "").toLowerCase().replace(/\s+/g, "_") ||
+    "unknown";
+
+  const approved =
+    res.status === "success" ||
+    code === "approved" ||
+    res.gateway_response?.toLowerCase().includes("approved") ||
+    res.gateway_response?.toLowerCase().includes("successful");
+
+  const message =
+    PAYSTACK_GATEWAY_MESSAGES[code] ||
+    res.gateway_response ||
+    (approved ? "Payment successful." : "Transaction could not be completed.");
+
+  return { approved, code, message };
+}
+
 /**
  * Perform an authenticated request to the Paystack API
  */

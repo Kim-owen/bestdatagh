@@ -417,12 +417,12 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
       for (const ref of refsToTry) {
         try {
           let pStatus = "";
-          let paidGhs = Number(primaryTx?.amount_ghs || 0);
-
+          let verifyData: any = null;
           try {
             const chargeCheck = await checkPaystackChargeStatus(ref);
             pStatus = (chargeCheck?.data?.status || "").toLowerCase();
             if (chargeCheck?.data?.amount) paidGhs = chargeCheck.data.amount / 100;
+            verifyData = chargeCheck?.data;
           } catch {
             // Ignore charge API 404
           }
@@ -431,9 +431,18 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
             const verifyRes = await verifyPaystackTransaction(ref);
             pStatus = (verifyRes.data?.status || "").toLowerCase();
             if (verifyRes.data?.amount) paidGhs = verifyRes.data.amount / 100;
+            verifyData = verifyRes.data;
           }
 
-          if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+          const { parsePaystackGatewayResponse } = await import("@/lib/paystack");
+          const gatewayParsed = parsePaystackGatewayResponse({
+            status: pStatus,
+            gateway_response: verifyData?.gateway_response,
+            gateway_response_code: verifyData?.gateway_response_code,
+            response_code: verifyData?.response_code,
+          });
+
+          if (gatewayParsed.approved || pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
             const targetTx = primaryTx || { id: null, user_id: null, amount_ghs: paidGhs };
 
             if (targetTx.id) {
