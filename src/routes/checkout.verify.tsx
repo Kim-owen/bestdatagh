@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Loader2, ShoppingBag } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useCart } from "@/lib/cart";
@@ -23,6 +24,7 @@ function CheckoutVerify() {
   const { reference } = Route.useSearch();
   const { clear } = useCart();
   const navigate = useNavigate();
+  const verifyOrderPaymentFn = useServerFn(verifyOrderPayment);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<"paid" | "processing" | "delivered" | "failed" | "error">("processing");
   const [errorMsg, setErrorMsg] = useState("");
@@ -35,7 +37,7 @@ function CheckoutVerify() {
       return;
     }
 
-    verifyOrderPayment({ data: { reference } })
+    verifyOrderPaymentFn({ data: { reference } })
       .then((res: any) => {
         setLoading(false);
         if (res.verified) {
