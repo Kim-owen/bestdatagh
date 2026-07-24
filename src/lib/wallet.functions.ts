@@ -7,7 +7,50 @@ export const getMyWallet = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1. Auto-reconcile any pending deposits for this user against Paystack
+    // 1. Global Paystack Reconciler: Auto-import & link all successful Paystack deposits for this user
+    try {
+      const { listRecentPaystackTransactions } = await import("@/lib/paystack");
+      const psRes = await listRecentPaystackTransactions({ status: "success" });
+      const psTxList = (psRes?.data || []) as any[];
+
+      const depTxs = psTxList.filter((pt: any) => {
+        const ref = String(pt.reference || "");
+        const isDep = ref.startsWith("DEP-") || pt.metadata?.type === "wallet_deposit";
+        return isDep && pt.status === "success";
+      });
+
+      for (const pt of depTxs) {
+        const paidGhs = (pt.amount || 0) / 100;
+        const ref = pt.reference;
+        const baseRef = ref.split("-R")[0].split("-F")[0];
+
+        const { data: existing } = await (supabaseAdmin as any)
+          .from("wallet_transactions")
+          .select("id, status, user_id")
+          .or(`reference.eq.${ref},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
+          .maybeSingle();
+
+        if (!existing) {
+          await (supabaseAdmin as any).from("wallet_transactions").insert({
+            user_id: context.userId,
+            amount_ghs: paidGhs,
+            type: "deposit",
+            reference: ref,
+            status: "completed",
+            description: `Paystack Deposit (GH₵ ${paidGhs.toFixed(2)})`,
+          });
+        } else if (existing.status !== "completed" || !existing.user_id) {
+          await (supabaseAdmin as any)
+            .from("wallet_transactions")
+            .update({ status: "completed", amount_ghs: paidGhs, user_id: context.userId })
+            .eq("id", existing.id);
+        }
+      }
+    } catch (importErr) {
+      console.warn("Global Paystack deposit import notice:", importErr);
+    }
+
+    // 2. Auto-reconcile any remaining pending deposits for this user
     try {
       const { data: pendingTxs } = await (supabaseAdmin as any)
         .from("wallet_transactions")
@@ -43,7 +86,7 @@ export const getMyWallet = createServerFn({ method: "GET" })
               if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
                 await (supabaseAdmin as any)
                   .from("wallet_transactions")
-                  .update({ status: "completed", amount_ghs: paidGhs })
+                  .update({ status: "completed", amount_ghs: paidGhs, user_id: context.userId })
                   .eq("id", tx.id);
                 break;
               }
@@ -55,7 +98,7 @@ export const getMyWallet = createServerFn({ method: "GET" })
       console.warn("Wallet getMyWallet auto-reconciliation warning:", reconcileErr);
     }
 
-    // 2. Fetch all user transactions & recalculate exact balance
+    // 3. Fetch all user transactions & recalculate exact balance
     const { data: transactions } = await (supabaseAdmin as any)
       .from("wallet_transactions")
       .select("*")
