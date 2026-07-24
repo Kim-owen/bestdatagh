@@ -1,12 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import {
   ArrowRight, Mail, Lock, User, ShieldCheck, Wallet, History, Rocket,
-  Smartphone, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Sparkles
+  Smartphone, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Sparkles, RefreshCw
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/otp.functions";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -243,15 +245,25 @@ function LoginForm({ next }: { next?: string }) {
   );
 }
 
-/* ============ Signup Form with Mobile & Confirm Password ============ */
+/* ============ Signup Form with Mobile OTP Verification ============ */
 function SignupForm({ next }: { next?: string }) {
   const nav = useNavigate();
+  const sendOtpFn = useServerFn(sendPhoneOtp);
+  const verifyOtpFn = useServerFn(verifyPhoneOtp);
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // OTP state
+  const [step, setStep] = useState<"DETAILS" | "OTP">("DETAILS");
+  const [otpCode, setOtpCode] = useState("");
+  const [maskedPhone, setMaskedPhone] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ok, setOk] = useState(false);
@@ -260,7 +272,16 @@ function SignupForm({ next }: { next?: string }) {
   const validPhone = cleanPhone.length === 9 || cleanPhone.length === 10;
   const passwordsMatch = password.length >= 8 && password === confirmPassword;
 
-  async function onSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    let timer: any = null;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => setResendCooldown((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Step 1: Send SMS OTP via TxtConnect Gateway
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
 
@@ -272,29 +293,154 @@ function SignupForm({ next }: { next?: string }) {
     }
 
     setBusy(true);
-    const formattedPhone = cleanPhone.startsWith("0") ? `+233${cleanPhone.slice(1)}` : `+233${cleanPhone}`;
+    try {
+      const res = await sendOtpFn({ data: { phone: cleanPhone } });
+      setMaskedPhone(res.maskedPhone);
+      setStep("OTP");
+      setResendCooldown(30);
+    } catch (error: any) {
+      setErr(error.message || "Failed to send SMS verification code via TxtConnect.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth`,
-        data: {
-          display_name: name,
-          phone: formattedPhone,
+  // Resend OTP
+  async function handleResendCode() {
+    if (resendCooldown > 0 || busy) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await sendOtpFn({ data: { phone: cleanPhone } });
+      setMaskedPhone(res.maskedPhone);
+      setResendCooldown(30);
+    } catch (error: any) {
+      setErr(error.message || "Failed to resend SMS code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Step 2: Verify OTP & Create Supabase User
+  async function handleVerifyAndSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+
+    const code = otpCode.trim();
+    if (code.length !== 6) {
+      return setErr("Please enter the full 6-digit SMS verification code.");
+    }
+
+    setBusy(true);
+    try {
+      // 1. Verify OTP against Supabase phone_verifications table
+      await verifyOtpFn({ data: { phone: cleanPhone, otpCode: code } });
+
+      const formattedPhone = cleanPhone.startsWith("0") ? `+233${cleanPhone.slice(1)}` : `+233${cleanPhone}`;
+
+      // 2. Create user account in Supabase
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
+          data: {
+            display_name: name,
+            phone: formattedPhone,
+            phone_verified: true,
+          },
         },
-      },
-    });
+      });
 
-    setBusy(false);
-    if (error) return setErr(error.message);
+      if (error) throw error;
 
-    setOk(true);
-    setTimeout(() => nav({ to: (next as any) || "/" }), 1200);
+      setOk(true);
+      setTimeout(() => nav({ to: (next as any) || "/" }), 1200);
+    } catch (error: any) {
+      setErr(error.message || "OTP verification failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (step === "OTP") {
+    return (
+      <form onSubmit={handleVerifyAndSignup} className="space-y-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[11px] font-bold text-emerald-400 mb-2">
+            <ShieldCheck className="h-3.5 w-3.5" /> SMS Verification Sent
+          </div>
+          <h2 className="text-xl font-black font-display text-white">Enter SMS Code</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            We sent a 6-digit code via TxtConnect SMS to <strong className="text-amber-400 font-bold">{maskedPhone}</strong>
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-bold text-slate-300">6-Digit Verification Code</label>
+          <div className="relative flex items-center rounded-2xl border border-white/10 bg-black/40 focus-within:border-emerald-400 transition-all">
+            <span className="pl-3.5 pr-2 text-xs font-bold text-slate-400">
+              <KeyRound className="h-4 w-4 text-emerald-400" />
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="123456"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/[^\d]/g, ""))}
+              required
+              autoFocus
+              className="w-full bg-transparent py-3 pr-4 text-sm font-extrabold tracking-widest text-emerald-300 outline-none placeholder:tracking-normal"
+            />
+          </div>
+        </div>
+
+        {err && (
+          <div className="flex items-center gap-2 rounded-2xl bg-destructive/10 border border-destructive/20 p-3 text-xs font-bold text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{err}</span>
+          </div>
+        )}
+
+        {ok && (
+          <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs font-bold text-emerald-500">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>Phone verified & account created! Redirecting…</span>
+          </div>
+        )}
+
+        <button
+          disabled={busy || otpCode.trim().length !== 6}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-slate-950 shadow-lg hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
+        >
+          {busy ? "Verifying Code…" : "Confirm Code & Create Account"} <ArrowRight className="h-4 w-4 stroke-[3]" />
+        </button>
+
+        <div className="flex items-center justify-between text-xs font-semibold pt-1">
+          <button
+            type="button"
+            onClick={() => setStep("DETAILS")}
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            ← Edit Details
+          </button>
+          <button
+            type="button"
+            disabled={resendCooldown > 0 || busy}
+            onClick={handleResendCode}
+            className="text-amber-400 hover:underline disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <RefreshCw className={`h-3 w-3 ${busy ? "animate-spin" : ""}`} />
+            <span>{resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend SMS Code"}</span>
+          </button>
+        </div>
+      </form>
+    );
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={handleSendOtp} className="space-y-4">
       <div>
         <h2 className="text-xl font-black font-display">Create Account</h2>
         <p className="text-xs text-muted-foreground mt-0.5">Register for free to track orders & save recipient numbers.</p>
@@ -394,18 +540,11 @@ function SignupForm({ next }: { next?: string }) {
         </div>
       )}
 
-      {ok && (
-        <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs font-bold text-emerald-500">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span>Account created successfully! Redirecting…</span>
-        </div>
-      )}
-
       <button
         disabled={busy}
         className="flex w-full items-center justify-center gap-2 rounded-2xl gold-gradient px-4 py-3.5 text-xs font-extrabold text-primary-foreground shadow-[0_4px_16px_-2px_hsl(243_85%_62%_/_0.5)] hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
       >
-        {busy ? "Creating Account…" : "Create Free Account"} <ArrowRight className="h-4 w-4" />
+        {busy ? "Sending SMS Verification…" : "Send SMS Code & Continue"} <ArrowRight className="h-4 w-4" />
       </button>
     </form>
   );
