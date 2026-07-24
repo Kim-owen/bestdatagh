@@ -1,4 +1,4 @@
-import { eventHandler, toWebRequest } from "h3";
+import { eventHandler, getRequestURL, getRequestHeaders } from "h3";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -58,27 +58,25 @@ async function handleRequest(request: Request, env: unknown = {}, ctx: unknown =
 }
 
 export default eventHandler(async (event) => {
-  const req = toWebRequest(event);
+  const urlObj = getRequestURL(event);
+  let pathname = urlObj.pathname;
 
-  let urlStr = req.url;
-  if (urlStr.includes("/__server")) {
-    urlStr = urlStr.replace("/__server", "");
-    try {
-      const urlObj = new URL(urlStr);
-      if (!urlObj.pathname || urlObj.pathname === "") {
-        urlObj.pathname = "/";
-      }
-      urlStr = urlObj.toString();
-    } catch {}
+  if (pathname.includes("/__server")) {
+    pathname = pathname.replace("/__server", "") || "/";
   }
 
-  const finalReq = urlStr === req.url ? req : new Request(urlStr, {
-    method: req.method,
-    headers: req.headers,
-    body: req.body,
+  urlObj.pathname = pathname;
+  const fullUrl = urlObj.toString();
+  const headers = getRequestHeaders(event) as any;
+  const method = event.method || event.node?.req?.method || "GET";
+
+  const req = new Request(fullUrl, {
+    method,
+    headers,
+    body: method !== "GET" && method !== "HEAD" ? (event.node?.req as any) : undefined,
     // @ts-ignore
-    duplex: req.body ? "half" : undefined,
+    duplex: method !== "GET" && method !== "HEAD" ? "half" : undefined,
   });
 
-  return handleRequest(finalReq, {}, event);
+  return handleRequest(req, {}, event);
 });
