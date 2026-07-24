@@ -154,8 +154,8 @@ function AccountPage() {
       <Header />
       <main className="mx-auto max-w-[1100px] px-4 sm:px-6 py-10 md:py-14 space-y-8">
         <header className="flex items-center gap-4">
-          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary text-xl font-bold">
-            {(name || user?.email || "?")[0]?.toUpperCase()}
+          <div className="relative h-14 w-14 rounded-2xl overflow-hidden border border-emerald-500/30 bg-white p-1 shadow-md shrink-0">
+            <img src="/logo.png" alt="Account Avatar" className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-2xl md:text-3xl font-extrabold tracking-tight">{name || "My account"}</h1>

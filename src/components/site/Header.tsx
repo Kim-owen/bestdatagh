@@ -186,8 +186,8 @@ export function Header() {
                   onClick={() => setMenu((v) => !v)}
                   className="flex items-center gap-2.5 rounded-2xl border border-border/60 bg-card/80 px-3.5 py-1.5 text-xs font-extrabold hover:bg-muted transition-all shadow-sm"
                 >
-                  <div className="grid h-6 w-6 place-items-center rounded-lg gold-gradient text-primary-foreground text-xs font-black shadow-sm">
-                    {(user.email ?? "?")[0].toUpperCase()}
+                  <div className="relative h-6 w-6 rounded-lg overflow-hidden border border-emerald-500/40 bg-white p-0.5 shadow-sm shrink-0">
+                    <img src="/logo.png" alt="User Avatar" className="h-full w-full object-contain" />
                   </div>
                   <span className="max-w-[120px] truncate">{user.email}</span>
                 </button>
