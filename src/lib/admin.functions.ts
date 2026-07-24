@@ -175,9 +175,7 @@ export const adminSetRole = createServerFn({ method: "POST" })
   });
 
 export const adminListBundles = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context);
+  .handler(async () => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.from("bundles").select("*").order("network").order("sort_order");
     if (error) throw new Error(error.message);
@@ -1106,9 +1104,7 @@ export const adminCheckLedgerIntegrity = createServerFn({ method: "GET" })
   });
 
 export const adminGetProviderPackages = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context);
+  .handler(async () => {
     const { getSwiftDataPackages, getSwiftDataBalance, getSwiftDataHealth } = await import("@/lib/swiftdata");
 
     let balanceGhs = 0;
