@@ -1,5 +1,5 @@
 const SWIFTDATA_BASE_URL = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
-const DEFAULT_KEY_PART = "88b8f51f6d0743868b4ac35afdd4a741";
+const DEFAULT_KEY_PART = "8287bd0fea81423ba46250f3d7a6fa41";
 const SWIFTDATA_API_KEY = process.env.SWIFTDATA_API_KEY || `sk_live_${DEFAULT_KEY_PART}`;
 
 export type SwiftDataNetwork = "yello" | "at_ishare" | "at_bigtime" | "telecel";
