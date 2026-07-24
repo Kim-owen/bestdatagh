@@ -8,6 +8,7 @@ import {
   adminGetProviderPackages,
   adminSyncProviderPackages,
 } from "@/lib/admin.functions";
+import { listActiveBundles } from "@/lib/public-bundles.functions";
 import { useState } from "react";
 import { Plus, Trash2, RefreshCw, Zap, CheckCircle2, ShieldCheck, Layers, Search, ToggleLeft, ToggleRight, Edit2, Save, X } from "lucide-react";
 import { TableRowSkeleton } from "@/components/ui/skeleton";
@@ -28,6 +29,7 @@ const empty = {
 
 function BundlesPage() {
   const list = useServerFn(adminListBundles);
+  const getPublicList = useServerFn(listActiveBundles);
   const save = useServerFn(adminSaveBundle);
   const del = useServerFn(adminDeleteBundle);
   const getProvider = useServerFn(adminGetProviderPackages);
@@ -37,7 +39,15 @@ function BundlesPage() {
 
   const { data: storeBundles, isLoading: loadingStore } = useQuery({
     queryKey: ["adminBundles"],
-    queryFn: () => list(),
+    queryFn: async () => {
+      try {
+        const res = await list();
+        if (Array.isArray(res) && res.length > 0) return res;
+      } catch (e) {
+        console.warn("adminListBundles call failed, using fallback getPublicList", e);
+      }
+      return await getPublicList();
+    },
   });
 
   const { data: providerInfo, isLoading: loadingProvider, refetch: refetchProvider } = useQuery({
