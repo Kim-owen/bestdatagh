@@ -7,23 +7,74 @@ export const getMyWallet = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [{ data: wallet }, { data: transactions }] = await Promise.all([
-      (supabaseAdmin as any)
-        .from("wallets")
-        .select("balance_ghs")
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-      (supabaseAdmin as any)
+    // 1. Auto-reconcile any pending deposits for this user against Paystack
+    try {
+      const { data: pendingTxs } = await (supabaseAdmin as any)
         .from("wallet_transactions")
         .select("*")
         .eq("user_id", context.userId)
+        .eq("type", "deposit")
+        .eq("status", "pending")
         .order("created_at", { ascending: false })
-        .limit(50),
-    ]);
+        .limit(20);
+
+      if (pendingTxs && pendingTxs.length > 0) {
+        const { verifyPaystackTransaction, checkPaystackChargeStatus } = await import("@/lib/paystack");
+        for (const tx of pendingTxs) {
+          const baseRef = (tx.reference || "").split("-R")[0].split("-F")[0];
+          const refsToTry = Array.from(new Set([tx.reference, baseRef].filter(Boolean)));
+          for (const ref of refsToTry) {
+            try {
+              let pStatus = "";
+              let paidGhs = Number(tx.amount_ghs);
+
+              try {
+                const chk = await checkPaystackChargeStatus(ref);
+                pStatus = (chk?.data?.status || "").toLowerCase();
+                if (chk?.data?.amount) paidGhs = chk.data.amount / 100;
+              } catch {}
+
+              if (pStatus !== "success" && pStatus !== "paid" && pStatus !== "completed") {
+                const ver = await verifyPaystackTransaction(ref);
+                pStatus = (ver?.data?.status || "").toLowerCase();
+                if (ver?.data?.amount) paidGhs = ver.data.amount / 100;
+              }
+
+              if (pStatus === "success" || pStatus === "paid" || pStatus === "completed") {
+                await (supabaseAdmin as any)
+                  .from("wallet_transactions")
+                  .update({ status: "completed", amount_ghs: paidGhs })
+                  .eq("id", tx.id);
+                break;
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (reconcileErr) {
+      console.warn("Wallet getMyWallet auto-reconciliation warning:", reconcileErr);
+    }
+
+    // 2. Fetch all user transactions & recalculate exact balance
+    const { data: transactions } = await (supabaseAdmin as any)
+      .from("wallet_transactions")
+      .select("*")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    const allTxs = transactions || [];
+    const completedTxs = allTxs.filter((t: any) => t.status === "completed" || t.status === "paid" || t.status === "delivered");
+    const calculatedBal = completedTxs.reduce((acc: number, t: any) => acc + Number(t.amount_ghs || 0), 0);
+
+    // Sync balance with wallets table
+    await (supabaseAdmin as any)
+      .from("wallets")
+      .upsert({ user_id: context.userId, balance_ghs: calculatedBal, updated_at: new Date().toISOString() });
 
     return {
-      balanceGhs: Number(wallet?.balance_ghs || 0),
-      transactions: transactions || [],
+      balanceGhs: Math.max(0, calculatedBal),
+      transactions: allTxs,
     };
   });
 

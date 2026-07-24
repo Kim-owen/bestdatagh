@@ -31,6 +31,7 @@ import { Route as CheckoutVerifyRouteImport } from './routes/checkout.verify'
 import { Route as PaymentMomoReferenceRouteImport } from './routes/payment-momo.$reference'
 import { Route as PaymentReferenceRouteImport } from './routes/payment.$reference'
 import { Route as AuthenticatedAccountApiKeysRouteImport } from './routes/_authenticated/account.api-keys'
+import { Route as AuthenticatedAccountTransactionsRouteImport } from './routes/_authenticated/account.transactions'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin.agents'
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin.analytics'
@@ -168,6 +169,12 @@ const AuthenticatedAccountApiKeysRoute =
   AuthenticatedAccountApiKeysRouteImport.update({
     id: '/api-keys',
     path: '/api-keys',
+    getParentRoute: () => AuthenticatedAccountRoute,
+  } as any)
+const AuthenticatedAccountTransactionsRoute =
+  AuthenticatedAccountTransactionsRouteImport.update({
+    id: '/transactions',
+    path: '/transactions',
     getParentRoute: () => AuthenticatedAccountRoute,
   } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
@@ -349,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
+  '/account/transactions': typeof AuthenticatedAccountTransactionsRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
@@ -399,6 +407,7 @@ export interface FileRoutesByTo {
   '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
   '/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
+  '/account/transactions': typeof AuthenticatedAccountTransactionsRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
@@ -452,6 +461,7 @@ export interface FileRoutesById {
   '/payment-momo/$reference': typeof PaymentMomoReferenceRoute
   '/payment/$reference': typeof PaymentReferenceRoute
   '/_authenticated/account/api-keys': typeof AuthenticatedAccountApiKeysRoute
+  '/_authenticated/account/transactions': typeof AuthenticatedAccountTransactionsRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/api-keys': typeof AuthenticatedAdminApiKeysRoute
@@ -505,6 +515,7 @@ export interface FileRouteTypes {
     | '/payment-momo/$reference'
     | '/payment/$reference'
     | '/account/api-keys'
+    | '/account/transactions'
     | '/admin/agents'
     | '/admin/analytics'
     | '/admin/api-keys'
@@ -555,6 +566,7 @@ export interface FileRouteTypes {
     | '/payment-momo/$reference'
     | '/payment/$reference'
     | '/account/api-keys'
+    | '/account/transactions'
     | '/admin/agents'
     | '/admin/analytics'
     | '/admin/api-keys'
@@ -607,6 +619,7 @@ export interface FileRouteTypes {
     | '/payment-momo/$reference'
     | '/payment/$reference'
     | '/_authenticated/account/api-keys'
+    | '/_authenticated/account/transactions'
     | '/_authenticated/admin/agents'
     | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/api-keys'
@@ -822,6 +835,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountApiKeysRouteImport
       parentRoute: typeof AuthenticatedAccountRoute
     }
+    '/_authenticated/account/transactions': {
+      id: '/_authenticated/account/transactions'
+      path: '/transactions'
+      fullPath: '/account/transactions'
+      preLoaderRoute: typeof AuthenticatedAccountTransactionsRouteImport
+      parentRoute: typeof AuthenticatedAccountRoute
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
@@ -1023,10 +1043,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAccountRouteChildren {
   AuthenticatedAccountApiKeysRoute: typeof AuthenticatedAccountApiKeysRoute
+  AuthenticatedAccountTransactionsRoute: typeof AuthenticatedAccountTransactionsRoute
 }
 
 const AuthenticatedAccountRouteChildren: AuthenticatedAccountRouteChildren = {
   AuthenticatedAccountApiKeysRoute: AuthenticatedAccountApiKeysRoute,
+  AuthenticatedAccountTransactionsRoute: AuthenticatedAccountTransactionsRoute,
 }
 
 const AuthenticatedAccountRouteWithChildren =

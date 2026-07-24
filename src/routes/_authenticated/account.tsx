@@ -134,11 +134,20 @@ function AccountPage() {
               <p className="text-xs text-muted-foreground">
                 Use your wallet balance for instant 1-click purchases at checkout.
               </p>
+
+              <Link
+                to="/account/transactions"
+                className="flex items-center justify-between text-xs font-bold text-primary hover:underline pt-2 border-t border-border"
+              >
+                <span>View Full Transaction History</span>
+                <Wallet className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-6">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Quick links</h3>
               <div className="grid gap-2">
+                <QLink to="/account/transactions" icon={Wallet} label="Wallet & Transaction History" />
                 <QLink to="/track-order" icon={ShoppingBag} label="My orders" />
                 <QLink to="/account/api-keys" icon={KeyRound} label="API keys" />
                 <QLink to="/agents" icon={Store} label={isAgent ? "Agent store" : "Become an agent"} />
