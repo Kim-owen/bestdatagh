@@ -1058,6 +1058,52 @@ export const adminApproveWithdrawal = createServerFn({ method: "POST" })
     return { ok: true, reference: transferRef };
   });
 
+/* ============ BANKING SECURITY: LEDGER ANTI-FRAUD INTEGRITY CHECK ============ */
+export const adminCheckLedgerIntegrity = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: wallets }, { data: transactions }] = await Promise.all([
+      (supabaseAdmin as any).from("wallets").select("user_id, balance_ghs"),
+      (supabaseAdmin as any).from("wallet_transactions").select("user_id, amount_ghs, status, type"),
+    ]);
+
+    const calculatedBalances = new Map<string, number>();
+
+    (transactions || []).forEach((tx: any) => {
+      if (tx.status === "completed" || tx.status === "paid") {
+        const cur = calculatedBalances.get(tx.user_id) || 0;
+        const amt = Number(tx.amount_ghs || 0);
+        const signedAmt = tx.type === "purchase" || tx.type === "debit" ? -Math.abs(amt) : Math.abs(amt);
+        calculatedBalances.set(tx.user_id, cur + signedAmt);
+      }
+    });
+
+    const anomalies: any[] = [];
+    (wallets || []).forEach((w: any) => {
+      const recordedBal = Number(w.balance_ghs || 0);
+      const calculatedBal = Number((calculatedBalances.get(w.user_id) || 0).toFixed(2));
+
+      if (Math.abs(recordedBal - calculatedBal) > 0.05) {
+        anomalies.push({
+          userId: w.user_id,
+          recordedBalance: recordedBal,
+          calculatedBalance: calculatedBal,
+          difference: Number((recordedBal - calculatedBal).toFixed(2)),
+        });
+      }
+    });
+
+    return {
+      totalWalletsChecked: (wallets || []).length,
+      anomaliesFound: anomalies.length,
+      anomalies,
+      isClean: anomalies.length === 0,
+    };
+  });
+
 export const adminGetProviderPackages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

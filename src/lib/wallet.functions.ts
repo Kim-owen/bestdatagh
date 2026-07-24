@@ -246,3 +246,59 @@ export const verifyWalletDeposit = createServerFn({ method: "POST" })
 
     return { ok: true, balanceGhs: newBal, alreadyVerified: false };
   });
+
+/* ============ BANKING SECURITY: WALLET PIN & PROTECTION ============ */
+function hashPin(pin: string): string {
+  const crypto = require("node:crypto");
+  return crypto.createHash("sha256").update(pin.trim()).digest("hex");
+}
+
+export const setWalletPin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { pin: string }) => d)
+  .handler(async ({ data, context }) => {
+    const pin = data.pin.trim();
+    if (!/^\d{4}$/.test(pin)) {
+      throw new Error("Wallet PIN must be exactly 4 digits.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const pinHash = hashPin(pin);
+    await (supabaseAdmin as any)
+      .from("wallets")
+      .upsert(
+        { user_id: context.userId, pin_hash: pinHash, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+
+    return { ok: true, message: "4-Digit Wallet PIN configured successfully!" };
+  });
+
+export const verifyWalletPin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { pin: string }) => d)
+  .handler(async ({ data, context }) => {
+    const pin = data.pin.trim();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: wallet } = await (supabaseAdmin as any)
+      .from("wallets")
+      .select("pin_hash, is_locked")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    if (wallet?.is_locked) {
+      throw new Error("Wallet account is locked for security reasons. Contact support.");
+    }
+
+    if (!wallet?.pin_hash) {
+      return { verified: true, hasPin: false };
+    }
+
+    const inputHash = hashPin(pin);
+    if (wallet.pin_hash !== inputHash) {
+      throw new Error("Incorrect 4-digit Wallet PIN. Please try again.");
+    }
+
+    return { verified: true, hasPin: true };
+  });

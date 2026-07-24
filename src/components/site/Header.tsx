@@ -12,6 +12,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMyWallet } from "@/lib/wallet.functions";
 import { WalletTopUpModal } from "./WalletModal";
 import { NotificationBell } from "./NotificationBell";
+import { InactivityTimer } from "./InactivityTimer";
 
 export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: boolean) {
   if (isAdmin) {
@@ -125,8 +126,9 @@ export function Header() {
   return (
     <>
       {/* iOS Glassmorphism Header Bar */}
-      <header className="sticky top-0 z-40 border-b border-border/40 bg-background/70 backdrop-blur-2xl transition-all duration-300 shadow-[0_4px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_30px_rgba(0,0,0,0.3)]">
-        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-3 px-4 sm:px-6">
+      <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-2xl transition-all duration-300">
+      <InactivityTimer />
+      <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-3 px-4 sm:px-6">
           <Logo />
 
           {/* Desktop Glass Navigation Pills */}
