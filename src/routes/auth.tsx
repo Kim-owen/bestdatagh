@@ -9,6 +9,7 @@ import {
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPhoneOtp, verifyPhoneOtp, triggerWelcomeSms } from "@/lib/otp.functions";
+import { recordLoginIpSecurity } from "@/lib/security.functions";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -163,6 +164,7 @@ function Field({
 /* ============ Login Form ============ */
 function LoginForm({ next }: { next?: string }) {
   const nav = useNavigate();
+  const recordLoginIpFn = useServerFn(recordLoginIpSecurity);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -176,6 +178,14 @@ function LoginForm({ next }: { next?: string }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) return setErr(error.message);
+
+    // Record IP Address & Trigger SMS Security Alert if New Device/IP
+    try {
+      await recordLoginIpFn({});
+    } catch (ipErr) {
+      console.warn("IP Security logging notice:", ipErr);
+    }
+
     nav({ to: (next as any) || "/" });
   }
 
