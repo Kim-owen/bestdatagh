@@ -167,25 +167,48 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
 
     // A. Check if deposit transaction
     if (data.orderId.startsWith("DEP-")) {
+      const baseRef = data.orderId.split("-R")[0].split("-F")[0];
       const { data: tx } = await (supabaseAdmin as any)
         .from("wallet_transactions")
-        .select("reference, amount_ghs")
-        .eq("reference", data.orderId)
+        .select("id, reference, amount_ghs")
+        .or(`reference.eq.${data.orderId},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (tx) {
         reference = tx.reference;
         totalGhs = Number(tx.amount_ghs);
       } else {
-        // Fallback: Verify with Paystack transaction API to get initialized amount
-        try {
-          const psData = await verifyPaystackTransaction(data.orderId);
-          if (psData.data?.amount) {
-            totalGhs = psData.data.amount / 100;
-            reference = data.orderId;
+        // Fallback A: Verify baseRef or orderId with Paystack API
+        const refsToTry = Array.from(new Set([data.orderId, baseRef].filter(Boolean)));
+        for (const refCandidate of refsToTry) {
+          try {
+            const psData = await verifyPaystackTransaction(refCandidate);
+            if (psData.data?.amount) {
+              totalGhs = psData.data.amount / 100;
+              reference = refCandidate;
+              break;
+            }
+          } catch {
+            // Try next candidate
           }
-        } catch {
-          // Ignore error if not initialized on Paystack yet
+        }
+
+        // Fallback B: Get the latest pending deposit if not found above
+        if (!totalGhs) {
+          const { data: latestPending } = await (supabaseAdmin as any)
+            .from("wallet_transactions")
+            .select("reference, amount_ghs")
+            .eq("type", "deposit")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestPending) {
+            reference = latestPending.reference;
+            totalGhs = Number(latestPending.amount_ghs);
+          }
         }
       }
     }
