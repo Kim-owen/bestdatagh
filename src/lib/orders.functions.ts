@@ -697,9 +697,9 @@ export const smartTrackOrders = createServerFn({ method: "POST" })
       const intl233 = cleanDigits.length === 12 && cleanDigits.startsWith("233") ? cleanDigits : `233${localTen.slice(1)}`;
       const short9 = cleanDigits.slice(-9);
 
-      const { data: items } = await supabaseAdmin
+      const { data: items } = await (supabaseAdmin as any)
         .from("order_items")
-        .select("order_id, recipient_phone, network, size_label, price_ghs, status, created_at, orders(id, reference, total_ghs, status, created_at)")
+        .select("order_id, recipient_phone, network, size_label, unit_price_ghs, status, created_at, orders(id, reference, total_ghs, status, created_at)")
         .or(`recipient_phone.ilike.%${short9}%,recipient_phone.eq.${localTen},recipient_phone.eq.${intl233}`)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -723,7 +723,7 @@ export const smartTrackOrders = createServerFn({ method: "POST" })
             network: item.network,
             size_label: item.size_label,
             recipient_phone: item.recipient_phone,
-            price_ghs: Number(item.price_ghs),
+            price_ghs: Number(item.unit_price_ghs || 0),
             status: item.status,
           });
         }
@@ -735,9 +735,9 @@ export const smartTrackOrders = createServerFn({ method: "POST" })
       let isUuid = /^[0-9a-fA-F-]{36}$/.test(rawQuery);
       const queryFilter = isUuid ? `reference.ilike.%${rawQuery}%,id.eq.${rawQuery}` : `reference.ilike.%${rawQuery}%`;
 
-      const { data: orders } = await supabaseAdmin
+      const { data: orders } = await (supabaseAdmin as any)
         .from("orders")
-        .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone, price_ghs, status)")
+        .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone, unit_price_ghs, status)")
         .or(queryFilter)
         .order("created_at", { ascending: false })
         .limit(20);
@@ -753,7 +753,7 @@ export const smartTrackOrders = createServerFn({ method: "POST" })
             network: it.network,
             size_label: it.size_label,
             recipient_phone: it.recipient_phone,
-            price_ghs: Number(it.price_ghs),
+            price_ghs: Number(it.unit_price_ghs || 0),
             status: it.status,
           })),
         }));
