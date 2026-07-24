@@ -44,7 +44,6 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
       { label: "Find Agent", to: "/find-agent" as const, search: undefined, icon: Users },
       { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
       { label: "Become an Agent", to: "/agents" as const, search: undefined, icon: Users },
-      { label: "FAQ", to: "/faq" as const, search: undefined, icon: HelpCircle },
     ];
   }
 
@@ -56,7 +55,6 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
     { label: "Agent Program", to: "/agents" as const, search: undefined, icon: Users },
     { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
     { label: "Reviews", to: "/reviews" as const, search: undefined, icon: Star },
-    { label: "FAQ", to: "/faq" as const, search: undefined, icon: HelpCircle },
   ];
 }
 

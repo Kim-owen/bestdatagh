@@ -677,3 +677,92 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
 
     return { status: order.status, order };
   });
+
+export const smartTrackOrders = createServerFn({ method: "POST" })
+  .inputValidator((d: { query: string }) => ({
+    query: (d.query || "").trim(),
+  }))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const rawQuery = data.query;
+    if (!rawQuery) throw new Error("Please enter a phone number or order tracking reference.");
+
+    const cleanDigits = rawQuery.replace(/[^\d]/g, "");
+    const isPhone = cleanDigits.length >= 9;
+
+    let ordersList: any[] = [];
+
+    if (isPhone) {
+      const localTen = cleanDigits.length === 10 ? cleanDigits : `0${cleanDigits.slice(-9)}`;
+      const intl233 = cleanDigits.length === 12 && cleanDigits.startsWith("233") ? cleanDigits : `233${localTen.slice(1)}`;
+      const short9 = cleanDigits.slice(-9);
+
+      const { data: items } = await supabaseAdmin
+        .from("order_items")
+        .select("order_id, recipient_phone, network, size_label, price_ghs, status, created_at, orders(id, reference, total_ghs, status, created_at)")
+        .or(`recipient_phone.ilike.%${short9}%,recipient_phone.eq.${localTen},recipient_phone.eq.${intl233}`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (items && items.length > 0) {
+        const orderMap = new Map<string, any>();
+        for (const item of items) {
+          const ord = (item as any).orders;
+          if (!ord) continue;
+          if (!orderMap.has(ord.id)) {
+            orderMap.set(ord.id, {
+              id: ord.id,
+              reference: ord.reference,
+              total_ghs: Number(ord.total_ghs),
+              status: ord.status,
+              created_at: ord.created_at,
+              items: [],
+            });
+          }
+          orderMap.get(ord.id).items.push({
+            network: item.network,
+            size_label: item.size_label,
+            recipient_phone: item.recipient_phone,
+            price_ghs: Number(item.price_ghs),
+            status: item.status,
+          });
+        }
+        ordersList = Array.from(orderMap.values());
+      }
+    }
+
+    if (ordersList.length === 0) {
+      let isUuid = /^[0-9a-fA-F-]{36}$/.test(rawQuery);
+      const queryFilter = isUuid ? `reference.ilike.%${rawQuery}%,id.eq.${rawQuery}` : `reference.ilike.%${rawQuery}%`;
+
+      const { data: orders } = await supabaseAdmin
+        .from("orders")
+        .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone, price_ghs, status)")
+        .or(queryFilter)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (orders && orders.length > 0) {
+        ordersList = orders.map((ord: any) => ({
+          id: ord.id,
+          reference: ord.reference,
+          total_ghs: Number(ord.total_ghs),
+          status: ord.status,
+          created_at: ord.created_at,
+          items: (ord.order_items || []).map((it: any) => ({
+            network: it.network,
+            size_label: it.size_label,
+            recipient_phone: it.recipient_phone,
+            price_ghs: Number(it.price_ghs),
+            status: it.status,
+          })),
+        }));
+      }
+    }
+
+    if (ordersList.length === 0) {
+      throw new Error(`No orders found for "${rawQuery}". Please check the phone number or reference and try again.`);
+    }
+
+    return { orders: ordersList };
+  });
