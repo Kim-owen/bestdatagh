@@ -1,29 +1,26 @@
-# Welcome to your Lovable project
+# BestData Ghana — Official Data Hub
 
-This project was built with [Lovable](https://lovable.dev).
+Ghana's premier wholesale and retail mobile data bundle platform. Buy cheap MTN, Telecel & AirtelTigo data bundles with instant Mobile Money delivery, wallet integration, and automated reseller store frontlines.
 
-## Build with Lovable
+## Features
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Instant Data Purchases**: Automated delivery for MTN, Telecel, and AirtelTigo.
+- **Bank-Grade Wallet**: Real-time deposit reconciliation with Paystack gateway.
+- **Reseller Storefronts**: Custom store URLs for agents and mentors.
+- **Order Tracker & Receipt Generator**: Track orders by phone or reference, copy receipt details, or print PDFs.
+- **Phone SMS OTP Security**: 2-Factor authentication via TxtConnect SMS Gateway.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requires Node.js v20+.
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 npm run dev
 ```
 
-## Built with
+## Production Build
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+```sh
+npm run build
+```
