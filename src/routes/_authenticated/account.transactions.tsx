@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Filter,
   Sparkles,
+  Download,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/account/transactions")({
@@ -102,6 +103,28 @@ function AccountTransactionsPage() {
     .filter((t: any) => (t.status === "completed" || t.status === "paid") && Number(t.amount_ghs) < 0)
     .reduce((acc: number, t: any) => acc + Math.abs(Number(t.amount_ghs)), 0);
 
+  const handleExportCsv = () => {
+    if (transactions.length === 0) return;
+    const headers = ["Date", "Reference", "Type", "Amount (GHS)", "Status", "Description"];
+    const rows = transactions.map((t: any) => [
+      `"${new Date(t.created_at || Date.now()).toLocaleString()}"`,
+      `"${t.reference || ""}"`,
+      `"${t.type || ""}"`,
+      Number(t.amount_ghs || 0).toFixed(2),
+      `"${t.status || ""}"`,
+      `"${(t.description || "").replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Bestdata_Statement_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="min-h-screen bg-[#060612] text-foreground flex flex-col justify-between">
       <Header />
@@ -125,7 +148,15 @@ function AccountTransactionsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleExportCsv}
+              className="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-4 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-800 transition-all"
+            >
+              <Download className="h-4 w-4 text-emerald-400" />
+              <span>Export Statement</span>
+            </button>
+
             <button
               onClick={() => refetch()}
               disabled={isRefetching}

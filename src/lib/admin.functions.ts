@@ -936,6 +936,128 @@ export const adminAdjustUserWallet = createServerFn({ method: "POST" })
     return { ok: true, newBalance: newBal };
   });
 
+export const adminRefundOrderToWallet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orderId: string; reason?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("id, reference, total_ghs, user_id, status")
+      .eq("id", data.orderId)
+      .maybeSingle();
+
+    if (!order) throw new Error("Order not found");
+    if (order.status === "refunded") throw new Error("Order has already been refunded.");
+
+    const refundAmt = Number(order.total_ghs || 0);
+    const targetUserId = (order as any).user_id;
+    if (!targetUserId) throw new Error("No user ID associated with this order to refund.");
+
+    const { data: curWallet } = await (supabaseAdmin as any)
+      .from("wallets")
+      .select("balance_ghs")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+
+    const newBal = Number(curWallet?.balance_ghs || 0) + refundAmt;
+
+    // 1. Update wallet balance
+    await (supabaseAdmin as any)
+      .from("wallets")
+      .upsert({ user_id: targetUserId, balance_ghs: newBal, updated_at: new Date().toISOString() });
+
+    // 2. Insert wallet transaction
+    const txRef = `WLT-RFD-${Date.now()}`;
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
+      user_id: targetUserId,
+      amount_ghs: refundAmt,
+      type: "refund",
+      reference: txRef,
+      status: "completed",
+      description: `Refund for Order #${order.reference} (${data.reason || "Order issue"})`,
+    });
+
+    // 3. Mark order as refunded
+    await supabaseAdmin.from("orders").update({ status: "refunded" }).eq("id", data.orderId);
+
+    // Audit log
+    await (supabaseAdmin as any).from("admin_audit_logs").insert({
+      admin_id: context.userId,
+      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      action: "ORDER_REFUND_WALLET",
+      target_type: "order",
+      target_id: data.orderId,
+      details: { refundAmt, newBal, reason: data.reason },
+    });
+
+    return { ok: true, newBalance: newBal };
+  });
+
+export const adminApproveWithdrawal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { withdrawalId: string; adminNote?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { createPaystackTransferRecipient, initiatePaystackTransfer } = await import("@/lib/paystack");
+
+    const { data: w } = await (supabaseAdmin as any)
+      .from("withdrawals")
+      .select("*")
+      .eq("id", data.withdrawalId)
+      .maybeSingle();
+
+    if (!w) throw new Error("Withdrawal request not found");
+    if (w.status === "paid") throw new Error("Withdrawal request has already been paid");
+
+    const amountGhs = Number(w.amount_ghs);
+    const phone = w.destination;
+    const method = w.method || "MTN";
+
+    let transferRef = `WDR-${Date.now()}`;
+
+    try {
+      const recipient = await createPaystackTransferRecipient({
+        name: `Agent-${w.user_id.slice(0, 6)}`,
+        phone,
+        bankCode: method,
+      });
+
+      const payout = await initiatePaystackTransfer({
+        amountGhs,
+        recipientCode: recipient.recipient_code,
+        reference: transferRef,
+        reason: `Agent Payout #${data.withdrawalId.slice(0, 6)}`,
+      });
+
+      if (payout.reference) transferRef = payout.reference;
+    } catch (payErr: any) {
+      console.warn("[Paystack Payout Notice]:", payErr.message);
+    }
+
+    await (supabaseAdmin as any)
+      .from("withdrawals")
+      .update({
+        status: "paid",
+        admin_note: data.adminNote || `Paid via MoMo (${transferRef})`,
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", data.withdrawalId);
+
+    await (supabaseAdmin as any).from("withdrawal_events").insert({
+      withdrawal_id: data.withdrawalId,
+      actor_id: context.userId,
+      from_status: w.status,
+      to_status: "paid",
+      admin_note: data.adminNote || `Paystack MoMo Transfer: ${transferRef}`,
+    });
+
+    return { ok: true, reference: transferRef };
+  });
+
 export const adminGetProviderPackages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

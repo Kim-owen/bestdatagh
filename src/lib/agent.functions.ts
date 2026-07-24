@@ -408,3 +408,111 @@ export const sweepCommissionToWallet = createServerFn({ method: "POST" })
 
     return { ok: true, amount_ghs: data.amount_ghs, newBalanceGhs: newBal };
   });
+
+/* ============ STOREFRONT & CUSTOM RESELL PRICING ============ */
+export const getAgentStorefront = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAgent(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: store }, { data: prices }, { data: bundles }] = await Promise.all([
+      (supabaseAdmin as any)
+        .from("agent_store_settings")
+        .select("*")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+      (supabaseAdmin as any)
+        .from("agent_custom_prices")
+        .select("*")
+        .eq("user_id", context.userId),
+      supabaseAdmin.from("bundles").select("*").eq("active", true).order("sort_order"),
+    ]);
+
+    return {
+      store: store || null,
+      customPrices: prices || [],
+      bundles: bundles || [],
+    };
+  });
+
+export const saveAgentStorefront = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { store_name: string; slug: string; whatsapp_phone?: string; notice_text?: string; prices?: Record<string, number> }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAgent(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const cleanSlug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 50);
+    if (!cleanSlug) throw new Error("Invalid store URL slug.");
+
+    const { error: storeErr } = await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .upsert(
+        {
+          user_id: context.userId,
+          store_name: data.store_name,
+          slug: cleanSlug,
+          whatsapp_phone: data.whatsapp_phone || null,
+          notice_text: data.notice_text || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (storeErr) throw new Error(storeErr.message);
+
+    if (data.prices) {
+      for (const [bundleId, price] of Object.entries(data.prices)) {
+        if (Number(price) > 0) {
+          await (supabaseAdmin as any)
+            .from("agent_custom_prices")
+            .upsert(
+              {
+                user_id: context.userId,
+                bundle_id: bundleId,
+                agent_price_ghs: Number(price),
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,bundle_id" }
+            );
+        }
+      }
+    }
+
+    return { ok: true, slug: cleanSlug };
+  });
+
+export const getPublicStorefrontBySlug = createServerFn({ method: "POST" })
+  .inputValidator((d: { slug: string }) => d)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: store } = await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .select("*")
+      .eq("slug", data.slug)
+      .maybeSingle();
+
+    if (!store) throw new Error("Storefront not found");
+
+    const [{ data: prices }, { data: bundles }] = await Promise.all([
+      (supabaseAdmin as any)
+        .from("agent_custom_prices")
+        .select("*")
+        .eq("user_id", store.user_id),
+      supabaseAdmin.from("bundles").select("*").eq("active", true).order("sort_order"),
+    ]);
+
+    const priceMap = new Map((prices || []).map((p: any) => [p.bundle_id, Number(p.agent_price_ghs)]));
+
+    const agentBundles = (bundles || []).map((b: any) => ({
+      ...b,
+      display_price_ghs: priceMap.get(b.id) || Number(b.price_ghs),
+    }));
+
+    return {
+      store,
+      bundles: agentBundles,
+    };
+  });
