@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { adminListWallets, adminAdjustUserWallet } from "@/lib/admin.functions";
+import { adminListWallets, adminAdjustUserWallet, adminReconcileAllPaystackDeposits } from "@/lib/admin.functions";
 import { Wallet, Plus, Minus, Search, CheckCircle2, AlertTriangle, ArrowUpRight, ArrowDownRight, RefreshCw, UserCheck } from "lucide-react";
 import { useState } from "react";
 
@@ -13,6 +13,7 @@ function AdminWalletsPage() {
   const queryClient = useQueryClient();
   const getWallets = useServerFn(adminListWallets);
   const adjustWallet = useServerFn(adminAdjustUserWallet);
+  const reconcileAllFn = useServerFn(adminReconcileAllPaystackDeposits);
 
   const { data: walletState, isLoading, refetch } = useQuery({
     queryKey: ["adminWallets"],
@@ -25,6 +26,20 @@ function AdminWalletsPage() {
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+
+  const handleReconcileAll = async () => {
+    setReconciling(true);
+    try {
+      await reconcileAllFn();
+      await queryClient.invalidateQueries({ queryKey: ["adminWallets"] });
+      await refetch();
+    } catch (e) {
+      console.warn("Reconcile error:", e);
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const mut = useMutation({
     mutationFn: () =>
@@ -76,6 +91,15 @@ function AdminWalletsPage() {
               <CheckCircle2 className="h-4 w-4" /> Wallet Updated!
             </div>
           )}
+
+          <button
+            onClick={handleReconcileAll}
+            disabled={reconciling}
+            className="flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${reconciling ? "animate-spin" : ""}`} />
+            <span>{reconciling ? "Reconciling..." : "Reconcile All Paystack Deposits"}</span>
+          </button>
 
           <button
             onClick={() => refetch()}

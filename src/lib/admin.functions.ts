@@ -764,11 +764,105 @@ export const adminGetReportData = createServerFn({ method: "GET" })
   });
 
 /* ============ 8. WALLET MANAGEMENT ============ */
+export const adminReconcileAllPaystackDeposits = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { listRecentPaystackTransactions } = await import("@/lib/paystack");
+
+    const psRes = await listRecentPaystackTransactions({ status: "success" });
+    const psTxList = (psRes?.data || []) as any[];
+
+    const depTxs = psTxList.filter((pt: any) => {
+      const ref = String(pt.reference || "");
+      const isDep = ref.startsWith("DEP-") || pt.metadata?.type === "wallet_deposit";
+      return isDep && pt.status === "success";
+    });
+
+    let importedCount = 0;
+
+    for (const pt of depTxs) {
+      const paidGhs = (pt.amount || 0) / 100;
+      const ref = pt.reference;
+      const baseRef = ref.split("-R")[0].split("-F")[0];
+      const targetUserId = pt.metadata?.user_id;
+
+      const { data: existing } = await (supabaseAdmin as any)
+        .from("wallet_transactions")
+        .select("id, status, user_id")
+        .or(`reference.eq.${ref},reference.eq.${baseRef},reference.ilike.${baseRef}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existing) {
+        let uId = targetUserId;
+        if (!uId) {
+          const { data: pending } = await (supabaseAdmin as any)
+            .from("wallet_transactions")
+            .select("user_id")
+            .eq("type", "deposit")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          uId = pending?.user_id;
+        }
+
+        if (uId) {
+          await (supabaseAdmin as any).from("wallet_transactions").insert({
+            user_id: uId,
+            amount_ghs: paidGhs,
+            type: "deposit",
+            reference: ref,
+            status: "completed",
+            description: `Paystack Deposit (GH₵ ${paidGhs.toFixed(2)})`,
+          });
+          importedCount++;
+        }
+      } else if (existing.status !== "completed" || !existing.user_id) {
+        await (supabaseAdmin as any)
+          .from("wallet_transactions")
+          .update({
+            status: "completed",
+            amount_ghs: paidGhs,
+            user_id: existing.user_id || targetUserId,
+          })
+          .eq("id", existing.id);
+        importedCount++;
+      }
+    }
+
+    // Recalculate balances for all profiles with completed wallet_transactions
+    const { data: profiles } = await supabaseAdmin.from("profiles").select("id");
+    for (const p of profiles || []) {
+      const { data: userTxs } = await (supabaseAdmin as any)
+        .from("wallet_transactions")
+        .select("amount_ghs, status")
+        .eq("user_id", p.id);
+
+      const completed = (userTxs || []).filter((t: any) => t.status === "completed" || t.status === "paid" || t.status === "delivered");
+      const bal = completed.reduce((acc: number, t: any) => acc + Number(t.amount_ghs || 0), 0);
+
+      if (bal >= 0) {
+        await (supabaseAdmin as any)
+          .from("wallets")
+          .upsert({ user_id: p.id, balance_ghs: bal, updated_at: new Date().toISOString() });
+      }
+    }
+
+    return { ok: true, importedCount };
+  });
+
 export const adminListWallets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Auto reconcile Paystack deposits when admin views wallets
+    try {
+      await adminReconcileAllPaystackDeposits({ context });
+    } catch {}
 
     const [{ data: wallets }, { data: transactions }, { data: profiles }] = await Promise.all([
       (supabaseAdmin as any).from("wallets").select("*").order("updated_at", { ascending: false }).limit(100),
