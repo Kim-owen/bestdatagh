@@ -138,6 +138,9 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const reference = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
+    const feeGhs = Number((data.amountGhs * 0.03).toFixed(2));
+    const totalChargeGhs = Number((data.amountGhs + feeGhs).toFixed(2));
+
     // Save pending deposit transaction locked to context.userId
     await (supabaseAdmin as any).from("wallet_transactions").insert({
       user_id: context.userId,
@@ -145,12 +148,26 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
       type: "deposit",
       reference,
       status: "pending",
-      description: `Wallet Deposit (GH₵ ${data.amountGhs.toFixed(2)})`,
+      description: `Wallet Deposit (GH₵ ${data.amountGhs.toFixed(2)} + 3% fee GH₵ ${feeGhs.toFixed(2)})`,
+    });
+
+    // Create order record for Payment Hub to charge totalChargeGhs
+    await (supabaseAdmin as any).from("orders").insert({
+      reference,
+      user_id: context.userId,
+      customer_email: `deposit-${context.userId}@bestdatagh.com`,
+      customer_phone: "0000000000",
+      total_ghs: totalChargeGhs,
+      source: "wallet_deposit",
+      status: "pending",
+      notes: `Net Deposit: GH₵ ${data.amountGhs.toFixed(2)} | Fee 3%: GH₵ ${feeGhs.toFixed(2)}`,
     });
 
     return {
       reference,
       amountGhs: data.amountGhs,
+      feeGhs,
+      totalChargeGhs,
     };
   });
 

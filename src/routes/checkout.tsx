@@ -83,7 +83,8 @@ function Checkout() {
         },
       });
 
-      await payWallet({ data: { orderId: orderRes.orderId, amountGhs: subtotal } });
+      const totalPayable = Number((subtotal * 1.03).toFixed(2));
+      await payWallet({ data: { orderId: orderRes.orderId, amountGhs: orderRes.totalGhs || totalPayable } });
       queryClient.invalidateQueries({ queryKey: ["myWallet"] });
       clear();
       navigate({
@@ -332,12 +333,12 @@ function Checkout() {
                   <span className="font-bold">GH₵ {subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Processing Fee</span>
-                  <span className="font-bold text-emerald-500">FREE</span>
+                  <span className="text-muted-foreground">Payment Processing Fee (3%)</span>
+                  <span className="font-bold text-amber-400">GH₵ {(subtotal * 0.03).toFixed(2)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-3">
                   <span className="text-xs font-extrabold uppercase">Total Payable</span>
-                  <span className="text-xl font-black text-foreground font-display">GH₵ {subtotal.toFixed(2)}</span>
+                  <span className="text-xl font-black text-foreground font-display">GH₵ {(subtotal * 1.03).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -356,7 +357,7 @@ function Checkout() {
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 py-4 text-xs font-black text-black shadow-md hover:scale-[1.01] active:scale-[.98] disabled:opacity-60 transition-all"
                 >
                   <Wallet className="h-4 w-4" />
-                  Pay GH₵ {subtotal.toFixed(2)} with Wallet (GH₵ {walletBalance.toFixed(2)} Avail)
+                  Pay GH₵ {(subtotal * 1.03).toFixed(2)} with Wallet (GH₵ {walletBalance.toFixed(2)} Avail)
                 </button>
               )}
 

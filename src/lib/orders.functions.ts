@@ -42,7 +42,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       }
     }
 
-    let totalGhs = 0;
+    let subtotalGhs = 0;
     const itemsToInsert: any[] = [];
 
     for (const item of data.items) {
@@ -54,7 +54,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       const qty = Math.max(1, Math.floor(Number(item.qty) || 1));
       
       if (priceToUse <= 0) throw new Error(`Invalid price for bundle: ${item.network} ${item.size}`);
-      totalGhs += priceToUse * qty;
+      subtotalGhs += priceToUse * qty;
 
       itemsToInsert.push({
         network: item.network,
@@ -66,7 +66,9 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
       });
     }
 
-    const formattedTotal = Number(totalGhs.toFixed(2));
+    const subtotalFormatted = Number(subtotalGhs.toFixed(2));
+    const feeGhs = Number((subtotalFormatted * 0.03).toFixed(2));
+    const totalGhs = Number((subtotalFormatted + feeGhs).toFixed(2));
     const reference = `BD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
     // 1. Create order record in database with pending status
@@ -77,9 +79,10 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
         user_id: data.userId || null,
         customer_phone: data.recipientPhone,
         customer_email: data.email,
-        total_ghs: formattedTotal,
+        total_ghs: totalGhs,
         source: "web",
         status: "pending",
+        notes: `Subtotal: GH₵ ${subtotalFormatted} | Fee 3%: GH₵ ${feeGhs}`,
       })
       .select("id, reference, total_ghs, status, created_at")
       .single();

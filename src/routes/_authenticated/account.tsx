@@ -124,9 +124,10 @@ function AccountPage() {
           },
         });
 
-        await payWalletFn({ data: { orderId: ordRes.orderId, amountGhs: Number(activeBundle.price_ghs) } });
+        const totalPayable = Number((Number(activeBundle.price_ghs) * 1.03).toFixed(2));
+        await payWalletFn({ data: { orderId: ordRes.orderId, amountGhs: ordRes.totalGhs || totalPayable } });
         qc.invalidateQueries({ queryKey: ["myWallet"] });
-        return { ok: true, reference: ordRes.reference, price: Number(activeBundle.price_ghs) };
+        return { ok: true, reference: ordRes.reference, price: totalPayable };
       } else {
         setBuyNowItem({
           network: activeBundle.network as any,

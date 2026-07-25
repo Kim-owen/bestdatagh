@@ -100,6 +100,24 @@ export function WalletTopUpModal({
           />
         </div>
 
+        {/* Fee breakdown */}
+        {amountToUse >= 1 && (
+          <div className="rounded-2xl bg-primary/5 border border-primary/20 p-3.5 space-y-1.5 text-xs font-bold">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Net Wallet Credit:</span>
+              <span className="text-foreground">GH₵ {amountToUse.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Payment Processing Fee (3%):</span>
+              <span className="text-amber-400">GH₵ {(amountToUse * 0.03).toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-border/50 text-foreground font-black text-sm">
+              <span>Total Payable:</span>
+              <span className="text-primary">GH₵ {(amountToUse * 1.03).toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3.5 flex items-center gap-2.5 text-xs text-emerald-500 font-bold">
           <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
           <span>In-App Mobile Money Deposit. Supports MTN MoMo, Telecel, AT & Cards.</span>
@@ -113,7 +131,7 @@ export function WalletTopUpModal({
           {mut.isPending || isProcessing ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Initializing Deposit Hub…</>
           ) : (
-            <><Zap className="h-4 w-4" /> Proceed to Deposit GH₵ {amountToUse.toFixed(2)}</>
+            <><Zap className="h-4 w-4" /> Pay GH₵ {(amountToUse * 1.03).toFixed(2)} & Deposit</>
           )}
         </button>
       </div>

@@ -59,7 +59,8 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
       });
 
       // Pay with wallet
-      await payWallet({ data: { orderId: orderRes.orderId, amountGhs: item.price } });
+      const totalPayable = Number((item.price * 1.03).toFixed(2));
+      await payWallet({ data: { orderId: orderRes.orderId, amountGhs: orderRes.totalGhs || totalPayable } });
       queryClient.invalidateQueries({ queryKey: ["myWallet"] });
       setOrderId(orderRes.orderId);
       setStatus("done");
@@ -194,12 +195,16 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
                 <span className="font-bold">{item.network}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Bundle:</span>
-                <span className="font-bold">{item.size}</span>
+                <span className="text-muted-foreground">Subtotal:</span>
+                <span className="font-bold">GH₵ {item.price.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-xs border-t border-border/50 pt-1 mt-1">
-                <span className="font-bold">Total:</span>
-                <span className="font-bold text-primary">GH₵ {item.price.toFixed(2)}</span>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Payment Fee (3%):</span>
+                <span className="font-bold text-amber-400">GH₵ {(item.price * 0.03).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs border-t border-border/50 pt-1 mt-1 font-bold">
+                <span>Total Payable:</span>
+                <span className="text-primary font-black">GH₵ {(item.price * 1.03).toFixed(2)}</span>
               </div>
             </div>
 
@@ -234,7 +239,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
                   className="flex w-full items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/10 py-2.5 text-xs font-bold text-primary hover:bg-primary/20 disabled:opacity-50 transition-all mb-2"
                 >
                   <Wallet className="h-4 w-4" />
-                  <span>Pay GH₵ {item.price.toFixed(2)} with Wallet (Bal: GH₵ {walletBalance.toFixed(2)})</span>
+                  <span>Pay GH₵ {(item.price * 1.03).toFixed(2)} with Wallet (Bal: GH₵ {walletBalance.toFixed(2)})</span>
                 </button>
               </div>
             )}
