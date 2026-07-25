@@ -557,11 +557,15 @@ export const adminGetHeroSlides = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await (supabaseAdmin as any).from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
+    const { data } = await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .select("bio")
+      .eq("slug", "global_hero_slides")
+      .maybeSingle();
 
-    if (!data || !data.value) return DEFAULT_HERO_SLIDES;
+    if (!data || !data.bio) return DEFAULT_HERO_SLIDES;
     try {
-      const parsed = JSON.parse(data.value) as HeroSlideItem[];
+      const parsed = JSON.parse(data.bio) as HeroSlideItem[];
       return parsed.length > 0 ? parsed : DEFAULT_HERO_SLIDES;
     } catch {
       return DEFAULT_HERO_SLIDES;
@@ -575,18 +579,44 @@ export const adminSaveHeroSlides = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const jsonStr = JSON.stringify(data);
-    await (supabaseAdmin as any).from("site_settings").upsert({ key: "hero_slides", value: jsonStr }, { onConflict: "key" });
+
+    const { data: existing } = await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .select("id")
+      .eq("slug", "global_hero_slides")
+      .maybeSingle();
+
+    if (existing) {
+      await (supabaseAdmin as any)
+        .from("agent_store_settings")
+        .update({ bio: jsonStr, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+    } else {
+      await (supabaseAdmin as any)
+        .from("agent_store_settings")
+        .insert({
+          user_id: context.userId,
+          store_name: "Global Hero Slides",
+          slug: "global_hero_slides",
+          bio: jsonStr,
+        });
+    }
+
     return { ok: true };
   });
 
 export const getPublicHeroSlides = createServerFn({ method: "GET" })
   .handler(async () => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await (supabaseAdmin as any).from("site_settings").select("value").eq("key", "hero_slides").maybeSingle();
+    const { data } = await (supabaseAdmin as any)
+      .from("agent_store_settings")
+      .select("bio")
+      .eq("slug", "global_hero_slides")
+      .maybeSingle();
 
-    if (!data || !data.value) return DEFAULT_HERO_SLIDES;
+    if (!data || !data.bio) return DEFAULT_HERO_SLIDES;
     try {
-      const parsed = JSON.parse(data.value) as HeroSlideItem[];
+      const parsed = JSON.parse(data.bio) as HeroSlideItem[];
       const activeOnly = parsed.filter((s) => s.active !== false).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
       return activeOnly.length > 0 ? activeOnly : DEFAULT_HERO_SLIDES;
     } catch {
