@@ -179,55 +179,71 @@ export const initiateMoMoPromptCharge = createServerFn({ method: "POST" })
       const rootPrefix = parts.length >= 2 ? `${parts[0]}-${parts[1]}` : data.orderId;
       const baseRef = data.orderId.split("-R")[0].split("-F")[0];
 
-      const { data: tx } = await (supabaseAdmin as any)
-        .from("wallet_transactions")
-        .select("id, user_id, reference, amount_ghs")
+      // Check orders table first for deposit record containing total_ghs with 3% fee
+      const { data: depOrder } = await supabaseAdmin
+        .from("orders")
+        .select("reference, total_ghs, user_id")
         .or(`reference.eq.${data.orderId},reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (tx) {
-        reference = tx.reference;
-        totalGhs = Number(tx.amount_ghs);
-        targetUserId = tx.user_id;
+      if (depOrder && depOrder.total_ghs) {
+        reference = depOrder.reference;
+        totalGhs = Number(depOrder.total_ghs);
+        targetUserId = depOrder.user_id || "";
       } else {
-        // Fallback A: Verify rootPrefix or orderId with Paystack API
-        const refsToTry = Array.from(new Set([data.orderId, rootPrefix, baseRef].filter(Boolean)));
-        for (const refCandidate of refsToTry) {
-          try {
-            const psData = await verifyPaystackTransaction(refCandidate);
-            if (psData.data?.amount) {
-              totalGhs = psData.data.amount / 100;
-              reference = refCandidate;
-              break;
+        const { data: tx } = await (supabaseAdmin as any)
+          .from("wallet_transactions")
+          .select("id, user_id, reference, amount_ghs")
+          .or(`reference.eq.${data.orderId},reference.ilike.${rootPrefix}%,reference.ilike.${baseRef}%`)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (tx) {
+          reference = tx.reference;
+          // Apply 3% deposit processing fee to transaction base amount
+          totalGhs = Number((Number(tx.amount_ghs) * 1.03).toFixed(2));
+          targetUserId = tx.user_id;
+        } else {
+          // Fallback A: Verify rootPrefix or orderId with Paystack API
+          const refsToTry = Array.from(new Set([data.orderId, rootPrefix, baseRef].filter(Boolean)));
+          for (const refCandidate of refsToTry) {
+            try {
+              const psData = await verifyPaystackTransaction(refCandidate);
+              if (psData.data?.amount) {
+                totalGhs = psData.data.amount / 100;
+                reference = refCandidate;
+                break;
+              }
+            } catch {
+              // Try next candidate
             }
-          } catch {
-            // Try next candidate
           }
-        }
 
-        // Fallback B: Get the latest deposit for this user
-        if (!totalGhs) {
-          const { data: latestPending } = await (supabaseAdmin as any)
-            .from("wallet_transactions")
-            .select("reference, amount_ghs, user_id")
-            .eq("type", "deposit")
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          // Fallback B: Get the latest deposit for this user
+          if (!totalGhs) {
+            const { data: latestPending } = await (supabaseAdmin as any)
+              .from("wallet_transactions")
+              .select("reference, amount_ghs, user_id")
+              .eq("type", "deposit")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          if (latestPending) {
-            reference = latestPending.reference;
-            totalGhs = Number(latestPending.amount_ghs);
-            targetUserId = latestPending.user_id;
+            if (latestPending) {
+              reference = latestPending.reference;
+              totalGhs = Number((Number(latestPending.amount_ghs) * 1.03).toFixed(2));
+              targetUserId = latestPending.user_id;
+            }
           }
-        }
 
-        // Fallback C: Default to minimum GH₵ 1.00 for deposits if not found in DB
-        if (!totalGhs) {
-          totalGhs = 1.0;
-          reference = data.orderId;
+          // Fallback C: Default to minimum GH₵ 1.03 for deposits if not found in DB
+          if (!totalGhs) {
+            totalGhs = 1.03;
+            reference = data.orderId;
+          }
         }
       }
     }
