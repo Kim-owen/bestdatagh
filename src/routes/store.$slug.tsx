@@ -9,6 +9,7 @@ import { useCart } from "@/lib/cart";
 import { getPublicStorefrontBySlug, joinAgentNetwork } from "@/lib/agent.functions";
 import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantBuyModal";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
+import { StorefrontShareStudio } from "@/components/site/StorefrontShareStudio";
 import {
   Store, ShieldCheck, MapPin, Users, MessageSquare, Video, ExternalLink,
   ShoppingBag, Zap, Star, UserPlus, CheckCircle2, Share2, Sparkles, Award
@@ -273,6 +274,8 @@ function AgentSocialStorefrontPage() {
               );
             })}
           </div>
+
+          <StorefrontShareStudio storeSlug={slug} storeName={store?.store_name || slug} />
         </div>
       </main>
 

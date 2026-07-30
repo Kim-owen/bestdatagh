@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyPaystackWebhookSignature, verifyPaystackTransaction } from "@/lib/paystack";
+import { createUserNotification } from "@/lib/agent.functions";
+import { getSwiftDataApiKey, buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } from "@/lib/swiftdata";
+import { sendOrderDeliveredSms } from "@/lib/otp.functions";
 
 export const Route = createFileRoute("/api/paystack/webhook")({
   server: {
@@ -73,6 +76,14 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                         .from("wallets")
                         .upsert({ user_id: targetUserId, balance_ghs: newBal, updated_at: new Date().toISOString() });
 
+                      await createUserNotification({
+                        userId: targetUserId,
+                        type: "wallet_deposit",
+                        title: "Wallet Deposit Confirmed 💳",
+                        body: `GH₵ ${paidGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
+                        link: "/account",
+                      });
+
                       console.log(`Paystack Webhook: Wallet deposit ${reference} credited GH₵ ${paidGhs} to user ${targetUserId}.`);
                     }
                   } else if (!existingTx && targetUserId) {
@@ -97,13 +108,21 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                       description: `Paystack Deposit (${reference})`,
                     });
 
+                    await createUserNotification({
+                      userId: targetUserId,
+                      type: "wallet_deposit",
+                      title: "Wallet Deposit Confirmed 💳",
+                      body: `GH₵ ${paidGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
+                      link: "/account",
+                    });
+
                     console.log(`Paystack Webhook: New wallet deposit ${reference} created & credited GH₵ ${paidGhs} to user ${targetUserId}.`);
                   }
                 } else {
                   // B. Handle Standard Order Payment
                   const { data: order } = await supabaseAdmin
                     .from("orders")
-                    .select("id, reference, total_ghs, status")
+                    .select("id, reference, total_ghs, status, user_id, order_items(network, size_label, recipient_phone)")
                     .eq("reference", reference)
                     .maybeSingle();
 
@@ -118,6 +137,49 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                         .from("order_items")
                         .update({ status: "processing" })
                         .eq("order_id", order.id);
+
+                      if (order.user_id) {
+                        await createUserNotification({
+                          userId: order.user_id,
+                          type: "order_paid",
+                          title: "Payment Received 🛍️",
+                          body: `Order #${order.reference} (GH₵ ${paidGhs.toFixed(2)}) is confirmed paid and being processed.`,
+                          link: `/track-order?ref=${order.reference}`,
+                        });
+                      }
+
+                      // Automated dispatch via SwiftData API if configured
+                      const firstItem = (order.order_items && order.order_items[0]) as any;
+                      if (firstItem && getSwiftDataApiKey()) {
+                        try {
+                          const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
+                          const sizeGb = parseSizeGb(firstItem.size_label);
+                          const swiftRes = await buySwiftDataBundle({
+                            phone: firstItem.recipient_phone,
+                            network: swiftNet,
+                            sizeGb,
+                            reference: order.reference,
+                          });
+
+                          if (swiftRes?.order?.status === "completed" || swiftRes?.status === "completed" || swiftRes?.success) {
+                            await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+                            await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+                            await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
+                            
+                            if (order.user_id) {
+                              await createUserNotification({
+                                userId: order.user_id,
+                                type: "order_delivered",
+                                title: "Data Bundle Delivered 🚀",
+                                body: `Your ${firstItem.network} ${firstItem.size_label} bundle has been delivered to ${firstItem.recipient_phone}. Ref: ${order.reference}`,
+                                link: `/track-order?ref=${order.reference}`,
+                              });
+                            }
+                          }
+                        } catch (swiftErr) {
+                          console.warn("[SwiftData Webhook Dispatch Warning]:", swiftErr);
+                        }
+                      }
 
                       console.log(`Paystack Webhook: Order ${reference} updated to PAID.`);
                     } else {

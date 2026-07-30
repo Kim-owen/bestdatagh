@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, listRecentPaystackTransactions, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
 import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder, getSwiftDataApiKey } from "./swiftdata";
+import { createUserNotification } from "./agent.functions";
+import { sendTransactionalEmail } from "./email.functions";
 
 export interface CartItemInput {
   id: string;
@@ -416,6 +418,7 @@ export const submitPaystackOtpCharge = createServerFn({ method: "POST" })
 export const pollOrderStatus = createServerFn({ method: "POST" })
   .validator((data: { reference: string }) => data)
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // 1. Check if deposit transaction (starts with "DEP-")
     if (data.reference.startsWith("DEP-")) {
       const parts = data.reference.split("-");
@@ -599,10 +602,9 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
     }
 
     // 2. Standard order check
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("id, reference, total_ghs, status, created_at, order_items(network, size_label, recipient_phone)")
+      .select("id, reference, total_ghs, status, created_at, user_id, customer_email, order_items(network, size_label, recipient_phone)")
       .eq("reference", data.reference)
       .maybeSingle();
 
@@ -625,6 +627,34 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
           await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", order.id);
           await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", order.id);
 
+          if ((order as any).user_id) {
+            await createUserNotification({
+              userId: (order as any).user_id,
+              type: "order_paid",
+              title: "Payment Received 🛍️",
+              body: `Order #${order.reference} (GH₵ ${order.total_ghs}) has been paid and is processing.`,
+              link: `/track-order?ref=${order.reference}`,
+            });
+          }
+
+          // Trigger email receipt if customer email available
+          if ((order as any).customer_email) {
+            await sendTransactionalEmail({
+              to: (order as any).customer_email,
+              subject: `Payment Confirmed - Order #${order.reference}`,
+              badge: "Payment Received",
+              title: "Payment Confirmed! 🛍️",
+              bodyText: `Your payment of GH₵ ${order.total_ghs} for Order #${order.reference} was received successfully. We are now processing your data bundle delivery.`,
+              actionUrl: `https://ghana-data-hub-gold.vercel.app/track-order?ref=${order.reference}`,
+              actionText: "Track Order Status",
+              details: [
+                { label: "Order Reference", value: order.reference },
+                { label: "Amount Paid", value: `GH₵ ${order.total_ghs}` },
+                { label: "Payment Method", value: "Mobile Money / Paystack" },
+              ],
+            }).catch(() => {});
+          }
+
           // Trigger automated dispatch via SwiftData API if configured
           const firstItem = order.order_items?.[0];
           if (firstItem && getSwiftDataApiKey()) {
@@ -643,6 +673,34 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
                 await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
                 const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
                 await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
+                
+                if ((order as any).user_id) {
+                  await createUserNotification({
+                    userId: (order as any).user_id,
+                    type: "order_delivered",
+                    title: "Data Bundle Delivered 🚀",
+                    body: `Your ${firstItem.network} ${firstItem.size_label} bundle has been delivered to ${firstItem.recipient_phone}. Ref: ${order.reference}`,
+                    link: `/track-order?ref=${order.reference}`,
+                  });
+                }
+
+                if ((order as any).customer_email) {
+                  await sendTransactionalEmail({
+                    to: (order as any).customer_email,
+                    subject: `Data Bundle Delivered 🚀 - Order #${order.reference}`,
+                    badge: "Delivered",
+                    title: "Your Data Has Been Delivered! 🚀",
+                    bodyText: `Your ${firstItem.network} ${firstItem.size_label} bundle has been successfully credited to ${firstItem.recipient_phone}.`,
+                    actionUrl: `https://ghana-data-hub-gold.vercel.app/track-order?ref=${order.reference}`,
+                    actionText: "View Receipt",
+                    details: [
+                      { label: "Reference", value: order.reference },
+                      { label: "Recipient Phone", value: firstItem.recipient_phone },
+                      { label: "Network", value: firstItem.network },
+                      { label: "Package", value: firstItem.size_label },
+                    ],
+                  }).catch(() => {});
+                }
                 return { status: "delivered", order: { ...order, status: "delivered" } };
               }
             } catch (swiftErr) {
@@ -660,8 +718,10 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
     // 2. If status is paid or processing, check order status via SwiftData API or progress transition
     if (order.status === "paid" || order.status === "processing") {
       const firstItem = (order.order_items && order.order_items[0]) || {};
+      const hasSwiftKey = Boolean(getSwiftDataApiKey());
+
       // Check SwiftData API if configured
-      if (getSwiftDataApiKey()) {
+      if (hasSwiftKey) {
         try {
           const swiftOrderRes = await getSwiftDataOrder(order.reference);
           const swiftStatus = (swiftOrderRes?.order?.status || swiftOrderRes?.status || "").toLowerCase();
@@ -671,33 +731,77 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
             await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
             const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
             await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
+            
+            if ((order as any).user_id) {
+              await createUserNotification({
+                userId: (order as any).user_id,
+                type: "order_delivered",
+                title: "Data Bundle Delivered 🚀",
+                body: `Your ${firstItem.network} ${firstItem.size_label} bundle has been delivered to ${firstItem.recipient_phone}. Ref: ${order.reference}`,
+                link: `/track-order?ref=${order.reference}`,
+              });
+            }
             return { status: "delivered", order: { ...order, status: "delivered" } };
           } else if (swiftStatus === "failed") {
             await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);
             await supabaseAdmin.from("order_items").update({ status: "failed" }).eq("order_id", order.id);
+            
+            if ((order as any).user_id) {
+              await createUserNotification({
+                userId: (order as any).user_id,
+                type: "order_failed",
+                title: "Order Fulfillment Issue ⚠️",
+                body: `Order #${order.reference} failed delivery. Please contact support.`,
+                link: `/track-order?ref=${order.reference}`,
+              });
+            }
             return { status: "failed", order: { ...order, status: "failed" } };
+          } else {
+            // SwiftData order is pending/processing -> keep processing
+            if (order.status !== "processing") {
+              await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+            }
+            return { status: "processing", order: { ...order, status: "processing" } };
           }
         } catch {
-          // Order not found on SwiftData yet or processing
+          // If SwiftData order not found yet (e.g. initial dispatch pending), try dispatching
+          if (firstItem.network && firstItem.size_label && firstItem.recipient_phone) {
+            try {
+              const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
+              const sizeGb = parseSizeGb(firstItem.size_label);
+              await buySwiftDataBundle({
+                phone: firstItem.recipient_phone,
+                network: swiftNet,
+                sizeGb,
+                reference: order.reference,
+              });
+            } catch (dispatchErr) {
+              console.warn("[SwiftData Re-dispatch Notice]:", dispatchErr);
+            }
+          }
+          if (order.status !== "processing") {
+            await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+          }
+          return { status: "processing", order: { ...order, status: "processing" } };
         }
-      }
+      } else {
+        // Fallback for environment without SwiftData API key (local preview mode)
+        const createdAt = new Date(order.created_at).getTime();
+        const elapsed = Date.now() - createdAt;
 
-      // Transition from paid -> processing -> delivered based on elapsed time so it follows clear steps
-      const createdAt = new Date(order.created_at).getTime();
-      const elapsed = Date.now() - createdAt;
-
-      if (elapsed > 5000) {
-        await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
-        await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
-        return { status: "delivered", order: { ...order, status: "delivered" } };
-      } else if (elapsed > 2000) {
-        if (order.status !== "processing") {
-          await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+        if (elapsed > 5000) {
+          await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+          await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+          return { status: "delivered", order: { ...order, status: "delivered" } };
+        } else if (elapsed > 2000) {
+          if (order.status !== "processing") {
+            await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+          }
+          return { status: "processing", order: { ...order, status: "processing" } };
         }
-        return { status: "processing", order: { ...order, status: "processing" } };
-      }
 
-      return { status: "paid", order: { ...order, status: "paid" } };
+        return { status: "paid", order: { ...order, status: "paid" } };
+      }
     }
 
     return { status: order.status, order };

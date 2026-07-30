@@ -7,6 +7,7 @@ import { Reviews } from "@/components/site/Reviews";
 import { useCart } from "@/lib/cart";
 import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantBuyModal";
 import { NetworkLogo } from "@/components/site/NetworkLogos";
+import { AISmartRecommender } from "@/components/site/AISmartRecommender";
 
 type Network = "MTN" | "Telecel" | "AirtelTigo";
 
@@ -127,6 +128,8 @@ function BuyData() {
                 ⚡ Instant Automated Dispatch
               </div>
             </div>
+
+            <AISmartRecommender />
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {BUNDLES[active].map((b) => (

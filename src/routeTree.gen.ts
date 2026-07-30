@@ -62,6 +62,7 @@ import { Route as ApiPublicV1BundlesRouteImport } from './routes/api/public/v1/b
 import { Route as ApiPublicV1OrdersRouteImport } from './routes/api/public/v1/orders'
 import { Route as ApiV1OrdersIndexRouteImport } from './routes/api/v1/orders/index'
 import { Route as ApiV1OrdersReferenceRouteImport } from './routes/api/v1/orders/$reference'
+import { Route as ApiV1OrdersCallbackRouteImport } from './routes/api/v1/orders/callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -345,6 +346,11 @@ const ApiV1OrdersReferenceRoute = ApiV1OrdersReferenceRouteImport.update({
   path: '/api/v1/orders/$reference',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1OrdersCallbackRoute = ApiV1OrdersCallbackRouteImport.update({
+  id: '/api/v1/orders/callback',
+  path: '/api/v1/orders/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -398,6 +404,7 @@ export interface FileRoutesByFullPath {
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
   '/api/v1/orders/$reference': typeof ApiV1OrdersReferenceRoute
+  '/api/v1/orders/callback': typeof ApiV1OrdersCallbackRoute
   '/api/v1/orders/': typeof ApiV1OrdersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -451,6 +458,7 @@ export interface FileRoutesByTo {
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
   '/api/v1/orders/$reference': typeof ApiV1OrdersReferenceRoute
+  '/api/v1/orders/callback': typeof ApiV1OrdersCallbackRoute
   '/api/v1/orders': typeof ApiV1OrdersIndexRoute
 }
 export interface FileRoutesById {
@@ -507,6 +515,7 @@ export interface FileRoutesById {
   '/api/public/v1/bundles': typeof ApiPublicV1BundlesRoute
   '/api/public/v1/orders': typeof ApiPublicV1OrdersRoute
   '/api/v1/orders/$reference': typeof ApiV1OrdersReferenceRoute
+  '/api/v1/orders/callback': typeof ApiV1OrdersCallbackRoute
   '/api/v1/orders/': typeof ApiV1OrdersIndexRoute
 }
 export interface FileRouteTypes {
@@ -563,6 +572,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
     | '/api/v1/orders/$reference'
+    | '/api/v1/orders/callback'
     | '/api/v1/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -616,6 +626,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
     | '/api/v1/orders/$reference'
+    | '/api/v1/orders/callback'
     | '/api/v1/orders'
   id:
     | '__root__'
@@ -671,6 +682,7 @@ export interface FileRouteTypes {
     | '/api/public/v1/bundles'
     | '/api/public/v1/orders'
     | '/api/v1/orders/$reference'
+    | '/api/v1/orders/callback'
     | '/api/v1/orders/'
   fileRoutesById: FileRoutesById
 }
@@ -702,6 +714,7 @@ export interface RootRouteChildren {
   ApiPublicV1BundlesRoute: typeof ApiPublicV1BundlesRoute
   ApiPublicV1OrdersRoute: typeof ApiPublicV1OrdersRoute
   ApiV1OrdersReferenceRoute: typeof ApiV1OrdersReferenceRoute
+  ApiV1OrdersCallbackRoute: typeof ApiV1OrdersCallbackRoute
   ApiV1OrdersIndexRoute: typeof ApiV1OrdersIndexRoute
 }
 
@@ -1078,6 +1091,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1OrdersReferenceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/orders/callback': {
+      id: '/api/v1/orders/callback'
+      path: '/api/v1/orders/callback'
+      fullPath: '/api/v1/orders/callback'
+      preLoaderRoute: typeof ApiV1OrdersCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1204,6 +1224,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicV1BundlesRoute: ApiPublicV1BundlesRoute,
   ApiPublicV1OrdersRoute: ApiPublicV1OrdersRoute,
   ApiV1OrdersReferenceRoute: ApiV1OrdersReferenceRoute,
+  ApiV1OrdersCallbackRoute: ApiV1OrdersCallbackRoute,
   ApiV1OrdersIndexRoute: ApiV1OrdersIndexRoute,
 }
 export const routeTree = rootRouteImport

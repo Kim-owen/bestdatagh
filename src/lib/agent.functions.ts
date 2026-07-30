@@ -339,6 +339,29 @@ export const adminListAllWithdrawalEvents = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export async function createUserNotification(params: {
+  userId: string;
+  type: string;
+  title: string;
+  body?: string;
+  link?: string;
+}) {
+  if (!params.userId) return;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (supabaseAdmin as any).from("notifications").insert({
+      user_id: params.userId,
+      type: params.type,
+      title: params.title,
+      body: params.body || null,
+      link: params.link || null,
+      read: false,
+    });
+  } catch (err) {
+    console.warn("[Notification Insert Notice]:", err);
+  }
+}
+
 export const listMyNotifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

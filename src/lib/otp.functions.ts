@@ -52,6 +52,7 @@ export const checkPhoneVerification = createServerFn({ method: "POST" })
     return { phone };
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Check in-memory store first
     const mem = inMemoryOtpStore.get(data.phone);
     if (mem && mem.verifiedAt) {
@@ -84,6 +85,7 @@ export const sendPhoneOtp = createServerFn({ method: "POST" })
     return { phone };
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Generate a 6-digit numeric OTP code
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000;
@@ -136,6 +138,7 @@ export const verifyPhoneOtp = createServerFn({ method: "POST" })
     return { phone, otpCode: code };
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Check in-memory store
     const mem = inMemoryOtpStore.get(data.phone);
 
