@@ -180,7 +180,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
     ] = await Promise.all([
       supabaseAdmin.from("profiles").select("*").order("created_at", { ascending: false }).limit(500),
       supabaseAdmin.from("user_roles").select("user_id, role"),
-      supabaseAdmin.from("wallets").select("user_id, balance_ghs, is_locked")
+      (supabaseAdmin as any).from("wallets").select("user_id, balance_ghs, is_locked")
     ]);
 
     if (pErr) throw new Error(pErr.message);
@@ -193,7 +193,7 @@ export const adminListUsers = createServerFn({ method: "GET" })
     });
 
     return (profiles ?? []).map((p: any) => {
-      const w = walletMap.get(p.id);
+      const w: any = walletMap.get(p.id);
       return {
         ...p,
         roles: roleMap.get(p.id) || [],
@@ -219,7 +219,7 @@ export const adminGetUserDetails = createServerFn({ method: "POST" })
       { data: storeSettings }
     ] = await Promise.all([
       supabaseAdmin.from("profiles").select("*").eq("id", data.userId).maybeSingle(),
-      supabaseAdmin.from("wallets").select("*").eq("user_id", data.userId).maybeSingle(),
+      (supabaseAdmin as any).from("wallets").select("*").eq("user_id", data.userId).maybeSingle(),
       supabaseAdmin.from("user_roles").select("role").eq("user_id", data.userId),
       (supabaseAdmin as any).from("wallet_transactions").select("*").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(50),
       supabaseAdmin.from("orders").select("*, order_items(*)").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(50),
@@ -267,59 +267,6 @@ export const adminLockUserAccount = createServerFn({ method: "POST" })
       );
 
     return { ok: true, is_locked: data.lock };
-  });
-
-export const adminAdjustUserWallet = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { userId: string; amountGhs: number; type: "credit" | "debit"; reason: string }) => {
-    const amt = Number(d.amountGhs);
-    if (!amt || amt <= 0) throw new Error("Amount must be greater than 0");
-    if (!d.reason?.trim()) throw new Error("A reason note is required for admin wallet adjustments.");
-    return { userId: d.userId, amountGhs: amt, type: d.type, reason: d.reason.trim() };
-  })
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: wallet } = await (supabaseAdmin as any)
-      .from("wallets")
-      .select("balance_ghs")
-      .eq("user_id", data.userId)
-      .maybeSingle();
-
-    const currentBal = Number(wallet?.balance_ghs || 0);
-    const delta = data.type === "credit" ? data.amountGhs : -data.amountGhs;
-    const newBal = Math.max(0, currentBal + delta);
-
-    // Update wallet balance
-    await (supabaseAdmin as any)
-      .from("wallets")
-      .upsert(
-        { user_id: data.userId, balance_ghs: newBal, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
-      );
-
-    // Record wallet audit transaction
-    const txRef = `ADM-ADJ-${Date.now()}`;
-    await (supabaseAdmin as any).from("wallet_transactions").insert({
-      user_id: data.userId,
-      amount_ghs: delta,
-      type: data.type === "credit" ? "deposit" : "purchase",
-      reference: txRef,
-      status: "completed",
-      description: `Admin Manual Adjustment (${data.type.toUpperCase()}): ${data.reason}`,
-    });
-
-    const { createUserNotification } = await import("@/lib/agent.functions");
-    await createUserNotification({
-      userId: data.userId,
-      type: "wallet_deposit",
-      title: data.type === "credit" ? "Wallet Account Credited 💳" : "Wallet Account Debited 💳",
-      body: `Your wallet was ${data.type === "credit" ? "credited" : "debited"} GH₵ ${data.amountGhs.toFixed(2)}. Reason: ${data.reason}`,
-      link: "/account",
-    });
-
-    return { ok: true, newBalance: newBal };
   });
 
 export const adminSendUserNotification = createServerFn({ method: "POST" })

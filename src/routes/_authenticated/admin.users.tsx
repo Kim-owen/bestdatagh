@@ -505,7 +505,7 @@ function UsersPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
-                        setAdjustWalletUser({ id: userDetails.profile.id });
+                        setAdjustWalletUser({ id: userDetails.profile?.id || detailModalUserId, email: userDetails.profile?.email });
                         setDetailModalUserId(null);
                       }}
                       className="inline-flex items-center gap-1.5 rounded-xl gold-gradient px-3 py-2 text-xs font-black text-primary-foreground shadow-md"
