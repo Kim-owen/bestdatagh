@@ -191,6 +191,7 @@ function AdminSettingsPage() {
                   onChange={(e) => setForm({ ...form, txtconnect_sender_id: e.target.value })}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-primary outline-none"
                 />
+              </div>
             </div>
           </div>
         </div>
