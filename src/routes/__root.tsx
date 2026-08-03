@@ -14,6 +14,7 @@ import { CartProvider } from "@/lib/cart";
 import { AuthProvider } from "@/lib/auth";
 import { CartDrawer, CartToast } from "@/components/site/CartDrawer";
 import { TopProgressBar } from "@/components/ui/LoadingSpinner";
+import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 
 
 function NotFoundComponent() {
@@ -137,6 +138,7 @@ function RootComponent() {
           <Outlet />
           <CartDrawer />
           <CartToast />
+          <FloatingWhatsApp />
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>
