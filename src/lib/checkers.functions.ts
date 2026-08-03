@@ -23,9 +23,11 @@ export const getResultCheckerProducts = createServerFn({ method: "GET" })
         .in("key", ["checker_price_waec", "checker_price_bece"]);
 
       if (configs && configs.length > 0) {
-        const configMap = new Map(configs.map((c: any) => [c.key, Number(c.value)]));
-        if (configMap.get("checker_price_waec")) waecPrice = configMap.get("checker_price_waec")!;
-        if (configMap.get("checker_price_bece")) becePrice = configMap.get("checker_price_bece")!;
+        const configMap = new Map<string, number>(configs.map((c: any) => [String(c.key), Number(c.value)]));
+        const wVal = configMap.get("checker_price_waec");
+        const bVal = configMap.get("checker_price_bece");
+        if (wVal && !isNaN(wVal)) waecPrice = wVal;
+        if (bVal && !isNaN(bVal)) becePrice = bVal;
       }
     } catch (e: any) {
       console.warn("[ResultCheckers] Could not fetch custom prices from site_settings:", e.message);
