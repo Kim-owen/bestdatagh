@@ -173,10 +173,185 @@ export const adminListUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profiles, error } = await supabaseAdmin.from("profiles").select("*").order("created_at", { ascending: false }).limit(500);
-    if (error) throw new Error(error.message);
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role");
-    return (profiles ?? []).map((p) => ({ ...p, roles: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role) }));
+    const [
+      { data: profiles, error: pErr },
+      { data: roles },
+      { data: wallets }
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("*").order("created_at", { ascending: false }).limit(500),
+      supabaseAdmin.from("user_roles").select("user_id, role"),
+      supabaseAdmin.from("wallets").select("user_id, balance_ghs, is_locked")
+    ]);
+
+    if (pErr) throw new Error(pErr.message);
+
+    const walletMap = new Map((wallets || []).map((w: any) => [w.user_id, w]));
+    const roleMap = new Map();
+    (roles || []).forEach((r: any) => {
+      if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, []);
+      roleMap.get(r.user_id).push(r.role);
+    });
+
+    return (profiles ?? []).map((p: any) => {
+      const w = walletMap.get(p.id);
+      return {
+        ...p,
+        roles: roleMap.get(p.id) || [],
+        balance_ghs: Number(w?.balance_ghs || 0),
+        is_locked: Boolean(w?.is_locked),
+      };
+    });
+  });
+
+export const adminGetUserDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [
+      { data: profile },
+      { data: wallet },
+      { data: roles },
+      { data: transactions },
+      { data: orders },
+      { data: storeSettings }
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("*").eq("id", data.userId).maybeSingle(),
+      supabaseAdmin.from("wallets").select("*").eq("user_id", data.userId).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", data.userId),
+      (supabaseAdmin as any).from("wallet_transactions").select("*").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(50),
+      supabaseAdmin.from("orders").select("*, order_items(*)").eq("user_id", data.userId).order("created_at", { ascending: false }).limit(50),
+      (supabaseAdmin as any).from("agent_store_settings").select("*").eq("user_id", data.userId).maybeSingle()
+    ]);
+
+    const txList = transactions || [];
+    const completedDeposits = txList.filter((t: any) => t.type === "deposit" && (t.status === "completed" || t.status === "paid"));
+    const totalDepositsGhs = completedDeposits.reduce((acc: number, t: any) => acc + Number(t.amount_ghs || 0), 0);
+
+    const paidOrdersList = (orders || []).filter((o: any) => o.status === "paid" || o.status === "delivered");
+    const totalOrdersSpendGhs = paidOrdersList.reduce((acc: number, o: any) => acc + Number(o.total_ghs || 0), 0);
+
+    return {
+      profile,
+      wallet: wallet || { balance_ghs: 0, is_locked: false },
+      roles: (roles || []).map((r: any) => r.role),
+      stats: {
+        totalDepositsGhs: Number(totalDepositsGhs.toFixed(2)),
+        totalOrdersSpendGhs: Number(totalOrdersSpendGhs.toFixed(2)),
+        totalOrdersCount: orders?.length || 0,
+      },
+      transactions: txList,
+      orders: orders || [],
+      storeSettings,
+    };
+  });
+
+export const adminLockUserAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; lock: boolean; reason?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    await (supabaseAdmin as any)
+      .from("wallets")
+      .upsert(
+        {
+          user_id: data.userId,
+          is_locked: data.lock,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+
+    return { ok: true, is_locked: data.lock };
+  });
+
+export const adminAdjustUserWallet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; amountGhs: number; type: "credit" | "debit"; reason: string }) => {
+    const amt = Number(d.amountGhs);
+    if (!amt || amt <= 0) throw new Error("Amount must be greater than 0");
+    if (!d.reason?.trim()) throw new Error("A reason note is required for admin wallet adjustments.");
+    return { userId: d.userId, amountGhs: amt, type: d.type, reason: d.reason.trim() };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: wallet } = await (supabaseAdmin as any)
+      .from("wallets")
+      .select("balance_ghs")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+
+    const currentBal = Number(wallet?.balance_ghs || 0);
+    const delta = data.type === "credit" ? data.amountGhs : -data.amountGhs;
+    const newBal = Math.max(0, currentBal + delta);
+
+    // Update wallet balance
+    await (supabaseAdmin as any)
+      .from("wallets")
+      .upsert(
+        { user_id: data.userId, balance_ghs: newBal, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+
+    // Record wallet audit transaction
+    const txRef = `ADM-ADJ-${Date.now()}`;
+    await (supabaseAdmin as any).from("wallet_transactions").insert({
+      user_id: data.userId,
+      amount_ghs: delta,
+      type: data.type === "credit" ? "deposit" : "purchase",
+      reference: txRef,
+      status: "completed",
+      description: `Admin Manual Adjustment (${data.type.toUpperCase()}): ${data.reason}`,
+    });
+
+    const { createUserNotification } = await import("@/lib/agent.functions");
+    await createUserNotification({
+      userId: data.userId,
+      type: "wallet_deposit",
+      title: data.type === "credit" ? "Wallet Account Credited 💳" : "Wallet Account Debited 💳",
+      body: `Your wallet was ${data.type === "credit" ? "credited" : "debited"} GH₵ ${data.amountGhs.toFixed(2)}. Reason: ${data.reason}`,
+      link: "/account",
+    });
+
+    return { ok: true, newBalance: newBal };
+  });
+
+export const adminSendUserNotification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; title: string; body: string; sendSms?: boolean }) => {
+    if (!d.title?.trim() || !d.body?.trim()) throw new Error("Title and body message are required.");
+    return { userId: d.userId, title: d.title.trim(), body: d.body.trim(), sendSms: Boolean(d.sendSms) };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { createUserNotification } = await import("@/lib/agent.functions");
+
+    await createUserNotification({
+      userId: data.userId,
+      type: "system",
+      title: data.title,
+      body: data.body,
+      link: "/account",
+    });
+
+    let smsSent = false;
+    if (data.sendSms) {
+      const { data: prof } = await supabaseAdmin.from("profiles").select("phone").eq("id", data.userId).maybeSingle();
+      if (prof?.phone) {
+        const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+        await sendTxtConnectSms(prof.phone, `[BestData Notification] ${data.title}: ${data.body}`).catch(() => {});
+        smsSent = true;
+      }
+    }
+
+    return { ok: true, smsSent };
   });
 
 export const adminSetRole = createServerFn({ method: "POST" })
