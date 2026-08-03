@@ -240,6 +240,18 @@ export const payOrderWithWallet = createServerFn({ method: "POST" })
     await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", data.orderId);
     await supabaseAdmin.from("order_items").update({ status: "processing" }).eq("order_id", data.orderId);
 
+    // 5. Dispatch SMS alert
+    const { data: userProfile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("phone")
+      .eq("id", context.userId)
+      .maybeSingle();
+
+    if (userProfile?.phone) {
+      const { sendWalletPurchaseSms } = await import("@/lib/otp.functions");
+      await sendWalletPurchaseSms(userProfile.phone, data.amountGhs, data.orderId, newBalance).catch(() => {});
+    }
+
     return { ok: true, newBalance };
   });
 
@@ -347,6 +359,19 @@ export const verifyWalletDeposit = createServerFn({ method: "POST" })
     await (supabaseAdmin as any)
       .from("wallets")
       .upsert({ user_id: context.userId, balance_ghs: Math.max(0, exactBal), updated_at: new Date().toISOString() });
+
+    // 5. Dispatch SMS alert
+    const { data: userProfile } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("phone")
+      .eq("id", context.userId)
+      .maybeSingle();
+
+    if (userProfile?.phone) {
+      const { sendDepositSuccessSms } = await import("@/lib/otp.functions");
+      const depositNetAmt = pendingTx ? Number(pendingTx.amount_ghs) : Number((paidGhs / 1.03).toFixed(2));
+      await sendDepositSuccessSms(userProfile.phone, depositNetAmt, data.reference, exactBal).catch(() => {});
+    }
 
     return { ok: true, balanceGhs: Math.max(0, exactBal), alreadyVerified: false };
   });

@@ -208,6 +208,33 @@ export async function sendOrderDeliveredSms(phone: string, reference: string, si
 }
 
 /**
+ * Send Wallet Deposit Confirmed Success SMS Notification
+ */
+export async function sendDepositSuccessSms(phone: string, amountGhs: number, reference: string, newBalanceGhs: number) {
+  if (!phone || phone === "0000000000") return null;
+  const message = `💳 BestData Alert: Deposit of GH₵ ${amountGhs.toFixed(2)} (Ref: ${reference}) was SUCCESSFUL! Your new wallet balance is GH₵ ${newBalanceGhs.toFixed(2)}.`;
+  return sendTxtConnectSms(phone, message);
+}
+
+/**
+ * Send Wallet Purchase SMS Notification
+ */
+export async function sendWalletPurchaseSms(phone: string, amountGhs: number, reference: string, newBalanceGhs: number) {
+  if (!phone || phone === "0000000000") return null;
+  const message = `🛍️ BestData Alert: GH₵ ${amountGhs.toFixed(2)} debited for Order #${reference}. Remaining balance: GH₵ ${newBalanceGhs.toFixed(2)}.`;
+  return sendTxtConnectSms(phone, message);
+}
+
+/**
+ * Send Agent Withdrawal Status SMS Notification
+ */
+export async function sendWithdrawalStatusSms(phone: string, amountGhs: number, status: string, destination: string) {
+  if (!phone || phone === "0000000000") return null;
+  const message = `💸 BestData Alert: Your commission withdrawal request of GH₵ ${amountGhs.toFixed(2)} (${destination}) is now ${status.toUpperCase()}.`;
+  return sendTxtConnectSms(phone, message);
+}
+
+/**
  * Send Welcome SMS Notification with WhatsApp Channel Link
  */
 export async function sendWelcomeSms(toPhone: string, name: string) {

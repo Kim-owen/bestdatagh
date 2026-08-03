@@ -4,7 +4,7 @@ import { verifyPaystackWebhookSignature, verifyPaystackTransaction } from "@/lib
 import { createUserNotification } from "@/lib/agent.functions";
 import { getSwiftDataApiKey, buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } from "@/lib/swiftdata";
 import { dispatchDataBundle } from "@/lib/provider-dispatch";
-import { sendOrderDeliveredSms } from "@/lib/otp.functions";
+import { sendOrderDeliveredSms, sendDepositSuccessSms } from "@/lib/otp.functions";
 
 export const Route = createFileRoute("/api/paystack/webhook")({
   server: {
@@ -86,6 +86,11 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                         link: "/account",
                       });
 
+                      const { data: userProf } = await supabaseAdmin.from("profiles").select("phone").eq("id", targetUserId).maybeSingle();
+                      if (userProf?.phone) {
+                        await sendDepositSuccessSms(userProf.phone, netCreditGhs, reference, newBal).catch(() => {});
+                      }
+
                       console.log(`Paystack Webhook: Wallet deposit ${reference} credited net GH₵ ${netCreditGhs} to user ${targetUserId}.`);
                     }
                   } else if (!existingTx && targetUserId) {
@@ -118,6 +123,11 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                       body: `GH₵ ${netCreditGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
                       link: "/account",
                     });
+
+                    const { data: userProf } = await supabaseAdmin.from("profiles").select("phone").eq("id", targetUserId).maybeSingle();
+                    if (userProf?.phone) {
+                      await sendDepositSuccessSms(userProf.phone, netCreditGhs, reference, newBal).catch(() => {});
+                    }
 
                     console.log(`Paystack Webhook: New wallet deposit ${reference} created & credited net GH₵ ${netCreditGhs} to user ${targetUserId}.`);
                   }
