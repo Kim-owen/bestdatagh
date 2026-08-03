@@ -12,27 +12,29 @@ export function FloatingWhatsApp() {
 
   const CHANNEL_LINK = "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
 
-  // Default position at bottom-right
   useEffect(() => {
     const saved = sessionStorage.getItem("wa_float_pos");
     if (saved) {
       try {
-        setPosition(JSON.parse(saved));
-        return;
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+          // Clamp to current screen bounds
+          const clampedX = Math.min(window.innerWidth - 70, Math.max(16, parsed.x));
+          const clampedY = Math.min(window.innerHeight - 70, Math.max(16, parsed.y));
+          setPosition({ x: clampedX, y: clampedY });
+        }
       } catch {}
     }
-    const initialX = window.innerWidth - 80;
-    const initialY = window.innerHeight - 90;
-    setPosition({ x: Math.max(16, initialX), y: Math.max(16, initialY) });
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(false);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      initialX: position?.x || window.innerWidth - 80,
-      initialY: position?.y || window.innerHeight - 90,
+      initialX: position?.x ?? rect.left,
+      initialY: position?.y ?? rect.top,
     };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -41,17 +43,14 @@ export function FloatingWhatsApp() {
       if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
         setIsDragging(true);
       }
-      const newX = Math.min(window.innerWidth - 70, Math.max(16, dragRef.current.initialX + dx));
-      const newY = Math.min(window.innerHeight - 70, Math.max(16, dragRef.current.initialY + dy));
+      const newX = Math.min(window.innerWidth - 70, Math.max(12, dragRef.current.initialX + dx));
+      const newY = Math.min(window.innerHeight - 70, Math.max(12, dragRef.current.initialY + dy));
       setPosition({ x: newX, y: newY });
     };
 
     const handleMouseUp = () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
-      if (position) {
-        sessionStorage.setItem("wa_float_pos", JSON.stringify(position));
-      }
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -61,34 +60,32 @@ export function FloatingWhatsApp() {
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(false);
     const touch = e.touches[0];
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     dragRef.current = {
       startX: touch.clientX,
       startY: touch.clientY,
-      initialX: position?.x || window.innerWidth - 80,
-      initialY: position?.y || window.innerHeight - 90,
+      initialX: position?.x ?? rect.left,
+      initialY: position?.y ?? rect.top,
     };
 
     const handleTouchMove = (moveEvent: TouchEvent) => {
       const touch = moveEvent.touches[0];
       const dx = touch.clientX - dragRef.current.startX;
       const dy = touch.clientY - dragRef.current.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
         setIsDragging(true);
       }
-      const newX = Math.min(window.innerWidth - 70, Math.max(16, dragRef.current.initialX + dx));
-      const newY = Math.min(window.innerHeight - 70, Math.max(16, dragRef.current.initialY + dy));
+      const newX = Math.min(window.innerWidth - 70, Math.max(12, dragRef.current.initialX + dx));
+      const newY = Math.min(window.innerHeight - 70, Math.max(12, dragRef.current.initialY + dy));
       setPosition({ x: newX, y: newY });
     };
 
     const handleTouchEnd = () => {
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
-      if (position) {
-        sessionStorage.setItem("wa_float_pos", JSON.stringify(position));
-      }
     };
 
-    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
     window.addEventListener("touchend", handleTouchEnd);
   };
 
@@ -101,28 +98,32 @@ export function FloatingWhatsApp() {
     window.open(CHANNEL_LINK, "_blank", "noopener,noreferrer");
   };
 
-  if (!position) return null;
+  // Determine inline position styles vs default fixed position
+  const containerStyle: React.CSSProperties = position
+    ? { left: `${position.x}px`, top: `${position.y}px` }
+    : {};
+
+  const containerClass = position
+    ? "fixed z-[9999] select-none pointer-events-auto"
+    : "fixed bottom-6 right-5 z-[9999] select-none pointer-events-auto";
 
   return (
-    <div
-      style={{ left: `${position.x}px`, top: `${position.y}px` }}
-      className="fixed z-50 select-none touch-none"
-    >
+    <div style={containerStyle} className={containerClass}>
       <div
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         onClick={handleClick}
-        className="group relative cursor-grab active:cursor-grabbing"
+        className="group relative cursor-grab active:cursor-grabbing touch-none"
       >
-        {/* Glow & Pulse Backdrop Effect */}
-        <div className="absolute -inset-1.5 rounded-full bg-emerald-500/40 blur-md group-hover:bg-emerald-500/70 transition-all animate-pulse" />
+        {/* Glowing backdrop pulse */}
+        <div className="absolute -inset-1 rounded-full bg-[#25D366]/40 blur-md group-hover:bg-[#25D366]/70 transition-all animate-pulse" />
 
         {/* WhatsApp Official Floating Button Handle */}
         <button
           type="button"
           aria-label="Join Official WhatsApp Channel"
-          title="Join Official WhatsApp Channel (Drag to move)"
-          className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-4 ring-emerald-500/40"
+          title="Join Official WhatsApp Channel"
+          className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-4 ring-emerald-500/30"
         >
           <span className="absolute inset-0 rounded-full bg-[#25D366] opacity-60 animate-ping" />
           
@@ -132,7 +133,7 @@ export function FloatingWhatsApp() {
           </svg>
         </button>
 
-        {/* Hover Tooltip Badge */}
+        {/* Desktop Tooltip Badge */}
         <div className="absolute right-16 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-slate-950/95 px-3.5 py-1.5 text-[11px] font-black text-emerald-400 shadow-xl backdrop-blur-md whitespace-nowrap pointer-events-none">
           <span className="h-2 w-2 rounded-full bg-[#25D366] animate-ping" />
           <span>Join WhatsApp Channel</span>
