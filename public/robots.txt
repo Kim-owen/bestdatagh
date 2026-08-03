@@ -4,4 +4,4 @@ Disallow: /admin
 Disallow: /_authenticated
 Disallow: /api/
 
-Sitemap: https://bestdatagh.com/sitemap.xml
+Sitemap: https://www.bestdatagh.shop/sitemap.xml

@@ -56,7 +56,7 @@ const FAQS = [
 
 export const Route = createFileRoute("/mtn-up2u")({
   head: () => {
-    const canonicalUrl = "https://bestdatagh.com/mtn-up2u";
+    const canonicalUrl = "https://www.bestdatagh.shop/mtn-up2u";
     const title = "MTN UP2U Data Packages Ghana — Buy Cheap MTN Yello Data 2026 | BestData";
     const description = "Buy cheap MTN UP2U data packages online in Ghana. Instant 5-second automated delivery, 90-day non-expiry validity, 1GB to 100GB packages via MTN MoMo.";
 
