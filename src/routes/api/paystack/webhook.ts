@@ -4,7 +4,7 @@ import { verifyPaystackWebhookSignature, verifyPaystackTransaction } from "@/lib
 import { createUserNotification } from "@/lib/agent.functions";
 import { getSwiftDataApiKey, buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } from "@/lib/swiftdata";
 import { dispatchDataBundle } from "@/lib/provider-dispatch";
-import { sendOrderDeliveredSms, sendDepositSuccessSms } from "@/lib/otp.functions";
+import { sendOrderDeliveredSms, sendDepositSuccessSms, sendOrderProcessingSms } from "@/lib/otp.functions";
 
 export const Route = createFileRoute("/api/paystack/webhook")({
   server: {
@@ -164,6 +164,9 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                       // Automated dispatch via Provider API (DataMart / SwiftData)
                       const firstItem = (order.order_items && order.order_items[0]) as any;
                       if (firstItem) {
+                        // Send immediate processing SMS alert to payer/recipient
+                        await sendOrderProcessingSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
+
                         try {
                           const dispatchRes = await dispatchDataBundle({
                             phone: firstItem.recipient_phone,

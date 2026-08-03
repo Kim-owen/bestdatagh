@@ -208,6 +208,16 @@ export async function sendOrderDeliveredSms(phone: string, reference: string, si
 }
 
 /**
+ * Send Order Payment Received & Processing SMS Notification
+ */
+export async function sendOrderProcessingSms(phone: string, reference: string, sizeLabel?: string, network?: string) {
+  if (!phone || phone === "0000000000") return null;
+  const bundleStr = sizeLabel && network ? `${sizeLabel} ${network} bundle` : "data bundle";
+  const message = `⏳ BestData Alert: Payment received for Order #${reference} (${bundleStr}). Your order is now PROCESSING and will be delivered shortly!`;
+  return sendTxtConnectSms(phone, message);
+}
+
+/**
  * Send Wallet Deposit Confirmed Success SMS Notification
  */
 export async function sendDepositSuccessSms(phone: string, amountGhs: number, reference: string, newBalanceGhs: number) {
