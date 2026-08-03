@@ -29,6 +29,8 @@ function AdminSettingsPage() {
     paystack_secret_key: "",
     txtconnect_api_key: "",
     txtconnect_sender_id: "BestData",
+    checker_price_waec: "18.00",
+    checker_price_bece: "18.00",
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -189,7 +191,41 @@ function AdminSettingsPage() {
                   onChange={(e) => setForm({ ...form, txtconnect_sender_id: e.target.value })}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-primary outline-none"
                 />
-              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 4: Result Checker Prices Configuration */}
+        <div className="rounded-3xl border border-border/80 bg-card p-6 space-y-4 shadow-sm">
+          <h2 className="text-sm font-black uppercase tracking-wider text-primary flex items-center gap-2">
+            <CreditCard className="h-4 w-4" /> Result Checker Card Prices (WAEC & BECE)
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Set customer sale prices for WAEC/WASSCE and BECE Result Checker Cards sold on the <span className="font-bold text-foreground">/checkers</span> page.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="font-bold text-foreground block mb-1">WAEC / WASSCE Card Price (GH₵)</label>
+              <input
+                type="number"
+                step="0.10"
+                min="1"
+                value={form.checker_price_waec || "18.00"}
+                onChange={(e) => setForm({ ...form, checker_price_waec: e.target.value })}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-bold text-foreground block mb-1">BECE Card Price (GH₵)</label>
+              <input
+                type="number"
+                step="0.10"
+                min="1"
+                value={form.checker_price_bece || "18.00"}
+                onChange={(e) => setForm({ ...form, checker_price_bece: e.target.value })}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+              />
             </div>
           </div>
         </div>

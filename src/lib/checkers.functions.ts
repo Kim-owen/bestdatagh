@@ -12,25 +12,49 @@ export interface CheckerProduct {
 
 export const getResultCheckerProducts = createServerFn({ method: "GET" })
   .handler(async () => {
+    let waecPrice = 18.0;
+    let becePrice = 18.0;
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: configs } = await (supabaseAdmin as any)
+        .from("site_settings")
+        .select("key, value")
+        .in("key", ["checker_price_waec", "checker_price_bece"]);
+
+      if (configs && configs.length > 0) {
+        const configMap = new Map(configs.map((c: any) => [c.key, Number(c.value)]));
+        if (configMap.get("checker_price_waec")) waecPrice = configMap.get("checker_price_waec")!;
+        if (configMap.get("checker_price_bece")) becePrice = configMap.get("checker_price_bece")!;
+      }
+    } catch (e: any) {
+      console.warn("[ResultCheckers] Could not fetch custom prices from site_settings:", e.message);
+    }
+
     const dmKey = getDataMartApiKey();
     if (dmKey) {
       try {
         const res = await getDataMartCheckerProducts();
         if (res && res.status === "success" && Array.isArray(res.data)) {
-          return res.data as CheckerProduct[];
+          const list = res.data as CheckerProduct[];
+          return list.map((p) => {
+            if (p.name === "WAEC" && waecPrice > 0) return { ...p, price: waecPrice };
+            if (p.name === "BECE" && becePrice > 0) return { ...p, price: becePrice };
+            return p;
+          });
         }
       } catch (err: any) {
         console.warn("[ResultCheckers] Failed to fetch live products from DataMart:", err.message);
       }
     }
 
-    // Default Fallback Products
+    // Default Fallback Products with Admin Configured Prices
     return [
       {
         id: "waec_card",
         name: "WAEC",
         description: "WASSCE / WAEC Result Checker Card (Serial Number + PIN)",
-        price: 15.7,
+        price: waecPrice,
         inStock: true,
         stockCount: 150,
       },
@@ -38,7 +62,7 @@ export const getResultCheckerProducts = createServerFn({ method: "GET" })
         id: "bece_card",
         name: "BECE",
         description: "BECE Result Checker Card (Serial Number + PIN)",
-        price: 15.7,
+        price: becePrice,
         inStock: true,
         stockCount: 85,
       },
