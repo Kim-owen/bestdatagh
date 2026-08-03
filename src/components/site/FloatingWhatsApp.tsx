@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, ExternalLink, Sparkles, Send } from "lucide-react";
 
 export function FloatingWhatsApp() {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number }>({
     startX: 0,
@@ -12,7 +10,9 @@ export function FloatingWhatsApp() {
     initialY: 0,
   });
 
-  // Default initial position at bottom-right
+  const CHANNEL_LINK = "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
+
+  // Default position at bottom-right
   useEffect(() => {
     const saved = sessionStorage.getItem("wa_float_pos");
     if (saved) {
@@ -21,14 +21,12 @@ export function FloatingWhatsApp() {
         return;
       } catch {}
     }
-    // Initial position 24px from bottom right
     const initialX = window.innerWidth - 80;
     const initialY = window.innerHeight - 90;
     setPosition({ x: Math.max(16, initialX), y: Math.max(16, initialY) });
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isOpen) return;
     setIsDragging(false);
     dragRef.current = {
       startX: e.clientX,
@@ -61,7 +59,6 @@ export function FloatingWhatsApp() {
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isOpen) return;
     setIsDragging(false);
     const touch = e.touches[0];
     dragRef.current = {
@@ -101,7 +98,7 @@ export function FloatingWhatsApp() {
       e.stopPropagation();
       return;
     }
-    setIsOpen(!isOpen);
+    window.open(CHANNEL_LINK, "_blank", "noopener,noreferrer");
   };
 
   if (!position) return null;
@@ -109,95 +106,37 @@ export function FloatingWhatsApp() {
   return (
     <div
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
-      className="fixed z-50 select-none touch-none transition-shadow"
+      className="fixed z-50 select-none touch-none"
     >
-      {/* WhatsApp Quick Popup Menu */}
-      {isOpen && (
-        <div className="absolute bottom-16 right-0 w-72 sm:w-80 rounded-3xl border border-emerald-500/30 bg-slate-950/95 p-5 backdrop-blur-2xl shadow-2xl text-white animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40">
-                <MessageCircle className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-xs font-black font-display text-white">BestData WhatsApp Support</h4>
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" /> Online 24/7
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <p className="mt-3 text-xs text-slate-300 leading-relaxed">
-            Need help with your data order or package inquiries? Chat directly with our automated support team!
-          </p>
-
-          <div className="mt-4 space-y-2">
-            <a
-              href="https://wa.me/233598762747?text=Hello%20BestData%20Support!%20I%20need%20assistance%20with%20data%20bundles."
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-4 py-3 text-xs font-extrabold text-white shadow-lg transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <Send className="h-4 w-4" /> Chat Directly on WhatsApp
-              </span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-70" />
-            </a>
-
-            <a
-              href="https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold text-slate-200 transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Join Official Updates Channel
-              </span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-70" />
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Movable Button Handle */}
       <div
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         onClick={handleClick}
         className="group relative cursor-grab active:cursor-grabbing"
       >
-        <div className="absolute -inset-1.5 rounded-full bg-emerald-500/30 blur-md group-hover:bg-emerald-500/50 transition-all" />
+        {/* Glow & Pulse Backdrop Effect */}
+        <div className="absolute -inset-1.5 rounded-full bg-emerald-500/40 blur-md group-hover:bg-emerald-500/70 transition-all animate-pulse" />
+
+        {/* WhatsApp Official Floating Button Handle */}
         <button
           type="button"
-          aria-label="WhatsApp Support"
-          className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-4 ${
-            isOpen ? "ring-white/40 bg-slate-900" : "ring-emerald-500/40"
-          }`}
+          aria-label="Join Official WhatsApp Channel"
+          title="Join Official WhatsApp Channel (Drag to move)"
+          className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-4 ring-emerald-500/40"
         >
-          {isOpen ? (
-            <X className="h-6 w-6 text-white" />
-          ) : (
-            <>
-              <span className="absolute inset-0 rounded-full bg-emerald-400 opacity-75 animate-ping" />
-              <MessageCircle className="relative h-7 w-7 fill-white text-emerald-500 stroke-[1.5]" />
-            </>
-          )}
+          <span className="absolute inset-0 rounded-full bg-[#25D366] opacity-60 animate-ping" />
+          
+          {/* Official WhatsApp Logo SVG */}
+          <svg className="relative h-8 w-8 fill-white drop-shadow-md" viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.572-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.461c-1.854 0-3.676-.499-5.269-1.442l-.378-.225-3.916 1.027 1.045-3.819-.247-.393A9.833 9.833 0 012.2 12.043c0-5.432 4.42-9.851 9.853-9.851 2.63 0 5.102 1.024 6.96 2.883a9.78 9.78 0 012.88 6.961c0 5.433-4.422 9.853-9.842 9.853m0-18.001C6.273 3.842 1.66 8.455 1.66 14.043c0 1.956.559 3.864 1.619 5.513l-1.719 6.277 6.425-1.685a10.158 10.158 0 005.487 1.574h.004c5.58 0 10.192-4.613 10.194-10.201.001-2.722-1.056-5.281-2.981-7.205A10.125 10.125 0 0012.051 3.842" />
+          </svg>
         </button>
 
-        {/* Hover / Movable Tooltip Badge */}
-        {!isOpen && (
-          <div className="absolute right-16 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-slate-950/90 px-3 py-1.5 text-[11px] font-black text-emerald-400 shadow-xl backdrop-blur-md whitespace-nowrap pointer-events-none">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>Chat Support (Drag Me)</span>
-          </div>
-        )}
+        {/* Hover Tooltip Badge */}
+        <div className="absolute right-16 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-slate-950/95 px-3.5 py-1.5 text-[11px] font-black text-emerald-400 shadow-xl backdrop-blur-md whitespace-nowrap pointer-events-none">
+          <span className="h-2 w-2 rounded-full bg-[#25D366] animate-ping" />
+          <span>Join WhatsApp Channel</span>
+        </div>
       </div>
     </div>
   );
