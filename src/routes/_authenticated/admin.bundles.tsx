@@ -224,12 +224,12 @@ function BundlesPage() {
             onClick={() => switchProviderMutation.mutate("datamart")}
             disabled={switchProviderMutation.isPending}
             className={`flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-              (providerInfo?.selectedProviderKey || "datamart") === "datamart"
+              ((providerInfo as any)?.selectedProviderKey || "datamart") === "datamart"
                 ? "bg-amber-400 text-slate-950 shadow-md"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${(providerInfo?.selectedProviderKey || "datamart") === "datamart" ? "bg-slate-950" : "bg-slate-500"}`} />
+            <span className={`h-2 w-2 rounded-full ${((providerInfo as any)?.selectedProviderKey || "datamart") === "datamart" ? "bg-slate-950" : "bg-slate-500"}`} />
             DataMart API
           </button>
 
@@ -237,12 +237,12 @@ function BundlesPage() {
             onClick={() => switchProviderMutation.mutate("swiftdata")}
             disabled={switchProviderMutation.isPending}
             className={`flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-              providerInfo?.selectedProviderKey === "swiftdata"
+              (providerInfo as any)?.selectedProviderKey === "swiftdata"
                 ? "bg-amber-400 text-slate-950 shadow-md"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${providerInfo?.selectedProviderKey === "swiftdata" ? "bg-slate-950" : "bg-slate-500"}`} />
+            <span className={`h-2 w-2 rounded-full ${(providerInfo as any)?.selectedProviderKey === "swiftdata" ? "bg-slate-950" : "bg-slate-500"}`} />
             SwiftData API
           </button>
         </div>
@@ -257,9 +257,9 @@ function BundlesPage() {
           </div>
           <div className="text-xl font-black text-white flex items-center gap-2 font-mono">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{providerInfo?.isHealthy ? "OPERATIONAL" : "CONNECTING..."}</span>
+            <span>{(providerInfo as any)?.isHealthy ? "OPERATIONAL" : "CONNECTING..."}</span>
           </div>
-          <div className="text-[11px] text-slate-400">{providerInfo?.activeProvider || "DataMart / SwiftData Gateway"}</div>
+          <div className="text-[11px] text-slate-400">{(providerInfo as any)?.activeProvider || "DataMart / SwiftData Gateway"}</div>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 space-y-2 backdrop-blur-xl">
@@ -268,7 +268,7 @@ function BundlesPage() {
             <Zap className="h-4 w-4 text-amber-400" />
           </div>
           <div className="text-xl font-black text-amber-400 font-mono">
-            GH₵ {(providerInfo?.balanceGhs ?? 0).toFixed(2)}
+            GH₵ {((providerInfo as any)?.balanceGhs ?? 0).toFixed(2)}
           </div>
           <div className="text-[11px] text-slate-400">Main API Fulfillment Balance</div>
         </div>

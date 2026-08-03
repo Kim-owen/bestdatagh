@@ -1418,6 +1418,31 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
     return { ok: true, syncedCount };
   });
 
+export const adminResetUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; newPassword: string }) => {
+    if (!d.userId || typeof d.userId !== "string") throw new Error("User ID is required.");
+    const pass = String(d.newPassword || "").trim();
+    if (pass.length < 6) throw new Error("New password must be at least 6 characters.");
+    return { userId: d.userId, newPassword: pass };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const url = "https://vtdccqchhsbujknbpqku.supabase.co";
+    const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
+    const supabaseAdmin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.newPassword,
+    });
+
+    if (error) {
+      throw new Error(`Failed to reset password: ${error.message}`);
+    }
+
+    return { ok: true, message: "User password reset successfully!" };
+  });
+
 
 
 

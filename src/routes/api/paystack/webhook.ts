@@ -55,10 +55,11 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                   const targetUserId = existingTx?.user_id || metadata.user_id;
 
                   if (existingTx && existingTx.status !== "completed") {
+                    const netCreditGhs = Number(existingTx.amount_ghs || paidGhs);
                     // Atomically lock and update status from pending -> completed
                     const { data: updatedTx } = await (supabaseAdmin as any)
                       .from("wallet_transactions")
-                      .update({ status: "completed", amount_ghs: paidGhs })
+                      .update({ status: "completed", amount_ghs: netCreditGhs })
                       .eq("id", existingTx.id)
                       .eq("status", "pending")
                       .select()
@@ -71,7 +72,7 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                         .eq("user_id", targetUserId)
                         .maybeSingle();
 
-                      const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+                      const newBal = Number(curWallet?.balance_ghs || 0) + netCreditGhs;
 
                       await (supabaseAdmin as any)
                         .from("wallets")
@@ -81,20 +82,21 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                         userId: targetUserId,
                         type: "wallet_deposit",
                         title: "Wallet Deposit Confirmed 💳",
-                        body: `GH₵ ${paidGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
+                        body: `GH₵ ${netCreditGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
                         link: "/account",
                       });
 
-                      console.log(`Paystack Webhook: Wallet deposit ${reference} credited GH₵ ${paidGhs} to user ${targetUserId}.`);
+                      console.log(`Paystack Webhook: Wallet deposit ${reference} credited net GH₵ ${netCreditGhs} to user ${targetUserId}.`);
                     }
                   } else if (!existingTx && targetUserId) {
+                    const netCreditGhs = Number((paidGhs / 1.03).toFixed(2));
                     const { data: curWallet } = await (supabaseAdmin as any)
                       .from("wallets")
                       .select("balance_ghs")
                       .eq("user_id", targetUserId)
                       .maybeSingle();
 
-                    const newBal = Number(curWallet?.balance_ghs || 0) + paidGhs;
+                    const newBal = Number(curWallet?.balance_ghs || 0) + netCreditGhs;
 
                     await (supabaseAdmin as any)
                       .from("wallets")
@@ -102,7 +104,7 @@ export const Route = createFileRoute("/api/paystack/webhook")({
 
                     await (supabaseAdmin as any).from("wallet_transactions").insert({
                       user_id: targetUserId,
-                      amount_ghs: paidGhs,
+                      amount_ghs: netCreditGhs,
                       type: "deposit",
                       reference,
                       status: "completed",
@@ -113,11 +115,11 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                       userId: targetUserId,
                       type: "wallet_deposit",
                       title: "Wallet Deposit Confirmed 💳",
-                      body: `GH₵ ${paidGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
+                      body: `GH₵ ${netCreditGhs.toFixed(2)} has been added to your wallet. Ref: ${reference}`,
                       link: "/account",
                     });
 
-                    console.log(`Paystack Webhook: New wallet deposit ${reference} created & credited GH₵ ${paidGhs} to user ${targetUserId}.`);
+                    console.log(`Paystack Webhook: New wallet deposit ${reference} created & credited net GH₵ ${netCreditGhs} to user ${targetUserId}.`);
                   }
                 } else {
                   // B. Handle Standard Order Payment

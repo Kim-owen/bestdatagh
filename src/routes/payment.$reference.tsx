@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { initiateMoMoPromptCharge, submitPaystackOtpCharge, pollOrderStatus, resolveMoMoAccountName, createPaymentRequestInvoice } from "@/lib/orders.functions";
 import { getMyWallet, payOrderWithWallet } from "@/lib/wallet.functions";
+import { getMyProfile } from "@/lib/profile.functions";
 import { useAuth } from "@/lib/auth";
 import { sendPhoneOtp } from "@/lib/otp.functions";
 import { CheckCircle2, Loader2, PhoneCall, RefreshCw, ShieldCheck, Zap, ArrowRight, Copy, Check, Sparkles, CreditCard, Lock, Phone, AlertCircle, X, Wallet } from "lucide-react";
@@ -87,21 +88,31 @@ function UnifiedPaymentPage() {
     },
   });
 
+  const fetchProfileFn = useServerFn(getMyProfile);
+  const { data: profileData } = useQuery({
+    queryKey: ["myProfile"],
+    queryFn: () => fetchProfileFn(),
+    enabled: !!user,
+  });
+
   const isDeposit = reference.startsWith("DEP-") || Boolean(pollData?.isDeposit);
   const order = pollData?.order as any;
   const currentStatus = pollData?.status || order?.status || "pending";
   const firstItem = order?.order_items?.[0];
-  const recipientPhone = firstItem?.recipient_phone || (user?.email ? "" : "");
+  const recipientPhone = firstItem?.recipient_phone || "";
   const networkName = firstItem?.network || "MTN";
   const sizeLabel = firstItem?.size_label || (isDeposit ? "Wallet Deposit" : "Data Bundle");
   const totalGhs = pollData?.depositAmount || order?.total_ghs || 0;
 
-  // Pre-fill payment phone with recipient phone if empty
+  // Pre-fill payment phone with recipient phone or logged-in user profile phone
   useEffect(() => {
-    if (recipientPhone && !paymentPhone) {
-      setPaymentPhone(recipientPhone);
+    if (!paymentPhone) {
+      const phoneToUse = recipientPhone || profileData?.profile?.phone || "";
+      if (phoneToUse) {
+        setPaymentPhone(phoneToUse);
+      }
     }
-  }, [recipientPhone, paymentPhone]);
+  }, [recipientPhone, profileData?.profile?.phone, paymentPhone]);
 
   useEffect(() => {
     if (networkName) {
@@ -205,6 +216,14 @@ function UnifiedPaymentPage() {
       setLoading(false);
     }
   };
+
+  // Auto-trigger MoMo Charge once for deposits when valid phone is pre-filled
+  useEffect(() => {
+    if (isDeposit && validPayerPhone && !autoTriggered && step === "MOMO_INPUT") {
+      setAutoTriggered(true);
+      executeMoMoCharge(activePayerPhone, selectedNetwork);
+    }
+  }, [isDeposit, validPayerPhone, autoTriggered, step, activePayerPhone, selectedNetwork]);
 
   // Step 1: Submit MoMo Payment Number -> Trigger Paystack Charge
   const handleMoMoSubmit = async (e: React.FormEvent) => {

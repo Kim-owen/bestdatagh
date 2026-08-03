@@ -129,13 +129,16 @@ export const getMyWallet = createServerFn({ method: "GET" })
 
 export const initializeWalletDeposit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { amountGhs: number; callbackUrl?: string }) => {
+  .inputValidator((d: { amountGhs: number; phone?: string; network?: string; callbackUrl?: string }) => {
     const amt = Number(d.amountGhs);
     if (!amt || amt < 1) throw new Error("Minimum deposit amount is GH₵ 1.00");
-    return { amountGhs: amt, callbackUrl: d.callbackUrl };
+    const cleanPhone = d.phone ? String(d.phone).replace(/\s+/g, "") : undefined;
+    return { amountGhs: amt, phone: cleanPhone, network: d.network, callbackUrl: d.callbackUrl };
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { chargePaystackMobileMoney } = await import("@/lib/paystack");
+
     const reference = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
     const feeGhs = Number((data.amountGhs * 0.03).toFixed(2));
@@ -151,23 +154,50 @@ export const initializeWalletDeposit = createServerFn({ method: "POST" })
       description: `Wallet Deposit (GH₵ ${data.amountGhs.toFixed(2)} + 3% fee GH₵ ${feeGhs.toFixed(2)})`,
     });
 
+    const userPhone = data.phone || "0000000000";
+
     // Create order record for Payment Hub to charge totalChargeGhs
     await (supabaseAdmin as any).from("orders").insert({
       reference,
       user_id: context.userId,
       customer_email: `deposit-${context.userId}@bestdatagh.com`,
-      customer_phone: "0000000000",
+      customer_phone: userPhone,
       total_ghs: totalChargeGhs,
       source: "wallet_deposit",
       status: "pending",
       notes: `Net Deposit: GH₵ ${data.amountGhs.toFixed(2)} | Fee 3%: GH₵ ${feeGhs.toFixed(2)}`,
     });
 
+    let paystackRes: any = null;
+    if (data.phone && data.network && /^\d{9,10}$/.test(data.phone)) {
+      let provider: "mtn" | "vod" | "tgo" = "mtn";
+      const netUpper = data.network.toUpperCase();
+      if (netUpper.includes("TELECEL") || netUpper.includes("VODA")) provider = "vod";
+      if (netUpper.includes("AT") || netUpper.includes("AIRTEL")) provider = "tgo";
+
+      try {
+        paystackRes = await chargePaystackMobileMoney({
+          email: `deposit-${context.userId}@bestdatagh.com`,
+          amountGhs: totalChargeGhs,
+          reference,
+          phone: data.phone,
+          provider,
+          metadata: {
+            user_id: context.userId,
+            type: "wallet_deposit",
+          },
+        });
+      } catch (chargeErr: any) {
+        console.warn("[Wallet Deposit Direct Charge Notice]:", chargeErr.message);
+      }
+    }
+
     return {
       reference,
       amountGhs: data.amountGhs,
       feeGhs,
       totalChargeGhs,
+      paystackRes,
     };
   });
 

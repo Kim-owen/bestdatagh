@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function AdminShell() {
   const nav = useNavigate();
+  const fnStats = useServerFn(adminStats);
   const [checking, setChecking] = useState(true);
   const [ok, setOk] = useState(false);
   const [userEmail, setUserEmail] = useState("");

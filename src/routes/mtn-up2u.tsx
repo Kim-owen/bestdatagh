@@ -432,7 +432,7 @@ function MtnUp2uPage() {
           </div>
         </section>
 
-        <Reviews />
+        <Reviews targetType="network" />
       </main>
 
       {/* Instant Buy Modal */}
