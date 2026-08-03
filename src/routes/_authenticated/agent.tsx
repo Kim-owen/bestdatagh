@@ -991,15 +991,35 @@ function StatCard({
 }
 
 function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    delivered: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-    processing: "bg-blue-500/15 text-blue-500 border-blue-500/30",
-    pending: "bg-amber-500/15 text-amber-500 border-amber-500/30",
-    failed: "bg-destructive/15 text-destructive border-destructive/30",
-    refunded: "bg-muted text-muted-foreground border-border",
-  };
+  const isDelivered = status === "delivered" || status === "completed";
+  const isProcessing = status === "processing" || status === "pending" || status === "paid";
+
+  if (isDelivered) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
+        <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Delivered (Instant)
+      </span>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-400 font-mono">
+        <Clock className="h-3 w-3 animate-spin text-blue-400" /> Processing (~15s)
+      </span>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-destructive font-mono">
+        <XCircle className="h-3 w-3 text-destructive" /> Failed
+      </span>
+    );
+  }
+
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider capitalize ${map[status] ?? "bg-muted text-muted-foreground"}`}>
+    <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono">
       {status}
     </span>
   );

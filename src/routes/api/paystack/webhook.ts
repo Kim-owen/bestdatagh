@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyPaystackWebhookSignature, verifyPaystackTransaction } from "@/lib/paystack";
 import { createUserNotification } from "@/lib/agent.functions";
 import { getSwiftDataApiKey, buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } from "@/lib/swiftdata";
+import { dispatchDataBundle } from "@/lib/provider-dispatch";
 import { sendOrderDeliveredSms } from "@/lib/otp.functions";
 
 export const Route = createFileRoute("/api/paystack/webhook")({
@@ -148,20 +149,18 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                         });
                       }
 
-                      // Automated dispatch via SwiftData API if configured
+                      // Automated dispatch via Provider API (DataMart / SwiftData)
                       const firstItem = (order.order_items && order.order_items[0]) as any;
-                      if (firstItem && getSwiftDataApiKey()) {
+                      if (firstItem) {
                         try {
-                          const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
-                          const sizeGb = parseSizeGb(firstItem.size_label);
-                          const swiftRes = await buySwiftDataBundle({
+                          const dispatchRes = await dispatchDataBundle({
                             phone: firstItem.recipient_phone,
-                            network: swiftNet,
-                            sizeGb,
+                            network: firstItem.network,
+                            sizeLabel: firstItem.size_label,
                             reference: order.reference,
                           });
 
-                          if (swiftRes?.order?.status === "completed" || swiftRes?.status === "completed" || swiftRes?.success) {
+                          if (dispatchRes.success && dispatchRes.status === "completed") {
                             await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
                             await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
                             await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
@@ -176,8 +175,8 @@ export const Route = createFileRoute("/api/paystack/webhook")({
                               });
                             }
                           }
-                        } catch (swiftErr) {
-                          console.warn("[SwiftData Webhook Dispatch Warning]:", swiftErr);
+                        } catch (dispatchErr) {
+                          console.warn("[Provider Webhook Dispatch Warning]:", dispatchErr);
                         }
                       }
 

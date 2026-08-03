@@ -7,6 +7,7 @@ import {
   adminDeleteBundle,
   adminGetProviderPackages,
   adminSyncProviderPackages,
+  adminSetActiveDataProvider,
 } from "@/lib/admin.functions";
 import { listActiveBundles } from "@/lib/public-bundles.functions";
 import { useState } from "react";
@@ -34,25 +35,45 @@ function BundlesPage() {
   const del = useServerFn(adminDeleteBundle);
   const getProvider = useServerFn(adminGetProviderPackages);
   const syncProvider = useServerFn(adminSyncProviderPackages);
+  const setActiveProviderFn = useServerFn(adminSetActiveDataProvider);
 
   const qc = useQueryClient();
+
+  const switchProviderMutation = useMutation({
+    mutationFn: (provider: "datamart" | "swiftdata") => setActiveProviderFn({ data: { provider } }),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["adminProviderPackages"] });
+      setSyncStatusMsg(`Active fulfillment provider switched to ${res.activeProvider === "datamart" ? "DataMart API" : "SwiftData API"}`);
+      setTimeout(() => setSyncStatusMsg(null), 6000);
+    },
+  });
 
   const { data: storeBundles, isLoading: loadingStore } = useQuery({
     queryKey: ["adminBundles"],
     queryFn: async () => {
       try {
         const res = await list();
-        if (Array.isArray(res) && res.length > 0) return res;
+        if (Array.isArray(res)) return res;
+        if (res && Array.isArray((res as any).data)) return (res as any).data;
+        if (res && typeof res === "object") return Object.values(res);
       } catch (e) {
         console.warn("adminListBundles call failed, using fallback getPublicList", e);
       }
-      return await getPublicList();
+      const pub = await getPublicList();
+      return Array.isArray(pub) ? pub : (pub as any)?.data ?? [];
     },
   });
 
   const { data: providerInfo, isLoading: loadingProvider, refetch: refetchProvider } = useQuery({
     queryKey: ["adminProviderPackages"],
-    queryFn: () => getProvider(),
+    queryFn: async () => {
+      try {
+        const res = await getProvider();
+        return res || { activeProvider: "datamart", packages: [] };
+      } catch (e) {
+        return { activeProvider: "datamart", packages: [] };
+      }
+    },
   });
 
   const [editing, setEditing] = useState<any>(null);
@@ -67,11 +88,24 @@ function BundlesPage() {
   const [quickAgentPrice, setQuickAgentPrice] = useState<number>(0);
 
   const saveMutation = useMutation({
-    mutationFn: (v: any) => save({ data: v }),
+    mutationFn: async (v: any) => {
+      const res = await save({ data: v });
+      if (res && (res as any).success === false) {
+        throw new Error((res as any).error || "Failed to save bundle");
+      }
+      return res;
+    },
     onSuccess: () => {
+      setSyncStatusMsg("✅ Package price saved and updated live across store!");
       qc.invalidateQueries({ queryKey: ["adminBundles"] });
+      qc.invalidateQueries({ queryKey: ["publicBundles"] });
+      qc.invalidateQueries({ queryKey: ["activeBundles"] });
       setEditing(null);
       setQuickEditId(null);
+      setTimeout(() => setSyncStatusMsg(null), 5000);
+    },
+    onError: (err: any) => {
+      setSyncStatusMsg(`❌ Save failed: ${err.message}`);
     },
   });
 
@@ -139,11 +173,11 @@ function BundlesPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs text-amber-400 font-bold uppercase tracking-widest mb-1">
-            <Zap className="h-4 w-4" /> SwiftData API Provider Integration
+            <Zap className="h-4 w-4" /> Provider API Integration (DataMart / SwiftData)
           </div>
           <h1 className="text-3xl font-black text-white font-display">Data Bundle Packages</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Sync packages in real-time from SwiftData Gateway or instantly add, edit & hide retail prices.
+            Sync packages in real-time from DataMart / SwiftData API or instantly add, edit & hide retail prices.
           </p>
         </div>
 
@@ -154,7 +188,7 @@ function BundlesPage() {
             className="inline-flex items-center gap-2 rounded-2xl gold-gradient px-5 py-3 text-xs font-black text-primary-foreground shadow-xl hover:scale-[1.02] active:scale-[.98] transition-all disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-            <span>{syncMutation.isPending ? "Syncing Packages..." : "Sync SwiftData API Packages"}</span>
+            <span>{syncMutation.isPending ? "Syncing Packages..." : "Sync Provider API Packages"}</span>
           </button>
 
           <button
@@ -174,6 +208,46 @@ function BundlesPage() {
         </div>
       )}
 
+      {/* Interactive Active Provider Selector Banner */}
+      <div className="rounded-3xl border border-amber-500/20 bg-slate-900/80 p-5 backdrop-blur-xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
+            <Zap className="h-4 w-4" /> Active Data Dispatch Gateway
+          </div>
+          <p className="text-xs text-slate-300">
+            Select which API provider gateway handles instant automated bundle dispatches:
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-white/10 w-full md:w-auto">
+          <button
+            onClick={() => switchProviderMutation.mutate("datamart")}
+            disabled={switchProviderMutation.isPending}
+            className={`flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              (providerInfo?.selectedProviderKey || "datamart") === "datamart"
+                ? "bg-amber-400 text-slate-950 shadow-md"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${(providerInfo?.selectedProviderKey || "datamart") === "datamart" ? "bg-slate-950" : "bg-slate-500"}`} />
+            DataMart API
+          </button>
+
+          <button
+            onClick={() => switchProviderMutation.mutate("swiftdata")}
+            disabled={switchProviderMutation.isPending}
+            className={`flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              providerInfo?.selectedProviderKey === "swiftdata"
+                ? "bg-amber-400 text-slate-950 shadow-md"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${providerInfo?.selectedProviderKey === "swiftdata" ? "bg-slate-950" : "bg-slate-500"}`} />
+            SwiftData API
+          </button>
+        </div>
+      </div>
+
       {/* Provider API Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 space-y-2 backdrop-blur-xl">
@@ -185,7 +259,7 @@ function BundlesPage() {
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>{providerInfo?.isHealthy ? "OPERATIONAL" : "CONNECTING..."}</span>
           </div>
-          <div className="text-[11px] text-slate-400">SwiftData Supabase Gateway</div>
+          <div className="text-[11px] text-slate-400">{providerInfo?.activeProvider || "DataMart / SwiftData Gateway"}</div>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 space-y-2 backdrop-blur-xl">
@@ -412,27 +486,27 @@ function BundlesPage() {
                 <tr>
                   <th className="p-4">Network</th>
                   <th className="p-4">Package Size</th>
-                  <th className="p-4">Public Retail</th>
-                  <th className="p-4">Agent Wholesale</th>
+                  <th className="p-4">Retail Selling Price</th>
+                  <th className="p-4">Agent Base Wholesale Price</th>
                   <th className="p-4">Validity</th>
                   <th className="p-4">Visibility</th>
-                  <th className="p-4 text-right">Quick Actions</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-mono">
                 {loadingStore && (
                   <>
-                    <TableRowSkeleton columns={7} />
-                    <TableRowSkeleton columns={7} />
-                    <TableRowSkeleton columns={7} />
-                    <TableRowSkeleton columns={7} />
-                    <TableRowSkeleton columns={7} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
+                    <TableRowSkeleton columns={6} />
                   </>
                 )}
                 {filteredStoreBundles.length === 0 && !loadingStore && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-400">
-                      No store bundles found for this filter. Click "Sync SwiftData API Packages" above to populate!
+                    <td colSpan={6} className="p-8 text-center text-slate-400">
+                      No store bundles found for this filter. Click "Sync Provider API Packages" above to populate!
                     </td>
                   </tr>
                 )}
@@ -455,39 +529,56 @@ function BundlesPage() {
                       </td>
                       <td className="p-4 font-extrabold text-amber-400 text-sm">{b.size_label}</td>
 
-                      {/* Public Retail Price */}
+                      {/* Public Retail Selling Price */}
                       <td className="p-4 font-bold">
                         {isQuickEditing ? (
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={quickPrice}
-                            onChange={(e) => setQuickPrice(Number(e.target.value))}
-                            className="w-20 rounded-lg border border-amber-400 bg-slate-950 p-1 text-amber-400 font-mono text-xs focus:outline-none"
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 text-xs font-mono">GH₵</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={quickPrice}
+                              onChange={(e) => setQuickPrice(Number(e.target.value))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveQuickEdit(b);
+                                if (e.key === "Escape") setQuickEditId(null);
+                              }}
+                              autoFocus
+                              className="w-24 rounded-lg border border-amber-400 bg-slate-950 px-2 py-1 text-amber-400 font-mono text-sm font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            />
+                          </div>
                         ) : (
-                          <span className="text-white font-mono">GH₵ {Number(b.price_ghs).toFixed(2)}</span>
-                        )}
-                      </td>
-
-                      {/* Agent Wholesale Price */}
-                      <td className="p-4 font-bold">
-                        {isQuickEditing ? (
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={quickAgentPrice}
-                            onChange={(e) => setQuickAgentPrice(Number(e.target.value))}
-                            className="w-20 rounded-lg border border-emerald-400 bg-slate-950 p-1 text-emerald-400 font-mono text-xs focus:outline-none"
-                          />
-                        ) : (
-                          <span className="text-emerald-400 font-mono">
-                            GH₵ {Number(b.agent_price_ghs ?? (b.price_ghs * 0.95)).toFixed(2)}
+                          <span className="text-white font-mono text-sm font-extrabold bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                            GH₵ {Number(b.price_ghs).toFixed(2)}
                           </span>
                         )}
                       </td>
 
-                      <td className="p-4 text-slate-300 font-sans">{b.validity}</td>
+                      {/* Agent Base Wholesale Price (Editable) */}
+                      <td className="p-4 font-bold">
+                        {isQuickEditing ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 text-xs font-mono">GH₵</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={quickAgentPrice}
+                              onChange={(e) => setQuickAgentPrice(Number(e.target.value))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveQuickEdit(b);
+                                if (e.key === "Escape") setQuickEditId(null);
+                              }}
+                              className="w-24 rounded-lg border border-emerald-400 bg-slate-950 px-2 py-1 text-emerald-400 font-mono text-sm font-bold focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-emerald-400 font-mono text-sm font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                            GH₵ {Number(b.agent_price_ghs ?? (b.price_ghs * 0.90)).toFixed(2)}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-4 text-slate-300 font-sans">{b.validity || "Non-Expiry"}</td>
 
                       {/* 1-Click Instant Active/Hidden Toggle */}
                       <td className="p-4 font-sans">
@@ -513,7 +604,7 @@ function BundlesPage() {
                         </button>
                       </td>
 
-                      {/* Quick Actions */}
+                      {/* Actions */}
                       <td className="p-4 text-right font-sans">
                         <div className="flex items-center justify-end gap-2">
                           {isQuickEditing ? (
@@ -521,7 +612,7 @@ function BundlesPage() {
                               <button
                                 onClick={() => saveQuickEdit(b)}
                                 disabled={saveMutation.isPending}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl gold-gradient text-slate-950 text-xs font-black shadow-md"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl gold-gradient text-slate-950 text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all"
                               >
                                 <Save className="h-3.5 w-3.5" /> Save
                               </button>
@@ -536,15 +627,15 @@ function BundlesPage() {
                             <>
                               <button
                                 onClick={() => startQuickEdit(b)}
-                                className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:text-white hover:bg-white/10 text-xs font-bold flex items-center gap-1"
+                                className="px-3 py-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 text-xs font-bold flex items-center gap-1 transition-all"
                               >
-                                <Edit2 className="h-3 w-3 text-amber-400" /> Quick Price
+                                <Edit2 className="h-3 w-3" /> Edit Price
                               </button>
                               <button
                                 onClick={() => setEditing(b)}
                                 className="px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white text-xs font-bold"
                               >
-                                Edit
+                                Options
                               </button>
                               <button
                                 onClick={() => confirm(`Delete ${b.network} ${b.size_label} bundle?`) && deleteMutation.mutate(b.id)}

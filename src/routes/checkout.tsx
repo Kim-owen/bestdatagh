@@ -4,7 +4,7 @@ import { Check, Loader2, ShoppingBag, AlertCircle, ShieldCheck, Zap, Lock } from
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { useCart } from "@/lib/cart";
-import { createCheckoutOrder, verifyOrderPayment } from "@/lib/orders.functions";
+import { createCheckoutOrder, verifyOrderPayment, verifyPhoneNumber } from "@/lib/orders.functions";
 import { checkPhoneVerification, sendPhoneOtp } from "@/lib/otp.functions";
 import { OtpVerificationModal } from "@/components/site/OtpVerificationModal";
 import { InAppPaymentModal } from "@/components/site/InAppPaymentModal";
@@ -69,6 +69,23 @@ function Checkout() {
   const canPayWallet = user && walletBalance >= subtotal && subtotal > 0;
 
   const sendOtpFn = useServerFn(sendPhoneOtp);
+  const verifyFn = useServerFn(verifyPhoneNumber);
+
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    const clean = recipientPhone.replace(/\s+/g, "");
+    if (clean.length === 10 && /^\d{10}$/.test(clean)) {
+      setVerifying(true);
+      verifyFn({ data: { phone: clean } })
+        .then((res: any) => setVerifyResult(res))
+        .catch(() => setVerifyResult(null))
+        .finally(() => setVerifying(false));
+    } else {
+      setVerifyResult(null);
+    }
+  }, [recipientPhone]);
 
   const handleWalletCheckout = async () => {
     if (!validRecipientPhone || items.length === 0) return;
@@ -290,6 +307,30 @@ function Checkout() {
                       className="flex-1 bg-transparent py-3 pr-4 text-xs font-bold outline-none"
                     />
                   </div>
+
+                  {verifying && (
+                    <p className="text-[11px] text-amber-400 font-mono flex items-center gap-1.5 mt-1.5">
+                      <Loader2 className="h-3 w-3 animate-spin text-amber-400" /> Verifying SIM network & delivery time...
+                    </p>
+                  )}
+
+                  {verifyResult && (
+                    <div className="mt-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-400 space-y-1 font-mono animate-in fade-in">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1">
+                          <ShieldCheck className="h-4 w-4 text-emerald-400" /> {verifyResult.isMtn ? "MTN Verified SIM" : "Number Verified"}
+                        </span>
+                        <span className="text-[10px] bg-emerald-500/20 px-2.5 py-0.5 rounded-full text-emerald-300">
+                          Est. Delivery: ~15 seconds
+                        </span>
+                      </div>
+                      {verifyResult.recommendation === "activate_first" && (
+                        <p className="text-[11px] text-amber-300 font-sans mt-1">
+                          💡 New SIM detected: Recommend 1GB initial bundle for network activation.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-border/50">

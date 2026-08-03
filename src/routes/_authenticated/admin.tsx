@@ -46,10 +46,16 @@ function AdminShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
 
   // Query live admin stats for badges
-  const fnStats = useServerFn(adminStats);
   const { data: statsData } = useQuery({
     queryKey: ["adminStats"],
-    queryFn: () => fnStats(),
+    queryFn: async () => {
+      try {
+        const res = await fnStats();
+        return res || { pendingAgentAppsCount: 0, pendingWithdrawalsCount: 0 };
+      } catch (e) {
+        return { pendingAgentAppsCount: 0, pendingWithdrawalsCount: 0 };
+      }
+    },
     enabled: ok,
     refetchInterval: 30000,
   });

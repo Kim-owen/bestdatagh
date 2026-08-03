@@ -11,10 +11,6 @@ export function clearBundleCache() {
 }
 
 export const listActiveBundles = createServerFn({ method: "GET" }).handler(async () => {
-  const now = Date.now();
-  if (cachedBundles && now - cacheTime < CACHE_TTL_MS) {
-    return cachedBundles;
-  }
 
   const url = "https://vtdccqchhsbujknbpqku.supabase.co";
   const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";

@@ -16,10 +16,12 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as BulkRouteImport } from './routes/bulk'
 import { Route as BuyDataRouteImport } from './routes/buy-data'
+import { Route as CheckersRouteImport } from './routes/checkers'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as DevelopersRouteImport } from './routes/developers'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as FindAgentRouteImport } from './routes/find-agent'
+import { Route as MtnUp2uRouteImport } from './routes/mtn-up2u'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as TrackOrderRouteImport } from './routes/track-order'
@@ -52,6 +54,7 @@ import { Route as AuthenticatedAdminSupportTicketsRouteImport } from './routes/_
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminWalletsRouteImport } from './routes/_authenticated/admin.wallets'
 import { Route as AuthenticatedAdminWithdrawalsRouteImport } from './routes/_authenticated/admin.withdrawals'
+import { Route as ApiDatamartWebhookRouteImport } from './routes/api/datamart/webhook'
 import { Route as ApiPaystackWebhookRouteImport } from './routes/api/paystack/webhook'
 import { Route as ApiV1BalanceRouteImport } from './routes/api/v1/balance'
 import { Route as ApiV1BuyDataRouteImport } from './routes/api/v1/buy-data'
@@ -98,6 +101,11 @@ const BuyDataRoute = BuyDataRouteImport.update({
   path: '/buy-data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckersRoute = CheckersRouteImport.update({
+  id: '/checkers',
+  path: '/checkers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
@@ -116,6 +124,11 @@ const FaqRoute = FaqRouteImport.update({
 const FindAgentRoute = FindAgentRouteImport.update({
   id: '/find-agent',
   path: '/find-agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MtnUp2uRoute = MtnUp2uRouteImport.update({
+  id: '/mtn-up2u',
+  path: '/mtn-up2u',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewsRoute = ReviewsRouteImport.update({
@@ -296,6 +309,11 @@ const AuthenticatedAdminWithdrawalsRoute =
     path: '/withdrawals',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const ApiDatamartWebhookRoute = ApiDatamartWebhookRouteImport.update({
+  id: '/api/datamart/webhook',
+  path: '/api/datamart/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPaystackWebhookRoute = ApiPaystackWebhookRouteImport.update({
   id: '/api/paystack/webhook',
   path: '/api/paystack/webhook',
@@ -359,10 +377,12 @@ export interface FileRoutesByFullPath {
   '/blog': typeof BlogRouteWithChildren
   '/bulk': typeof BulkRoute
   '/buy-data': typeof BuyDataRoute
+  '/checkers': typeof CheckersRoute
   '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
   '/find-agent': typeof FindAgentRoute
+  '/mtn-up2u': typeof MtnUp2uRoute
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
@@ -394,6 +414,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/wallets': typeof AuthenticatedAdminWalletsRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
+  '/api/datamart/webhook': typeof ApiDatamartWebhookRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/api/v1/balance': typeof ApiV1BalanceRoute
   '/api/v1/buy-data': typeof ApiV1BuyDataRoute
@@ -414,10 +435,12 @@ export interface FileRoutesByTo {
   '/blog': typeof BlogRouteWithChildren
   '/bulk': typeof BulkRoute
   '/buy-data': typeof BuyDataRoute
+  '/checkers': typeof CheckersRoute
   '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
   '/find-agent': typeof FindAgentRoute
+  '/mtn-up2u': typeof MtnUp2uRoute
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
@@ -448,6 +471,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/wallets': typeof AuthenticatedAdminWalletsRoute
   '/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
+  '/api/datamart/webhook': typeof ApiDatamartWebhookRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/api/v1/balance': typeof ApiV1BalanceRoute
   '/api/v1/buy-data': typeof ApiV1BuyDataRoute
@@ -470,10 +494,12 @@ export interface FileRoutesById {
   '/blog': typeof BlogRouteWithChildren
   '/bulk': typeof BulkRoute
   '/buy-data': typeof BuyDataRoute
+  '/checkers': typeof CheckersRoute
   '/checkout': typeof CheckoutRouteWithChildren
   '/developers': typeof DevelopersRoute
   '/faq': typeof FaqRoute
   '/find-agent': typeof FindAgentRoute
+  '/mtn-up2u': typeof MtnUp2uRoute
   '/reviews': typeof ReviewsRoute
   '/support': typeof SupportRoute
   '/track-order': typeof TrackOrderRoute
@@ -505,6 +531,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/wallets': typeof AuthenticatedAdminWalletsRoute
   '/_authenticated/admin/withdrawals': typeof AuthenticatedAdminWithdrawalsRoute
+  '/api/datamart/webhook': typeof ApiDatamartWebhookRoute
   '/api/paystack/webhook': typeof ApiPaystackWebhookRoute
   '/api/v1/balance': typeof ApiV1BalanceRoute
   '/api/v1/buy-data': typeof ApiV1BuyDataRoute
@@ -527,10 +554,12 @@ export interface FileRouteTypes {
     | '/blog'
     | '/bulk'
     | '/buy-data'
+    | '/checkers'
     | '/checkout'
     | '/developers'
     | '/faq'
     | '/find-agent'
+    | '/mtn-up2u'
     | '/reviews'
     | '/support'
     | '/track-order'
@@ -562,6 +591,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/wallets'
     | '/admin/withdrawals'
+    | '/api/datamart/webhook'
     | '/api/paystack/webhook'
     | '/api/v1/balance'
     | '/api/v1/buy-data'
@@ -582,10 +612,12 @@ export interface FileRouteTypes {
     | '/blog'
     | '/bulk'
     | '/buy-data'
+    | '/checkers'
     | '/checkout'
     | '/developers'
     | '/faq'
     | '/find-agent'
+    | '/mtn-up2u'
     | '/reviews'
     | '/support'
     | '/track-order'
@@ -616,6 +648,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/wallets'
     | '/admin/withdrawals'
+    | '/api/datamart/webhook'
     | '/api/paystack/webhook'
     | '/api/v1/balance'
     | '/api/v1/buy-data'
@@ -637,10 +670,12 @@ export interface FileRouteTypes {
     | '/blog'
     | '/bulk'
     | '/buy-data'
+    | '/checkers'
     | '/checkout'
     | '/developers'
     | '/faq'
     | '/find-agent'
+    | '/mtn-up2u'
     | '/reviews'
     | '/support'
     | '/track-order'
@@ -672,6 +707,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/wallets'
     | '/_authenticated/admin/withdrawals'
+    | '/api/datamart/webhook'
     | '/api/paystack/webhook'
     | '/api/v1/balance'
     | '/api/v1/buy-data'
@@ -694,10 +730,12 @@ export interface RootRouteChildren {
   BlogRoute: typeof BlogRouteWithChildren
   BulkRoute: typeof BulkRoute
   BuyDataRoute: typeof BuyDataRoute
+  CheckersRoute: typeof CheckersRoute
   CheckoutRoute: typeof CheckoutRouteWithChildren
   DevelopersRoute: typeof DevelopersRoute
   FaqRoute: typeof FaqRoute
   FindAgentRoute: typeof FindAgentRoute
+  MtnUp2uRoute: typeof MtnUp2uRoute
   ReviewsRoute: typeof ReviewsRoute
   SupportRoute: typeof SupportRoute
   TrackOrderRoute: typeof TrackOrderRoute
@@ -705,6 +743,7 @@ export interface RootRouteChildren {
   PaymentMomoReferenceRoute: typeof PaymentMomoReferenceRoute
   PaymentReferenceRoute: typeof PaymentReferenceRoute
   StoreSlugRoute: typeof StoreSlugRoute
+  ApiDatamartWebhookRoute: typeof ApiDatamartWebhookRoute
   ApiPaystackWebhookRoute: typeof ApiPaystackWebhookRoute
   ApiV1BalanceRoute: typeof ApiV1BalanceRoute
   ApiV1BuyDataRoute: typeof ApiV1BuyDataRoute
@@ -769,6 +808,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BuyDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkers': {
+      id: '/checkers'
+      path: '/checkers'
+      fullPath: '/checkers'
+      preLoaderRoute: typeof CheckersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout': {
       id: '/checkout'
       path: '/checkout'
@@ -795,6 +841,13 @@ declare module '@tanstack/react-router' {
       path: '/find-agent'
       fullPath: '/find-agent'
       preLoaderRoute: typeof FindAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mtn-up2u': {
+      id: '/mtn-up2u'
+      path: '/mtn-up2u'
+      fullPath: '/mtn-up2u'
+      preLoaderRoute: typeof MtnUp2uRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reviews': {
@@ -1021,6 +1074,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminWithdrawalsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/api/datamart/webhook': {
+      id: '/api/datamart/webhook'
+      path: '/api/datamart/webhook'
+      fullPath: '/api/datamart/webhook'
+      preLoaderRoute: typeof ApiDatamartWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/paystack/webhook': {
       id: '/api/paystack/webhook'
       path: '/api/paystack/webhook'
@@ -1204,10 +1264,12 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRoute: BlogRouteWithChildren,
   BulkRoute: BulkRoute,
   BuyDataRoute: BuyDataRoute,
+  CheckersRoute: CheckersRoute,
   CheckoutRoute: CheckoutRouteWithChildren,
   DevelopersRoute: DevelopersRoute,
   FaqRoute: FaqRoute,
   FindAgentRoute: FindAgentRoute,
+  MtnUp2uRoute: MtnUp2uRoute,
   ReviewsRoute: ReviewsRoute,
   SupportRoute: SupportRoute,
   TrackOrderRoute: TrackOrderRoute,
@@ -1215,6 +1277,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentMomoReferenceRoute: PaymentMomoReferenceRoute,
   PaymentReferenceRoute: PaymentReferenceRoute,
   StoreSlugRoute: StoreSlugRoute,
+  ApiDatamartWebhookRoute: ApiDatamartWebhookRoute,
   ApiPaystackWebhookRoute: ApiPaystackWebhookRoute,
   ApiV1BalanceRoute: ApiV1BalanceRoute,
   ApiV1BuyDataRoute: ApiV1BuyDataRoute,

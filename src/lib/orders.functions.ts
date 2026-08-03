@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { initializePaystackTransaction, verifyPaystackTransaction, checkPaystackChargeStatus, listRecentPaystackTransactions, chargePaystackMobileMoney, submitPaystackOtp, resolvePaystackAccount, createPaystackCustomer, createPaystackPaymentRequest, notifyPaystackPaymentRequest } from "./paystack";
 import { mapToSwiftDataNetwork, parseSizeGb, buySwiftDataBundle, getSwiftDataOrder, getSwiftDataApiKey } from "./swiftdata";
+import { dispatchDataBundle, queryProviderOrderStatus } from "./provider-dispatch";
 import { createUserNotification } from "./agent.functions";
 import { sendTransactionalEmail } from "./email.functions";
 
@@ -655,20 +656,18 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
             }).catch(() => {});
           }
 
-          // Trigger automated dispatch via SwiftData API if configured
+          // Trigger automated dispatch via Provider API (DataMart / SwiftData)
           const firstItem = order.order_items?.[0];
-          if (firstItem && getSwiftDataApiKey()) {
+          if (firstItem) {
             try {
-              const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
-              const sizeGb = parseSizeGb(firstItem.size_label);
-              const swiftRes = await buySwiftDataBundle({
+              const dispatchRes = await dispatchDataBundle({
                 phone: firstItem.recipient_phone,
-                network: swiftNet,
-                sizeGb,
+                network: firstItem.network,
+                sizeLabel: firstItem.size_label,
                 reference: order.reference,
               });
 
-              if (swiftRes?.order?.status === "completed" || swiftRes?.status === "completed" || swiftRes?.success) {
+              if (dispatchRes.success && dispatchRes.status === "completed") {
                 await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
                 await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
                 const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
@@ -703,8 +702,8 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
                 }
                 return { status: "delivered", order: { ...order, status: "delivered" } };
               }
-            } catch (swiftErr) {
-              console.warn("[SwiftData Dispatch Notice]:", swiftErr);
+            } catch (dispatchErr) {
+              console.warn("[Provider Dispatch Notice]:", dispatchErr);
             }
           }
 
@@ -715,92 +714,66 @@ export const pollOrderStatus = createServerFn({ method: "POST" })
       }
     }
 
-    // 2. If status is paid or processing, check order status via SwiftData API or progress transition
+    // 2. If status is paid or processing, check order status via Provider API
     if (order.status === "paid" || order.status === "processing") {
       const firstItem = (order.order_items && order.order_items[0]) || {};
-      const hasSwiftKey = Boolean(getSwiftDataApiKey());
+      const providerCheck = await queryProviderOrderStatus(order.reference);
 
-      // Check SwiftData API if configured
-      if (hasSwiftKey) {
-        try {
-          const swiftOrderRes = await getSwiftDataOrder(order.reference);
-          const swiftStatus = (swiftOrderRes?.order?.status || swiftOrderRes?.status || "").toLowerCase();
-
-          if (swiftStatus === "completed" || swiftStatus === "delivered") {
-            await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
-            await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
-            const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
-            await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
-            
-            if ((order as any).user_id) {
-              await createUserNotification({
-                userId: (order as any).user_id,
-                type: "order_delivered",
-                title: "Data Bundle Delivered 🚀",
-                body: `Your ${firstItem.network} ${firstItem.size_label} bundle has been delivered to ${firstItem.recipient_phone}. Ref: ${order.reference}`,
-                link: `/track-order?ref=${order.reference}`,
-              });
-            }
-            return { status: "delivered", order: { ...order, status: "delivered" } };
-          } else if (swiftStatus === "failed") {
-            await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);
-            await supabaseAdmin.from("order_items").update({ status: "failed" }).eq("order_id", order.id);
-            
-            if ((order as any).user_id) {
-              await createUserNotification({
-                userId: (order as any).user_id,
-                type: "order_failed",
-                title: "Order Fulfillment Issue ⚠️",
-                body: `Order #${order.reference} failed delivery. Please contact support.`,
-                link: `/track-order?ref=${order.reference}`,
-              });
-            }
-            return { status: "failed", order: { ...order, status: "failed" } };
-          } else {
-            // SwiftData order is pending/processing -> keep processing
-            if (order.status !== "processing") {
-              await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
-            }
-            return { status: "processing", order: { ...order, status: "processing" } };
+      if (providerCheck.found) {
+        if (providerCheck.status === "completed") {
+          await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
+          await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
+          const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+          await sendOrderDeliveredSms(firstItem.recipient_phone, order.reference, firstItem.size_label, firstItem.network).catch(() => {});
+          
+          if ((order as any).user_id) {
+            await createUserNotification({
+              userId: (order as any).user_id,
+              type: "order_delivered",
+              title: "Data Bundle Delivered 🚀",
+              body: `Your ${firstItem.network} ${firstItem.size_label} bundle has been delivered to ${firstItem.recipient_phone}. Ref: ${order.reference}`,
+              link: `/track-order?ref=${order.reference}`,
+            });
           }
-        } catch {
-          // If SwiftData order not found yet (e.g. initial dispatch pending), try dispatching
-          if (firstItem.network && firstItem.size_label && firstItem.recipient_phone) {
-            try {
-              const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
-              const sizeGb = parseSizeGb(firstItem.size_label);
-              await buySwiftDataBundle({
-                phone: firstItem.recipient_phone,
-                network: swiftNet,
-                sizeGb,
-                reference: order.reference,
-              });
-            } catch (dispatchErr) {
-              console.warn("[SwiftData Re-dispatch Notice]:", dispatchErr);
-            }
+          return { status: "delivered", order: { ...order, status: "delivered" } };
+        } else if (providerCheck.status === "failed") {
+          await supabaseAdmin.from("orders").update({ status: "failed" }).eq("id", order.id);
+          await supabaseAdmin.from("order_items").update({ status: "failed" }).eq("order_id", order.id);
+          
+          if ((order as any).user_id) {
+            await createUserNotification({
+              userId: (order as any).user_id,
+              type: "order_failed",
+              title: "Order Fulfillment Issue ⚠️",
+              body: `Order #${order.reference} failed delivery. Please contact support.`,
+              link: `/track-order?ref=${order.reference}`,
+            });
           }
+          return { status: "failed", order: { ...order, status: "failed" } };
+        } else {
           if (order.status !== "processing") {
             await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
           }
           return { status: "processing", order: { ...order, status: "processing" } };
         }
       } else {
-        // Fallback for environment without SwiftData API key (local preview mode)
-        const createdAt = new Date(order.created_at).getTime();
-        const elapsed = Date.now() - createdAt;
-
-        if (elapsed > 5000) {
-          await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
-          await supabaseAdmin.from("order_items").update({ status: "delivered" }).eq("order_id", order.id);
-          return { status: "delivered", order: { ...order, status: "delivered" } };
-        } else if (elapsed > 2000) {
-          if (order.status !== "processing") {
-            await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+        // Provider status not found yet -> try re-dispatching
+        if (firstItem.network && firstItem.size_label && firstItem.recipient_phone) {
+          try {
+            await dispatchDataBundle({
+              phone: firstItem.recipient_phone,
+              network: firstItem.network,
+              sizeLabel: firstItem.size_label,
+              reference: order.reference,
+            });
+          } catch (dispatchErr) {
+            console.warn("[Provider Re-dispatch Notice]:", dispatchErr);
           }
-          return { status: "processing", order: { ...order, status: "processing" } };
         }
-
-        return { status: "paid", order: { ...order, status: "paid" } };
+        if (order.status !== "processing") {
+          await supabaseAdmin.from("orders").update({ status: "processing" }).eq("id", order.id);
+        }
+        return { status: "processing", order: { ...order, status: "processing" } };
       }
     }
 
@@ -894,4 +867,11 @@ export const smartTrackOrders = createServerFn({ method: "POST" })
     }
 
     return { orders: ordersList };
+  });
+
+export const verifyPhoneNumber = createServerFn({ method: "POST" })
+  .validator((data: { phone: string }) => ({ phone: String(data.phone || "").trim() }))
+  .handler(async ({ data }) => {
+    const { verifyDataMartNumber } = await import("./datamart");
+    return await verifyDataMartNumber(data.phone);
   });

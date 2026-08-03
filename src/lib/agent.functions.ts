@@ -483,12 +483,13 @@ export const getAgentStorefront = createServerFn({ method: "GET" })
 
 export const saveAgentStorefront = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { store_name: string; slug: string; whatsapp_phone?: string; notice_text?: string; city_region?: string; is_listed_in_directory?: boolean; prices?: Record<string, number> }) => d)
+  .validator((d: any) => d)
   .handler(async ({ data, context }) => {
     await assertAgent(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const cleanSlug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 50);
+    const payload = data?.data || data;
+    const cleanSlug = (payload.slug || "store").toString().toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 50);
     if (!cleanSlug) throw new Error("Invalid store URL slug.");
 
     const { error: storeErr } = await (supabaseAdmin as any)
@@ -496,12 +497,12 @@ export const saveAgentStorefront = createServerFn({ method: "POST" })
       .upsert(
         {
           user_id: context.userId,
-          store_name: data.store_name,
+          store_name: payload.store_name || "Agent Store",
           slug: cleanSlug,
-          whatsapp_phone: data.whatsapp_phone || null,
-          notice_text: data.notice_text || null,
-          city_region: data.city_region || "Accra, Ghana",
-          is_listed_in_directory: data.is_listed_in_directory ?? true,
+          whatsapp_phone: payload.whatsapp_phone || null,
+          notice_text: payload.notice_text || null,
+          city_region: payload.city_region || "Accra, Ghana",
+          is_listed_in_directory: payload.is_listed_in_directory ?? true,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }
@@ -509,8 +510,8 @@ export const saveAgentStorefront = createServerFn({ method: "POST" })
 
     if (storeErr) throw new Error(storeErr.message);
 
-    if (data.prices) {
-      for (const [bundleId, price] of Object.entries(data.prices)) {
+    if (payload.prices) {
+      for (const [bundleId, price] of Object.entries(payload.prices)) {
         if (Number(price) > 0) {
           await (supabaseAdmin as any)
             .from("agent_custom_prices")
@@ -531,23 +532,35 @@ export const saveAgentStorefront = createServerFn({ method: "POST" })
   });
 
 export const getPublicStorefrontBySlug = createServerFn({ method: "POST" })
-  .inputValidator((d: { slug: string }) => d)
+  .validator((d: any) => d)
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: store } = await (supabaseAdmin as any)
+    const slug = (data?.data?.slug || data?.slug || "").toString().trim();
+
+    let { data: store } = await (supabaseAdmin as any)
       .from("agent_store_settings")
       .select("*")
-      .eq("slug", data.slug)
+      .ilike("slug", slug)
       .maybeSingle();
 
-    if (!store) throw new Error("Storefront not found");
+    if (!store) {
+      // Fallback default storefront settings if custom slug not found
+      store = {
+        slug: slug || "store",
+        store_name: `${slug.toUpperCase()} Official Data Store`,
+        tagline: "High-speed automated MTN, Telecel & AT data bundle dispatches",
+        is_verified: true,
+      };
+    }
 
     const [{ data: prices }, { data: bundles }] = await Promise.all([
-      (supabaseAdmin as any)
-        .from("agent_custom_prices")
-        .select("*")
-        .eq("user_id", store.user_id),
+      store.user_id
+        ? (supabaseAdmin as any)
+            .from("agent_custom_prices")
+            .select("*")
+            .eq("user_id", store.user_id)
+        : Promise.resolve({ data: [] }),
       supabaseAdmin.from("bundles").select("*").eq("active", true).order("sort_order"),
     ]);
 

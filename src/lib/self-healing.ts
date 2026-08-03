@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { getSwiftDataBalance, getSwiftDataPackages, buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } from "@/lib/swiftdata";
+import { getDataMartBalance, getDataMartApiKey } from "@/lib/datamart";
+import { dispatchDataBundle } from "@/lib/provider-dispatch";
 import { clearBundleCache } from "@/lib/public-bundles.functions";
 import { sendTransactionalEmail } from "@/lib/email.functions";
 import { verifyPaystackTransaction } from "@/lib/paystack";
@@ -81,7 +83,7 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
           const existingId = existingMap.get(key);
 
           if (existingId) {
-            await supa.from("bundles").update({ size_mb: sizeMb, price_ghs: priceGhs, active: true }).eq("id", existingId);
+            await supa.from("bundles").update({ size_mb: sizeMb, active: true }).eq("id", existingId);
           } else {
             await supa.from("bundles").insert({
               network: netName,
@@ -106,28 +108,35 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
 
   // 3. Audit Provider API & Balance + Low Balance Alert
   try {
-    const balRes = await getSwiftDataBalance();
-    if (balRes && balRes.success) {
-      providerBalanceGhs = Number(balRes.balance || 0);
-
-      // Low Balance Alert: Trigger email notification if provider balance < GH₵ 50
-      if (providerBalanceGhs < 50) {
-        repairedItems.push(`Low Balance Alert Triggered: Current SwiftData balance is GH₵ ${providerBalanceGhs.toFixed(2)}`);
-        await sendTransactionalEmail({
-          to: process.env.ADMIN_EMAIL || "support@bestdatagh.com",
-          subject: `Low Provider Balance Alert - GH₵ ${providerBalanceGhs.toFixed(2)} Remaining`,
-          badge: "Low Balance Warning",
-          title: "Low Provider API Balance Alert ⚠️",
-          bodyText: `Your SwiftData provider API balance has dropped to GH₵ ${providerBalanceGhs.toFixed(2)}. Please top up your API balance to avoid order dispatch disruptions.`,
-          actionUrl: "https://ghana-data-hub-gold.vercel.app/admin",
-          actionText: "Open Admin Portal",
-          details: [
-            { label: "Current Balance", value: `GH₵ ${providerBalanceGhs.toFixed(2)}` },
-            { label: "Recommended Threshold", value: "GH₵ 50.00+" },
-            { label: "Status", value: "Action Required" },
-          ],
-        }).catch(() => {});
+    if (getDataMartApiKey()) {
+      const dmBal = await getDataMartBalance();
+      if (dmBal && dmBal.status === "success") {
+        providerBalanceGhs = dmBal.balance;
       }
+    } else {
+      const balRes = await getSwiftDataBalance();
+      if (balRes && balRes.success) {
+        providerBalanceGhs = Number(balRes.balance || 0);
+      }
+    }
+
+    // Low Balance Alert: Trigger email notification if provider balance < GH₵ 50
+    if (providerBalanceGhs < 50 && providerBalanceGhs >= 0) {
+      repairedItems.push(`Low Balance Alert Triggered: Current Provider API balance is GH₵ ${providerBalanceGhs.toFixed(2)}`);
+      await sendTransactionalEmail({
+        to: process.env.ADMIN_EMAIL || "support@bestdatagh.com",
+        subject: `Low Provider Balance Alert - GH₵ ${providerBalanceGhs.toFixed(2)} Remaining`,
+        badge: "Low Balance Warning",
+        title: "Low Provider API Balance Alert ⚠️",
+        bodyText: `Your provider API balance has dropped to GH₵ ${providerBalanceGhs.toFixed(2)}. Please top up your API balance to avoid order dispatch disruptions.`,
+        actionUrl: "https://ghana-data-hub-gold.vercel.app/admin",
+        actionText: "Open Admin Portal",
+        details: [
+          { label: "Current Balance", value: `GH₵ ${providerBalanceGhs.toFixed(2)}` },
+          { label: "Recommended Threshold", value: "GH₵ 50.00+" },
+          { label: "Status", value: "Action Required" },
+        ],
+      }).catch(() => {});
     }
   } catch (balErr: any) {
     repairedItems.push(`Provider balance check warning: ${balErr.message}`);
@@ -151,16 +160,14 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
           if (verifyRes.data?.status === "success") {
             const firstItem = (ord.order_items && ord.order_items[0]) as any;
             if (firstItem) {
-              const swiftNet = mapToSwiftDataNetwork(firstItem.network, firstItem.size_label);
-              const sizeGb = parseSizeGb(firstItem.size_label);
-              const swiftRes = await buySwiftDataBundle({
+              const dispatchRes = await dispatchDataBundle({
                 phone: firstItem.recipient_phone,
-                network: swiftNet,
-                sizeGb,
+                network: firstItem.network,
+                sizeLabel: firstItem.size_label,
                 reference: ord.reference,
               });
 
-              if (swiftRes?.order?.status === "completed" || swiftRes?.status === "completed" || swiftRes?.success) {
+              if (dispatchRes.success && dispatchRes.status === "completed") {
                 await supa.from("orders").update({ status: "delivered" }).eq("id", ord.id);
                 await supa.from("order_items").update({ status: "delivered" }).eq("order_id", ord.id);
                 reconciledCount++;
@@ -168,15 +175,15 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
             }
           }
         } catch {
-          // Ignore individual order reconciliation error
+          // Skip if verification fails
         }
       }
       if (reconciledCount > 0) {
-        repairedItems.push(`Auto-reconciliation: Fulfilling & delivered ${reconciledCount} pending orders`);
+        repairedItems.push(`Auto-reconciled ${reconciledCount} pending orders via automated payment verification`);
       }
     }
   } catch (recErr: any) {
-    repairedItems.push(`Auto-reconciliation notice: ${recErr.message}`);
+    repairedItems.push(`Reconciliation error: ${recErr.message}`);
   }
 
   return {

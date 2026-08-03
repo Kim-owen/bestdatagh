@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Menu, Moon, ShoppingBag, Sun, X, User as UserIcon, LogOut, Shield, KeyRound, Upload, Store,
   Home, Smartphone, Users, Package, Search, Code, Star, HelpCircle, Sparkles, ChevronRight, Zap,
-  Wallet, Plus
+  Wallet, Plus, GraduationCap
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart";
@@ -41,6 +41,7 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
     return [
       { label: "Home", to: "/" as const, search: undefined, icon: Home },
       { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+      { label: "Result Checkers", to: "/checkers" as const, search: undefined, icon: GraduationCap },
       { label: "Find Agent", to: "/find-agent" as const, search: undefined, icon: Users },
       { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
       { label: "Become an Agent", to: "/agents" as const, search: undefined, icon: Users },
@@ -50,11 +51,12 @@ export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: 
   // Public / Visitor Nav
   return [
     { label: "Home", to: "/" as const, search: undefined, icon: Home },
+    { label: "MTN UP2U", to: "/mtn-up2u" as const, search: undefined, icon: Zap },
     { label: "Buy Data", to: "/buy-data" as const, search: { network: "MTN" as const }, icon: Smartphone },
+    { label: "Result Checkers", to: "/checkers" as const, search: undefined, icon: GraduationCap },
     { label: "Find Agent", to: "/find-agent" as const, search: undefined, icon: Users },
     { label: "Agent Program", to: "/agents" as const, search: undefined, icon: Users },
     { label: "Track Order", to: "/track-order" as const, search: undefined, icon: Search },
-    { label: "Reviews", to: "/reviews" as const, search: undefined, icon: Star },
   ];
 }
 

@@ -11,6 +11,8 @@ import {
   Smartphone, ShieldCheck, Sparkles, FileText, ShoppingBag, Copy, Check
 } from "lucide-react";
 
+import { DeliveryProgressTracker } from "@/components/site/DeliveryProgressTracker";
+
 export const Route = createFileRoute("/track-order")({
   head: () => ({
     meta: [
@@ -220,6 +222,18 @@ function TrackOrder() {
           {/* Order Cards List */}
           {orders.length > 0 && (
             <div className="space-y-4 pt-4">
+              {/* Delivery Progress Tracker Widget */}
+              <DeliveryProgressTracker
+                orders={orders.map((o) => ({
+                  id: o.id,
+                  reference: o.reference,
+                  placedAt: o.created_at,
+                  deliveredAt: o.updated_at || o.created_at,
+                  status: o.status,
+                  durationLabel: "15s",
+                }))}
+              />
+
               <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest">
                 Found {orders.length} Order{orders.length > 1 ? "s" : ""}
               </h3>
@@ -249,7 +263,7 @@ function TrackOrder() {
                         )}
                         {isProcessing && (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 px-3 py-1 text-xs font-black text-amber-400">
-                            <Clock className="h-3.5 w-3.5 animate-spin" /> Processing
+                            <Clock className="h-3.5 w-3.5 animate-spin" /> Processing (~15s)
                           </span>
                         )}
                         {isFailed && (
@@ -259,6 +273,19 @@ function TrackOrder() {
                         )}
                       </div>
                     </div>
+
+                    {/* Delivery Time & Status Banner */}
+                    {isProcessing && (
+                      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-center justify-between font-mono animate-in fade-in">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                          <span>Fulfillment Pipeline: Dispatching bundle to SIM...</span>
+                        </div>
+                        <span className="font-bold text-[11px] bg-slate-950 px-2.5 py-1 rounded-full border border-amber-400/30">
+                          Est. Time: ~15 sec
+                        </span>
+                      </div>
+                    )}
 
                     {/* Order Items */}
                     <div className="space-y-2">

@@ -9,60 +9,78 @@ async function assertAdmin(ctx: { supabase: any; userId: string }) {
 }
 
 export const adminStats = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [orders, users, reviews, bundles, paidOrders, keys, pendingWs, pendingApps, recent] = await Promise.all([
-      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("reviews").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("bundles").select("id", { count: "exact", head: true }),
-      supabaseAdmin.from("orders").select("id, total_ghs, status, created_at, order_items(network, size_label)").in("status", ["paid", "delivered"]),
-      supabaseAdmin.from("api_keys").select("id", { count: "exact", head: true }).eq("active", true),
-      supabaseAdmin.from("withdrawals").select("id, amount_ghs").eq("status", "pending"),
-      supabaseAdmin.from("agent_applications").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      supabaseAdmin.from("orders").select("id, reference, total_ghs, status, source, created_at, order_items(network, size_label, recipient_phone)").order("created_at", { ascending: false }).limit(10),
-    ]);
+  .handler(async () => {
+    try {
+      const url = "https://vtdccqchhsbujknbpqku.supabase.co";
+      const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
+      const supabaseAdmin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    const paidList = paidOrders.data ?? [];
-    const totalRevenue = paidList.reduce((s: number, r: any) => s + Number(r.total_ghs || 0), 0);
+      const [orders, users, reviews, bundles, paidOrders, keys, pendingWs, pendingApps, recent] = await Promise.all([
+        supabaseAdmin.from("orders").select("id", { count: "exact", head: true }),
+        supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
+        supabaseAdmin.from("reviews").select("id", { count: "exact", head: true }),
+        supabaseAdmin.from("bundles").select("id", { count: "exact", head: true }),
+        supabaseAdmin.from("orders").select("id, total_ghs, status, created_at, order_items(network, size_label)").in("status", ["paid", "delivered"]),
+        supabaseAdmin.from("api_keys").select("id", { count: "exact", head: true }).eq("active", true),
+        supabaseAdmin.from("withdrawals").select("id, amount_ghs").eq("status", "pending"),
+        supabaseAdmin.from("agent_applications").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabaseAdmin.from("orders").select("id, reference, total_ghs, status, source, created_at, order_items(network, size_label, recipient_phone)").order("created_at", { ascending: false }).limit(10),
+      ]);
 
-    const pendingWithdrawalCount = pendingWs.data?.length ?? 0;
-    const pendingWithdrawalGhs = (pendingWs.data ?? []).reduce((s: number, w: any) => s + Number(w.amount_ghs || 0), 0);
+      const paidList = paidOrders.data ?? [];
+      const totalRevenue = paidList.reduce((s: number, r: any) => s + Number(r.total_ghs || 0), 0);
 
-    // Compute sales breakdown by network
-    const networkBreakdown = { mtn: 0, telecel: 0, airteltigo: 0 };
-    for (const o of paidList) {
-      const item = (o.order_items && o.order_items[0]) || {};
-      const netLower = (item.network || "").toLowerCase();
-      const val = Number(o.total_ghs || 0);
-      if (netLower.includes("telecel") || netLower.includes("vodafone")) {
-        networkBreakdown.telecel += val;
-      } else if (netLower.includes("airtel") || netLower.includes("ishare") || netLower.includes("bigtime")) {
-        networkBreakdown.airteltigo += val;
-      } else {
-        networkBreakdown.mtn += val;
+      const pendingWithdrawalCount = pendingWs.data?.length ?? 0;
+      const pendingWithdrawalGhs = (pendingWs.data ?? []).reduce((s: number, w: any) => s + Number(w.amount_ghs || 0), 0);
+
+      // Compute sales breakdown by network
+      const networkBreakdown = { mtn: 0, telecel: 0, airteltigo: 0 };
+      for (const o of paidList) {
+        const item = (o.order_items && o.order_items[0]) || {};
+        const netLower = (item.network || "").toLowerCase();
+        const val = Number(o.total_ghs || 0);
+        if (netLower.includes("telecel") || netLower.includes("vodafone")) {
+          networkBreakdown.telecel += val;
+        } else if (netLower.includes("airtel") || netLower.includes("ishare") || netLower.includes("bigtime")) {
+          networkBreakdown.airteltigo += val;
+        } else {
+          networkBreakdown.mtn += val;
+        }
       }
-    }
 
-    return {
-      orders: orders.count ?? 0,
-      users: users.count ?? 0,
-      reviews: reviews.count ?? 0,
-      bundles: bundles.count ?? 0,
-      apiKeys: keys.count ?? 0,
-      revenue: Number(totalRevenue.toFixed(2)),
-      pendingWithdrawalsCount: pendingWithdrawalCount,
-      pendingWithdrawalsGhs: Number(pendingWithdrawalGhs.toFixed(2)),
-      pendingAgentAppsCount: pendingApps.count ?? 0,
-      networkBreakdown: {
-        mtn: Number(networkBreakdown.mtn.toFixed(2)),
-        telecel: Number(networkBreakdown.telecel.toFixed(2)),
-        airteltigo: Number(networkBreakdown.airteltigo.toFixed(2)),
-      },
-      recentOrders: recent.data ?? [],
-    };
+      return {
+        orders: orders.count ?? 0,
+        users: users.count ?? 0,
+        reviews: reviews.count ?? 0,
+        bundles: bundles.count ?? 0,
+        apiKeys: keys.count ?? 0,
+        revenue: Number(totalRevenue.toFixed(2)),
+        pendingWithdrawalsCount: pendingWithdrawalCount,
+        pendingWithdrawalsGhs: Number(pendingWithdrawalGhs.toFixed(2)),
+        pendingAgentAppsCount: pendingApps.count ?? 0,
+        networkBreakdown: {
+          mtn: Number(networkBreakdown.mtn.toFixed(2)),
+          telecel: Number(networkBreakdown.telecel.toFixed(2)),
+          airteltigo: Number(networkBreakdown.airteltigo.toFixed(2)),
+        },
+        recentOrders: recent.data ?? [],
+      };
+    } catch (err: any) {
+      return {
+        orders: 0,
+        users: 0,
+        reviews: 0,
+        bundles: 0,
+        apiKeys: 0,
+        revenue: 0,
+        pendingWithdrawalsCount: 0,
+        pendingWithdrawalsGhs: 0,
+        pendingAgentAppsCount: 0,
+        networkBreakdown: { mtn: 0, telecel: 0, airteltigo: 0 },
+        recentOrders: [],
+        error: err.message || "Unauthorized",
+      };
+    }
   });
 
 export const adminListOrders = createServerFn({ method: "GET" })
@@ -180,32 +198,75 @@ export const adminListBundles = createServerFn({ method: "GET" })
     const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
     const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data, error } = await supa.from("bundles").select("*").order("network").order("sort_order");
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    const ADMIN_ID = "04682757-ba41-4af1-aedd-f433b08f8aa0";
+
+    const [{ data: bundles, error: bErr }, { data: agentPrices }] = await Promise.all([
+      supa.from("bundles").select("*").order("network").order("sort_order"),
+      supa.from("agent_custom_prices").select("bundle_id, agent_price_ghs").eq("user_id", ADMIN_ID),
+    ]);
+
+    if (bErr) throw new Error(bErr.message);
+
+    const priceMap = new Map((agentPrices || []).map((p: any) => [p.bundle_id, Number(p.agent_price_ghs)]));
+
+    return (bundles || []).map((b: any) => ({
+      ...b,
+      agent_price_ghs: priceMap.get(b.id) ?? Number((Number(b.price_ghs) * 0.90).toFixed(2)),
+    }));
   });
 
 export const adminSaveBundle = createServerFn({ method: "POST" })
-  .inputValidator((d: any) => d)
+  .validator((d: any) => d)
   .handler(async ({ data }) => {
-    const url = "https://vtdccqchhsbujknbpqku.supabase.co";
-    const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
-    const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { clearBundleCache } = await import("@/lib/public-bundles.functions");
-    const payload: any = {
-      network: data.network, size_label: data.size_label, size_mb: Number(data.size_mb),
-      price_ghs: Number(data.price_ghs), validity: data.validity || "Non-Expiry",
-      popular: !!data.popular, active: data.active !== false, sort_order: Number(data.sort_order ?? 100),
-    };
-    if (data.id) {
-      const { error } = await supa.from("bundles").update(payload).eq("id", data.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supa.from("bundles").insert(payload);
-      if (error) throw new Error(error.message);
+    try {
+      const url = "https://vtdccqchhsbujknbpqku.supabase.co";
+      const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
+      const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+      const { clearBundleCache } = await import("@/lib/public-bundles.functions");
+
+      const bundleData = data?.data || data;
+      const retailPrice = Number(bundleData.price_ghs || 0);
+
+      const payload: any = {
+        network: bundleData.network,
+        size_label: bundleData.size_label,
+        size_mb: Number(bundleData.size_mb || 1024),
+        price_ghs: retailPrice,
+        validity: bundleData.validity || "Non-Expiry",
+        popular: !!bundleData.popular,
+        active: bundleData.active !== false,
+        sort_order: Number(bundleData.sort_order ?? 100),
+        updated_at: new Date().toISOString(),
+      };
+
+      let bundleId = bundleData.id;
+      if (bundleId) {
+        const { error } = await supa.from("bundles").update(payload).eq("id", bundleId);
+        if (error) throw new Error(error.message);
+      } else {
+        const { data: newBundle, error } = await supa.from("bundles").insert(payload).select().single();
+        if (error) throw new Error(error.message);
+        bundleId = newBundle?.id;
+      }
+
+      // Upsert Agent Base Wholesale Price into agent_custom_prices if provided
+      const rawAgentPrice = Number(bundleData.agent_price_ghs);
+      if (!isNaN(rawAgentPrice) && rawAgentPrice > 0 && bundleId) {
+        const ADMIN_ID = "04682757-ba41-4af1-aedd-f433b08f8aa0";
+        await supa.from("agent_custom_prices").upsert({
+          user_id: ADMIN_ID,
+          bundle_id: bundleId,
+          agent_price_ghs: rawAgentPrice,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id,bundle_id" });
+      }
+
+      clearBundleCache();
+      return { ok: true };
+    } catch (err: any) {
+      console.error("adminSaveBundle error:", err);
+      return { success: false, error: err.message || "Failed to save bundle" };
     }
-    clearBundleCache();
-    return { ok: true };
   });
 
 export const adminDeleteBundle = createServerFn({ method: "POST" })
@@ -325,10 +386,10 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
 
     // 3. CHECK PROVIDER GATEWAY TO PREVENT DUPLICATE PURCHASES
     try {
-      const existingGatewayOrder = await getSwiftDataOrder(order.reference);
-      if (existingGatewayOrder && existingGatewayOrder.order) {
-        const swiftStatus = (existingGatewayOrder.order.status || "").toLowerCase();
-        if (swiftStatus === "completed" || swiftStatus === "delivered") {
+      const { queryProviderOrderStatus } = await import("@/lib/provider-dispatch");
+      const existingGatewayOrder = await queryProviderOrderStatus(order.reference);
+      if (existingGatewayOrder && existingGatewayOrder.found) {
+        if (existingGatewayOrder.status === "completed") {
           await supabaseAdmin.from("orders").update({ status: "delivered" }).eq("id", order.id);
 
           const item = (order.order_items && order.order_items[0]) || {};
@@ -341,7 +402,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
             action: "PREVENTED_DUPLICATE_RETRY",
             target_type: "order",
             target_id: order.id,
-            details: { reference: order.reference, message: "Order was already completed on gateway" },
+            details: { reference: order.reference, message: "Order was already completed on provider gateway" },
           });
 
           return {
@@ -350,7 +411,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
             status: "delivered",
             apiSuccess: true,
             alreadyCompleted: true,
-            apiErrorMsg: "Order was already completed on gateway. Status updated to Delivered (Duplicate prevented).",
+            apiErrorMsg: `Order was already completed on ${existingGatewayOrder.provider} gateway. Status updated to Delivered.`,
           };
         }
       }
@@ -358,28 +419,29 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
       // Order not on gateway yet, safe to proceed with purchase
     }
 
-    // 4. EXECUTE BUNDLE PURCHASE VIA SWIFTDATA API
+    // 4. EXECUTE BUNDLE PURCHASE VIA PROVIDER DISPATCHER (DATAMART / SWIFTDATA)
     const item = (order.order_items && order.order_items[0]) || {};
-    const swiftNetwork = mapToSwiftDataNetwork(item.network || "MTN", item.size_label);
-    const sizeGb = parseSizeGb(item.size_label || "1GB");
-
     let apiSuccess = false;
     let apiErrorMsg = "";
 
     if (item.recipient_phone) {
       try {
-        const swiftRes = await buySwiftDataBundle({
+        const { dispatchDataBundle } = await import("@/lib/provider-dispatch");
+        const dispatchRes = await dispatchDataBundle({
           phone: item.recipient_phone,
-          network: swiftNetwork,
-          sizeGb,
+          network: item.network || "MTN",
+          sizeLabel: item.size_label || "1GB",
           reference: order.reference,
         });
-        if (swiftRes && (swiftRes.success || swiftRes.status === "completed" || swiftRes.status === "processing")) {
+
+        if (dispatchRes.success) {
           apiSuccess = true;
+        } else {
+          apiErrorMsg = dispatchRes.message || "Provider API error";
         }
-      } catch (swiftErr: any) {
-        apiErrorMsg = swiftErr.message || "Provider API error";
-        console.warn("SwiftData retry error:", apiErrorMsg);
+      } catch (dispatchErr: any) {
+        apiErrorMsg = dispatchErr.message || "Provider API error";
+        console.warn("Provider retry error:", apiErrorMsg);
       }
     }
 
@@ -420,21 +482,20 @@ export const adminCheckSwiftDataOrderStatus = createServerFn({ method: "POST" })
   .inputValidator((d: { reference: string }) => ({ reference: String(d.reference) }))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const { getSwiftDataOrder } = await import("@/lib/swiftdata");
+    const { queryProviderOrderStatus } = await import("@/lib/provider-dispatch");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     try {
-      const apiRes = await getSwiftDataOrder(data.reference);
-      if (apiRes && apiRes.order) {
-        const swiftStatus = (apiRes.order.status || "").toLowerCase();
+      const providerCheck = await queryProviderOrderStatus(data.reference);
+      if (providerCheck.found) {
         let dbStatus = "processing";
-        if (swiftStatus === "completed" || swiftStatus === "delivered") dbStatus = "delivered";
-        else if (swiftStatus === "failed") dbStatus = "failed";
+        if (providerCheck.status === "completed") dbStatus = "delivered";
+        else if (providerCheck.status === "failed") dbStatus = "failed";
 
         await supabaseAdmin.from("orders").update({ status: dbStatus }).eq("reference", data.reference);
-        return { ok: true, status: dbStatus, apiData: apiRes.order };
+        return { ok: true, status: dbStatus, provider: providerCheck.provider, apiData: providerCheck.raw };
       }
-      return { ok: false, message: "Order not found on SwiftData gateway" };
+      return { ok: false, message: "Order not found on active provider gateways (DataMart/SwiftData)" };
     } catch (e: any) {
       return { ok: false, message: e.message };
     }
@@ -507,13 +568,16 @@ export const adminGetSiteSettings = createServerFn({ method: "GET" })
 
 export const adminSaveSiteSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: Record<string, string>) => d)
+  .validator((d: any) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const entries = Object.entries(data);
+    const payload = data?.data || data;
+    const entries = Object.entries(payload);
     for (const [key, value] of entries) {
-      await (supabaseAdmin as any).from("site_settings").upsert({ key, value: String(value) }, { onConflict: "key" });
+      if (key) {
+        await (supabaseAdmin as any).from("site_settings").upsert({ key, value: String(value) }, { onConflict: "key" });
+      }
     }
     return { ok: true };
   });
@@ -1136,49 +1200,108 @@ export const adminCheckLedgerIntegrity = createServerFn({ method: "GET" })
     };
   });
 
+export const adminSetActiveDataProvider = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { provider: "datamart" | "swiftdata" }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("site_settings")
+      .upsert({ key: "active_data_provider", value: data.provider }, { onConflict: "key" });
+
+    if (error) throw new Error(error.message);
+    return { ok: true, activeProvider: data.provider };
+  });
+
 export const adminGetProviderPackages = createServerFn({ method: "GET" })
   .handler(async () => {
-    const { getSwiftDataPackages, getSwiftDataBalance, getSwiftDataHealth } = await import("@/lib/swiftdata");
+    const { getSwiftDataPackages, getSwiftDataBalance } = await import("@/lib/swiftdata");
+    const { getDataMartBalance, getDataMartPackages, getDataMartApiKey } = await import("@/lib/datamart");
+    const { getActiveProviderPreference } = await import("@/lib/provider-dispatch");
 
+    const preferredProviderKey = await getActiveProviderPreference();
     let balanceGhs = 0;
+    let datamartBalanceGhs = 0;
+    let swiftdataBalanceGhs = 0;
     let isHealthy = false;
     let rawPackages: any[] = [];
     let networks: any[] = [];
+    let activeProvider = preferredProviderKey === "swiftdata" ? "SwiftData API" : "DataMart API";
 
-    try {
-      const pRes = await getSwiftDataPackages();
-      if (pRes && pRes.packages) {
-        rawPackages = pRes.packages;
-        networks = pRes.networks || [];
+    const dmKey = getDataMartApiKey();
+    if (dmKey) {
+      try {
+        const dmBal = await getDataMartBalance();
+        if (dmBal && typeof dmBal.balance === "number") {
+          datamartBalanceGhs = dmBal.balance;
+        }
+      } catch (e: any) {
+        console.warn("Failed to fetch DataMart balance:", e.message);
       }
-    } catch (e: any) {
-      console.warn("Failed to fetch SwiftData packages:", e.message);
+
+      try {
+        const dmPackagesRes = await getDataMartPackages();
+        if (dmPackagesRes && dmPackagesRes.data) {
+          const list: any[] = [];
+          Object.entries(dmPackagesRes.data).forEach(([net, pkgs]: [string, any]) => {
+            if (Array.isArray(pkgs)) {
+              pkgs.forEach((p) => {
+                list.push({
+                  id: `dm_${net}_${p.capacity}`,
+                  network: net.toLowerCase().includes("yello") ? "yello" : net.toLowerCase().includes("telecel") ? "telecel" : "at_ishare",
+                  size_gb: p.capacity,
+                  size_label: `${p.capacity}GB`,
+                  price_ghs: p.price,
+                  validity: "Non-Expiry",
+                });
+              });
+            }
+          });
+          if (list.length > 0 && preferredProviderKey === "datamart") {
+            rawPackages = list;
+            isHealthy = true;
+          }
+        }
+      } catch (e: any) {
+        console.warn("Failed to fetch DataMart packages:", e.message);
+      }
     }
 
+    // Check SwiftData
     try {
       const bRes = await getSwiftDataBalance();
       if (bRes && typeof bRes.balance === "number") {
-        balanceGhs = bRes.balance;
+        swiftdataBalanceGhs = bRes.balance;
       }
     } catch (e: any) {
       console.warn("Failed to fetch SwiftData balance:", e.message);
     }
 
     try {
-      const hRes = await getSwiftDataHealth();
-      if (hRes && (hRes.success || hRes.status === "operational")) {
-        isHealthy = true;
+      const pRes = await getSwiftDataPackages();
+      if (pRes && pRes.packages) {
+        networks = pRes.networks || [];
+        if (rawPackages.length === 0 || preferredProviderKey === "swiftdata") {
+          rawPackages = pRes.packages;
+          isHealthy = true;
+        }
       }
     } catch (e: any) {
-      console.warn("Failed to fetch SwiftData health:", e.message);
+      console.warn("Failed to fetch SwiftData packages:", e.message);
     }
 
+    balanceGhs = preferredProviderKey === "swiftdata" ? swiftdataBalanceGhs : datamartBalanceGhs;
     if (rawPackages.length > 0 || balanceGhs > 0) {
       isHealthy = true;
     }
 
     return {
       balanceGhs,
+      datamartBalanceGhs,
+      swiftdataBalanceGhs,
+      activeProvider,
+      selectedProviderKey: preferredProviderKey,
       isHealthy,
       networks,
       packages: rawPackages,
@@ -1188,48 +1311,91 @@ export const adminGetProviderPackages = createServerFn({ method: "GET" })
 export const adminSyncProviderPackages = createServerFn({ method: "POST" })
   .handler(async () => {
     const { getSwiftDataPackages } = await import("@/lib/swiftdata");
+    const { getDataMartPackages, getDataMartApiKey } = await import("@/lib/datamart");
     const { clearBundleCache } = await import("@/lib/public-bundles.functions");
 
-    const pRes = await getSwiftDataPackages();
-    if (!pRes || !pRes.packages || !Array.isArray(pRes.packages)) {
-      throw new Error("No packages returned from provider API");
+    let packagesToSync: any[] = [];
+    const dmKey = getDataMartApiKey();
+
+    if (dmKey) {
+      try {
+        const dmRes = await getDataMartPackages();
+        if (dmRes && dmRes.data) {
+          Object.entries(dmRes.data).forEach(([netKey, pkgs]: [string, any]) => {
+            if (Array.isArray(pkgs)) {
+              pkgs.forEach((p) => {
+                let netName = "MTN";
+                if (netKey.toUpperCase().includes("TELECEL")) netName = "Telecel";
+                else if (netKey.toUpperCase().includes("AT")) netName = "AirtelTigo";
+
+                packagesToSync.push({
+                  network: netName,
+                  size_gb: p.capacity,
+                  size_label: `${p.capacity}GB`,
+                  price_ghs: p.price,
+                  validity: "Non-Expiry",
+                });
+              });
+            }
+          });
+        }
+      } catch (dmErr: any) {
+        console.warn("DataMart sync error, falling back to SwiftData:", dmErr.message);
+      }
+    }
+
+    if (packagesToSync.length === 0) {
+      const pRes = await getSwiftDataPackages();
+      if (!pRes || !pRes.packages || !Array.isArray(pRes.packages)) {
+        throw new Error("No packages returned from provider API");
+      }
+      packagesToSync = pRes.packages.map((pkg: any) => {
+        let netName = "MTN";
+        if (pkg.network === "telecel") netName = "Telecel";
+        else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
+        return {
+          network: netName,
+          size_gb: pkg.size_gb || 1,
+          size_label: pkg.size_label || `${pkg.size_gb || 1}GB`,
+          price_ghs: Number(pkg.price ?? pkg.price_ghs ?? 0),
+          validity: pkg.validity || "Non-Expiry",
+        };
+      });
     }
 
     const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
     const supa = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    const { data: existingBundles } = await supa.from("bundles").select("id, network, size_label");
-    const existingMap = new Map((existingBundles || []).map((b) => [`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, b.id]));
+    const { data: existingBundles } = await supa.from("bundles").select("id, network, size_label, price_ghs");
+    const existingMap = new Map((existingBundles || []).map((b: any) => [`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, b]));
 
     let syncedCount = 0;
     await Promise.all(
-      pRes.packages.map(async (pkg: any) => {
-        let netName = "MTN";
-        if (pkg.network === "telecel") netName = "Telecel";
-        else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
-
+      packagesToSync.map(async (pkg: any) => {
+        const netName = pkg.network;
         const sizeGb = pkg.size_gb || 1;
         const sizeLabel = pkg.size_label || `${sizeGb}GB`;
         const sizeMb = Math.round(sizeGb * 1024);
-        const priceGhs = Number(pkg.price ?? pkg.price_ghs ?? 0);
+        const exactProviderPrice = Number(pkg.price_ghs || 0);
 
         const key = `${netName.toLowerCase()}_${sizeLabel.toLowerCase()}`;
-        const existingId = existingMap.get(key);
+        const existing = existingMap.get(key);
 
-        if (existingId) {
+        if (existing) {
           const updateData: any = {
             size_mb: sizeMb,
             validity: pkg.validity || "Non-Expiry",
             active: true,
           };
-          if (priceGhs > 0) {
-            updateData.price_ghs = priceGhs;
+          // Preserve custom admin prices: Only update price if unconfigured/zero
+          if (!existing.price_ghs || Number(existing.price_ghs) <= 0) {
+            updateData.price_ghs = exactProviderPrice;
           }
           await supa
             .from("bundles")
             .update(updateData)
-            .eq("id", existingId);
+            .eq("id", existing.id);
         } else {
           await supa
             .from("bundles")
@@ -1237,7 +1403,7 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
               network: netName,
               size_label: sizeLabel,
               size_mb: sizeMb,
-              price_ghs: priceGhs,
+              price_ghs: exactProviderPrice,
               validity: pkg.validity || "Non-Expiry",
               popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
               active: true,

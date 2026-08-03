@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Loader2, X, Lock, ShieldCheck } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import type { Network } from "@/lib/cart";
-import { createCheckoutOrder } from "@/lib/orders.functions";
+import { createCheckoutOrder, verifyPhoneNumber } from "@/lib/orders.functions";
 import { InAppPaymentModal } from "@/components/site/InAppPaymentModal";
 
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,7 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
   const fetchWallet = useServerFn(getMyWallet);
   const payWallet = useServerFn(payOrderWithWallet);
   const createOrderFn = useServerFn(createCheckoutOrder);
+  const verifyFn = useServerFn(verifyPhoneNumber);
 
   const { data: walletData } = useQuery({
     queryKey: ["myWallet"],
@@ -34,6 +35,21 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
   const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
   const [orderId, setOrderId] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    const clean = phone.replace(/\s+/g, "");
+    if (clean.length === 10 && /^\d{10}$/.test(clean)) {
+      setVerifying(true);
+      verifyFn({ data: { phone: clean } })
+        .then((res: any) => setVerifyResult(res))
+        .catch(() => setVerifyResult(null))
+        .finally(() => setVerifying(false));
+    } else {
+      setVerifyResult(null);
+    }
+  }, [phone]);
 
   const [paymentModalData, setPaymentModalData] = useState<{
     orderId: string;
@@ -222,6 +238,30 @@ export function InstantBuyModal({ item, onClose }: { item: InstantBuyItem; onClo
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 required
               />
+
+              {verifying && (
+                <p className="text-[11px] text-amber-400 font-mono flex items-center gap-1.5 mt-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin text-amber-400" /> Verifying number status & delivery time...
+                </p>
+              )}
+
+              {verifyResult && (
+                <div className="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-400 space-y-1 font-mono animate-in fade-in">
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> {verifyResult.isMtn ? "MTN Verified" : "Number Verified"}
+                    </span>
+                    <span className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded-full text-emerald-300">
+                      Est. Delivery: ~15 seconds
+                    </span>
+                  </div>
+                  {verifyResult.recommendation === "activate_first" && (
+                    <p className="text-[11px] text-amber-300 font-sans mt-1">
+                      💡 New SIM detected: Recommend 1GB initial bundle for network activation.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {errorMsg && (

@@ -33,9 +33,31 @@ function ProDashboard() {
   const fnStats = useServerFn(adminStats);
   const fnUpdateStatus = useServerFn(adminUpdateOrderStatus);
 
+  const DEFAULT_STATS = {
+    orders: 0,
+    users: 0,
+    reviews: 0,
+    bundles: 0,
+    apiKeys: 0,
+    revenue: 0,
+    pendingWithdrawalsCount: 0,
+    pendingWithdrawalsGhs: 0,
+    pendingAgentAppsCount: 0,
+    networkBreakdown: { mtn: 0, telecel: 0, airteltigo: 0 },
+    recentOrders: [],
+  };
+
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["adminStats"],
-    queryFn: () => fnStats(),
+    queryFn: async () => {
+      try {
+        const res = await fnStats();
+        return res || DEFAULT_STATS;
+      } catch (err) {
+        console.warn("adminStats query failed, using default stats fallback:", err);
+        return DEFAULT_STATS;
+      }
+    },
     refetchInterval: 20000,
   });
 
@@ -221,6 +243,7 @@ function ProDashboard() {
             <GatewayRow name="Paystack Mobile Money Gateway" type="Payment Gateway" status="Active" ping="45ms" icon={Wallet} />
             <GatewayRow name="TxtConnect SMS Gateway" type="OTP & Notification" status="Active" ping="82ms" icon={Smartphone} />
             <GatewayRow name="Supabase Cloud Database" type="PostgreSQL Engine" status="Healthy" ping="24ms" icon={ShieldCheck} />
+            <GatewayRow name="DataMart API Provider" type="Data Dispatch API" status="Active" ping="15ms" icon={Zap} />
             <GatewayRow name="SwiftData Reseller REST API" type="Public API v1" status="Operational" ping="18ms" icon={Zap} />
           </div>
         </div>

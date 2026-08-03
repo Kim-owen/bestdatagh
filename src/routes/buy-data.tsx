@@ -9,6 +9,11 @@ import { InstantBuyModal, type InstantBuyItem } from "@/components/site/InstantB
 import { NetworkLogo } from "@/components/site/NetworkLogos";
 import { AISmartRecommender } from "@/components/site/AISmartRecommender";
 
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useMemo } from "react";
+import { listActiveBundles } from "@/lib/public-bundles.functions";
+
 type Network = "MTN" | "Telecel" | "AirtelTigo";
 
 const NETWORK_META: Record<Network, { color: string; tint: string; desc: string; validity: string }> = {
@@ -18,7 +23,7 @@ const NETWORK_META: Record<Network, { color: string; tint: string; desc: string;
 };
 
 
-const BUNDLES: Record<Network, { size: string; price: number; popular?: boolean }[]> = {
+const FALLBACK_BUNDLES: Record<Network, { size: string; price: number; popular?: boolean }[]> = {
   MTN: [
     { size: "1 GB", price: 4.15 },
     { size: "2 GB", price: 8.15 },
@@ -70,6 +75,36 @@ function BuyData() {
   const meta = NETWORK_META[active];
   const { addItem, open: openCart } = useCart();
   const [instant, setInstant] = useState<InstantBuyItem>(null);
+
+  const getPublicList = useServerFn(listActiveBundles);
+  const { data: dbBundles } = useQuery({
+    queryKey: ["activeBundles"],
+    queryFn: () => getPublicList(),
+  });
+
+  const activeBundles = useMemo(() => {
+    if (!dbBundles || !Array.isArray(dbBundles) || dbBundles.length === 0) {
+      return FALLBACK_BUNDLES[active].map((b) => ({ id: `${active}-${b.size}`, ...b }));
+    }
+
+    const filtered = dbBundles.filter((b: any) => {
+      const net = (b.network || "").toLowerCase();
+      const target = active.toLowerCase();
+      if (target === "airteltigo") return net.includes("at") || net.includes("airtel") || net.includes("tigo");
+      return net.includes(target);
+    });
+
+    if (filtered.length === 0) {
+      return FALLBACK_BUNDLES[active].map((b) => ({ id: `${active}-${b.size}`, ...b }));
+    }
+
+    return filtered.map((b: any) => ({
+      id: b.id,
+      size: b.size_label || `${b.size_mb / 1024} GB`,
+      price: Number(b.price_ghs),
+      popular: !!b.popular,
+    }));
+  }, [dbBundles, active]);
 
 
   return (
@@ -132,7 +167,7 @@ function BuyData() {
             <AISmartRecommender />
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {BUNDLES[active].map((b) => (
+              {activeBundles.map((b) => (
                 <div
                   key={b.size}
                   className="group relative overflow-hidden rounded-3xl border border-border/80 bg-card p-5 shadow-sm hover:-translate-y-1.5 hover:shadow-2xl transition-all duration-300 flex flex-col justify-between"

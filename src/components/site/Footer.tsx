@@ -17,6 +17,7 @@ const COLS = [
   {
     heading: "Networks",
     links: [
+      ["MTN UP2U Bundles", "/mtn-up2u"],
       ["MTN Data Bundles", "/buy-data?network=MTN"],
       ["Telecel Data Bundles", "/buy-data?network=Telecel"],
       ["AirtelTigo Data Bundles", "/buy-data?network=AirtelTigo"],
@@ -26,11 +27,11 @@ const COLS = [
   {
     heading: "Buy Data",
     links: [
+      ["MTN UP2U Data Packages", "/mtn-up2u"],
       ["All Bundle Sizes", "/buy-data"],
       ["MTN Bundles (90-day)", "/buy-data?network=MTN"],
       ["Telecel Bundles (non-expiry)", "/buy-data?network=Telecel"],
       ["AirtelTigo Bundles (non-expiry)", "/buy-data?network=AirtelTigo"],
-      ["Cheapest Bundles", "/buy-data"],
     ],
   },
 ] as const;

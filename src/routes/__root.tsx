@@ -78,6 +78,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "google-site-verification", content: "google3dcbc2c3d85b850c" },
       { title: "Bestdata — Ghana's Cheapest MTN, Telecel & AirtelTigo Data Bundles" },
       { name: "description", content: "Buy cheap MTN, Telecel & AirtelTigo data bundles in Ghana. Fast delivery, secure Paystack payments. No account required." },
       { property: "og:title", content: "Bestdata — Ghana's Cheapest Data Bundles" },
@@ -107,6 +108,11 @@ function RootShell({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'){document.documentElement.classList.add('dark');}}catch(e){document.documentElement.classList.add('dark');}})();`,
           }}
+        />
+        <script
+          src="https://api.datamartgh.shop/delivery-tracker.js"
+          data-api-key="a2654417e41cd6408c14f538af4c3565c15e5bf58f36ead5ffab1b5d75b88f56"
+          async
         />
         <HeadContent />
       </head>

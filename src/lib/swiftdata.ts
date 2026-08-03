@@ -1,6 +1,12 @@
 const defaultSwiftDataKey = ["sk_live_", "8287bd0fea81423b", "a46250f3d7a6fa41"].join("");
 
-const SWIFTDATA_BASE_URL = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
+const BASE_URL_RAW = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
+const SWIFTDATA_BASE_URL = BASE_URL_RAW.replace(/\/v1\/api$/, "").replace(/\/api$/, "");
+
+function getEndpoint(path: string): string {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${SWIFTDATA_BASE_URL}/functions/v1/api${cleanPath}`;
+}
 
 export function getSwiftDataApiKey(): string {
   return process.env.SWIFTDATA_API_KEY || defaultSwiftDataKey;
@@ -48,7 +54,7 @@ export async function buySwiftDataBundle(params: {
 }) {
   const cleanPhone = params.phone.replace(/\s+/g, "");
 
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/buy-data`, {
+  const res = await fetch(getEndpoint("/buy-data"), {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
@@ -71,7 +77,7 @@ export async function buySwiftDataBundle(params: {
 }
 
 export async function getSwiftDataOrder(reference: string) {
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/orders/${encodeURIComponent(reference)}`, {
+  const res = await fetch(getEndpoint(`/orders/${encodeURIComponent(reference)}`), {
     method: "GET",
     headers: {
       "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
@@ -87,7 +93,7 @@ export async function getSwiftDataOrder(reference: string) {
 }
 
 export async function listSwiftDataOrders(limit = 50, offset = 0) {
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/orders?limit=${limit}&offset=${offset}`, {
+  const res = await fetch(getEndpoint(`/orders?limit=${limit}&offset=${offset}`), {
     method: "GET",
     headers: {
       "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
@@ -103,7 +109,7 @@ export async function listSwiftDataOrders(limit = 50, offset = 0) {
 }
 
 export async function getSwiftDataBalance() {
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/balance`, {
+  const res = await fetch(getEndpoint("/balance"), {
     method: "GET",
     headers: {
       "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
@@ -120,7 +126,7 @@ export async function getSwiftDataBalance() {
 
 export async function verifySwiftDataNumber(phone: string) {
   const cleanPhone = phone.replace(/\s+/g, "");
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/verify-number`, {
+  const res = await fetch(getEndpoint("/verify-number"), {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,

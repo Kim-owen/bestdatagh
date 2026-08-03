@@ -15,6 +15,8 @@ import {
   ShoppingBag, Zap, Star, UserPlus, CheckCircle2, Share2, Sparkles, Award
 } from "lucide-react";
 
+import { DeliveryProgressTracker } from "@/components/site/DeliveryProgressTracker";
+
 export const Route = createFileRoute("/store/$slug")({
   head: ({ params }) => ({
     meta: [
@@ -195,6 +197,31 @@ function AgentSocialStorefrontPage() {
 
         {/* Live Bundle Pricing & Store Content */}
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-10 space-y-8">
+          {/* Live Storefront Delivery Progress Tracker Widget */}
+          <DeliveryProgressTracker
+            customBannerMsg="Live Dispatch Status — Orders processed instantly."
+            orders={[
+              {
+                id: "st_1",
+                reference: "#247021",
+                queueType: "fast",
+                durationLabel: "Instant",
+                placedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+                deliveredAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
+                status: "completed",
+              },
+              {
+                id: "st_2",
+                reference: "#1990891",
+                queueType: "standard",
+                durationLabel: "15s",
+                placedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+                deliveredAt: new Date(Date.now() - 44 * 60 * 1000).toISOString(),
+                status: "completed",
+              },
+            ]}
+          />
+
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Reseller Retail Rates</span>
@@ -236,7 +263,7 @@ function AgentSocialStorefrontPage() {
                       <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">{b.network}</span>
                     </div>
 
-                    <h3 className="text-lg font-black text-white">{b.name}</h3>
+                    <h3 className="text-lg font-black text-white">{b.size_label || b.name || "Data Bundle"}</h3>
                     <p className="text-2xl font-black text-amber-400 font-display">GH₵ {displayPrice.toFixed(2)}</p>
                   </div>
 
@@ -246,7 +273,7 @@ function AgentSocialStorefrontPage() {
                         addItem({
                           id: b.id,
                           network: b.network,
-                          size: b.name,
+                          size: b.size_label || b.name || "1GB",
                           price: displayPrice,
                         })
                       }
@@ -260,7 +287,7 @@ function AgentSocialStorefrontPage() {
                       onClick={() =>
                         setBuyNowItem({
                           network: b.network,
-                          size: b.name,
+                          size: b.size_label || b.name || "1GB",
                           price: displayPrice,
                         })
                       }

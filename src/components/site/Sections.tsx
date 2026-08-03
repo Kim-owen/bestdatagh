@@ -2,17 +2,47 @@ import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, Zap, Shield, BadgePercent, MessageCircle, Clock, ClipboardCheck,
   Wallet, History, Rocket, Lock, Headphones, Smartphone, CreditCard, Signal, MapPin, Calendar,
-  MessageSquare, Mail,
+  MessageSquare, Mail, GraduationCap,
 } from "lucide-react";
 import { NetworkLogo } from "./NetworkLogos";
 import { Reveal, SectionHeading } from "./Reveal";
 
 /* ============ Networks ============ */
 const NETWORKS = [
-  { name: "MTN", desc: "Ghana's largest network", price: "From GHS 4.15", social: "30K+ users", to: "/buy-data?network=MTN", color: "hsl(48 100% 50%)", tint: "hsl(48 100% 50% / 0.12)" },
-  { name: "Telecel", desc: "Reliable nationwide coverage", price: "From GHS 38.00", social: "7K+ users", to: "/buy-data?network=Telecel", color: "hsl(0 85% 50%)", tint: "hsl(0 85% 50% / 0.12)" },
-  { name: "AirtelTigo (AT)", desc: "Best value bundles", price: "From GHS 3.95", social: "10K+ users", to: "/buy-data?network=AirtelTigo", color: "hsl(210 85% 45%)", tint: "hsl(210 85% 45% / 0.12)" },
+  { name: "MTN", desc: "Ghana's largest network", price: "From GHS 4.00", social: "30K+ users", to: "/buy-data?network=MTN", color: "hsl(48 100% 50%)", tint: "hsl(48 100% 50% / 0.12)" },
+  { name: "Telecel", desc: "Reliable nationwide coverage", price: "From GHS 19.50", social: "7K+ users", to: "/buy-data?network=Telecel", color: "hsl(0 85% 50%)", tint: "hsl(0 85% 50% / 0.12)" },
+  { name: "AirtelTigo (AT)", desc: "Best value bundles", price: "From GHS 3.80", social: "10K+ users", to: "/buy-data?network=AirtelTigo", color: "hsl(210 85% 45%)", tint: "hsl(210 85% 45% / 0.12)" },
 ];
+
+export function ResultCheckersBanner() {
+  return (
+    <section className="py-10">
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
+        <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 p-8 md:p-10 shadow-2xl backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-2 text-center md:text-left">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-400 uppercase tracking-widest">
+              <GraduationCap className="h-4 w-4" /> Official Examination Portal
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-white font-display">
+              Buy WAEC & BECE Result Checker Cards
+            </h2>
+            <p className="text-xs md:text-sm text-slate-300 max-w-xl">
+              Get official WASSCE and BECE result checker cards issued instantly. Serial Number & PIN displayed on screen and sent to your phone via SMS.
+            </p>
+          </div>
+
+          <Link
+            to="/checkers"
+            className="inline-flex items-center gap-2 rounded-2xl gold-gradient px-6 py-3.5 text-xs font-black text-slate-950 shadow-xl hover:scale-105 active:scale-95 transition-all shrink-0"
+          >
+            <span>Buy Result Checker — GH₵ 15.70</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function NetworksSection() {
   return (
