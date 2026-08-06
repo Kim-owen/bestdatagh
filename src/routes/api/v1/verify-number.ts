@@ -46,15 +46,22 @@ export const Route = createFileRoute("/api/v1/verify-number")({
 
         const results = rawPhones.map((p) => {
           const clean = String(p).replace(/\s+/g, "");
-          const isValid = /^\d{9,10}$/.test(clean);
+          const full = clean.startsWith("233") ? "0" + clean.slice(3) : clean;
+          const isValid = /^0(24|54|55|59|25|53|20|50|27|57|26|56)\d{7}$/.test(full);
 
-          // All valid Ghana MTN/Telecel/AirtelTigo numbers are eligible on BestData
+          let network = "Unknown";
+          if (/^0(24|54|55|59|25|53)/.test(full)) network = "MTN";
+          else if (/^0(20|50)/.test(full)) network = "Telecel";
+          else if (/^0(27|57|26|56)/.test(full)) network = "AirtelTigo";
+
           return {
             phone: clean,
+            cleanPhone: full,
             valid: isValid,
             verified: isValid,
+            network,
             status: isValid ? "verified" : "unverified",
-            message: isValid ? "Number is active on network and ready to receive data" : "Number is not valid",
+            message: isValid ? `Number is active on ${network} network and ready to receive data` : "Number is not a valid Ghana phone format",
           };
         });
 

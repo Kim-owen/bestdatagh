@@ -45,3 +45,38 @@ export const listMyOrders = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return data ?? [];
   });
+
+export const verifyBulkPhoneNumbers = createServerFn({ method: "POST" })
+  .inputValidator((d: { phones: string[] }) => {
+    if (!Array.isArray(d?.phones)) return { phones: [] };
+    return { phones: d.phones.slice(0, 500) };
+  })
+  .handler(async ({ data }) => {
+    const results = data.phones.map((raw) => {
+      const clean = String(raw || "").replace(/\s+/g, "");
+      const full = clean.startsWith("233") ? "0" + clean.slice(3) : clean;
+      const isValid = /^0(24|54|55|59|25|53|20|50|27|57|26|56)\d{7}$/.test(full);
+
+      let network = "Unknown";
+      if (/^0(24|54|55|59|25|53)/.test(full)) network = "MTN";
+      else if (/^0(20|50)/.test(full)) network = "Telecel";
+      else if (/^0(27|57|26|56)/.test(full)) network = "AirtelTigo";
+
+      return {
+        phone: raw,
+        cleanPhone: full,
+        valid: isValid,
+        network,
+        status: isValid ? "verified" : "invalid",
+        message: isValid ? `Valid ${network} Ghana number` : "Invalid Ghana phone format",
+      };
+    });
+
+    const verifiedCount = results.filter((r) => r.valid).length;
+    return {
+      total: results.length,
+      verifiedCount,
+      invalidCount: results.length - verifiedCount,
+      results,
+    };
+  });
