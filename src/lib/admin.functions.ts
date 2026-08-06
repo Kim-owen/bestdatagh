@@ -608,19 +608,204 @@ export const adminCheckSwiftDataOrderStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     try {
+      const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("id, reference, status, order_items(network, size_label, recipient_phone)")
+        .eq("reference", data.reference)
+        .maybeSingle();
+
       const providerCheck = await queryProviderOrderStatus(data.reference);
       if (providerCheck.found) {
         let dbStatus = "processing";
         if (providerCheck.status === "completed") dbStatus = "delivered";
         else if (providerCheck.status === "failed") dbStatus = "failed";
 
-        await supabaseAdmin.from("orders").update({ status: dbStatus }).eq("reference", data.reference);
-        return { ok: true, status: dbStatus, provider: providerCheck.provider, apiData: providerCheck.raw };
+        let smsSent = false;
+        if (order) {
+          const oldStatus = order.status;
+          await supabaseAdmin.from("orders").update({ status: dbStatus }).eq("id", order.id);
+          await supabaseAdmin.from("order_items").update({ status: dbStatus }).eq("order_id", order.id);
+
+          if (dbStatus === "delivered" && oldStatus !== "delivered") {
+            const item = (order.order_items && order.order_items[0]) as any;
+            if (item && item.recipient_phone) {
+              const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+              await sendOrderDeliveredSms(item.recipient_phone, order.reference, item.size_label, item.network).catch(() => {});
+              smsSent = true;
+            }
+          }
+
+          await (supabaseAdmin as any).from("admin_audit_logs").insert({
+            admin_id: context.userId,
+            admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+            action: "VERIFY_GATEWAY_DELIVERY_STATUS",
+            target_type: "order",
+            target_id: order.id,
+            details: { reference: data.reference, provider: providerCheck.provider, status: dbStatus, oldStatus, smsSent },
+          }).catch(() => {});
+        } else {
+          await supabaseAdmin.from("orders").update({ status: dbStatus }).eq("reference", data.reference);
+        }
+
+        return { ok: true, status: dbStatus, provider: providerCheck.provider, apiData: providerCheck.raw, smsSent };
       }
       return { ok: false, message: "Order not found on active provider gateways (DataMart/SwiftData)" };
     } catch (e: any) {
       return { ok: false, message: e.message };
     }
+  });
+
+export const adminVerifyProviderGateway = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { getDataMartBalance, getDataMartApiKey } = await import("@/lib/datamart");
+    const { getSwiftDataBalance, getSwiftDataApiKey } = await import("@/lib/swiftdata");
+    const { getActiveProviderPreference } = await import("@/lib/provider-dispatch");
+
+    const activePreference = await getActiveProviderPreference();
+    const startTime = Date.now();
+
+    let dataMart = {
+      configured: false,
+      healthy: false,
+      balance: 0,
+      currency: "GHS",
+      latencyMs: 0,
+      message: "API Key not configured",
+    };
+
+    let swiftData = {
+      configured: false,
+      healthy: false,
+      balance: 0,
+      currency: "GHS",
+      latencyMs: 0,
+      message: "API Key not configured",
+    };
+
+    // Check DataMart Gateway
+    const dmKey = getDataMartApiKey();
+    if (dmKey) {
+      dataMart.configured = true;
+      const dmStart = Date.now();
+      try {
+        const dmBal = await getDataMartBalance();
+        dataMart.latencyMs = Date.now() - dmStart;
+        if (dmBal && (dmBal.status === "success" || typeof dmBal.balance === "number")) {
+          dataMart.healthy = true;
+          dataMart.balance = Number(dmBal.balance || 0);
+          dataMart.currency = dmBal.currency || "GHS";
+          dataMart.message = "DataMart Gateway Operational";
+        } else {
+          dataMart.message = (dmBal as any)?.message || "DataMart API error";
+        }
+      } catch (e: any) {
+        dataMart.latencyMs = Date.now() - dmStart;
+        dataMart.message = e.message || "Failed to reach DataMart endpoint";
+      }
+    }
+
+    // Check SwiftData Gateway
+    const swiftKey = getSwiftDataApiKey();
+    if (swiftKey) {
+      swiftData.configured = true;
+      const swiftStart = Date.now();
+      try {
+        const swiftBal = await getSwiftDataBalance();
+        swiftData.latencyMs = Date.now() - swiftStart;
+        if (swiftBal && (swiftBal.success || typeof swiftBal.balance === "number")) {
+          swiftData.healthy = true;
+          swiftData.balance = Number(swiftBal.balance || 0);
+          swiftData.currency = swiftBal.currency || "GHS";
+          swiftData.message = "SwiftData Gateway Operational";
+        } else {
+          swiftData.message = swiftBal?.error || "SwiftData API error";
+        }
+      } catch (e: any) {
+        swiftData.latencyMs = Date.now() - swiftStart;
+        swiftData.message = e.message || "Failed to reach SwiftData endpoint";
+      }
+    }
+
+    const totalTimeMs = Date.now() - startTime;
+    const overallHealthy = activePreference === "swiftdata" ? swiftData.healthy : dataMart.healthy;
+
+    return {
+      ok: true,
+      activePreference,
+      overallHealthy,
+      totalTimeMs,
+      dataMart,
+      swiftData,
+      timestamp: new Date().toISOString(),
+    };
+  });
+
+export const adminSyncAllProviderOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { queryProviderOrderStatus } = await import("@/lib/provider-dispatch");
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: pendingOrders } = await supabaseAdmin
+      .from("orders")
+      .select("id, reference, status, order_items(network, size_label, recipient_phone)")
+      .in("status", ["pending", "paid", "processing"])
+      .gte("created_at", sevenDaysAgo)
+      .limit(50);
+
+    if (!pendingOrders || pendingOrders.length === 0) {
+      return { ok: true, totalChecked: 0, updatedToDelivered: 0, updatedToFailed: 0, unchanged: 0 };
+    }
+
+    let updatedToDelivered = 0;
+    let updatedToFailed = 0;
+    let unchanged = 0;
+
+    for (const ord of pendingOrders) {
+      try {
+        const providerCheck = await queryProviderOrderStatus(ord.reference);
+        if (providerCheck.found) {
+          let newStatus: string | null = null;
+          if (providerCheck.status === "completed") newStatus = "delivered";
+          else if (providerCheck.status === "failed") newStatus = "failed";
+
+          if (newStatus && newStatus !== ord.status) {
+            await supabaseAdmin.from("orders").update({ status: newStatus }).eq("id", ord.id);
+            await supabaseAdmin.from("order_items").update({ status: newStatus }).eq("order_id", ord.id);
+
+            if (newStatus === "delivered") {
+              updatedToDelivered++;
+              const item = (ord.order_items && ord.order_items[0]) as any;
+              if (item && item.recipient_phone) {
+                const { sendOrderDeliveredSms } = await import("@/lib/otp.functions");
+                await sendOrderDeliveredSms(item.recipient_phone, ord.reference, item.size_label, item.network).catch(() => {});
+              }
+            } else if (newStatus === "failed") {
+              updatedToFailed++;
+            }
+          } else {
+            unchanged++;
+          }
+        } else {
+          unchanged++;
+        }
+      } catch {
+        unchanged++;
+      }
+    }
+
+    return {
+      ok: true,
+      totalChecked: pendingOrders.length,
+      updatedToDelivered,
+      updatedToFailed,
+      unchanged,
+      timestamp: new Date().toISOString(),
+    };
   });
 
 
@@ -868,6 +1053,101 @@ export const adminSendBroadcastSms = createServerFn({ method: "POST" })
     });
 
     return { ok: true, sentCount: successCount, totalCount: phoneNumbers.length };
+  });
+
+export const adminTriggerWeAreLiveSms = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { customMessage?: string; siteUrl?: string; whatsappUrl?: string; supportPhone?: string; audience?: "all" | "agents" } | undefined) => d || {})
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+
+    // Fetch defaults from site settings if not explicitly provided
+    const { data: settingsData } = await (supabaseAdmin as any).from("site_settings").select("key, value");
+    const settingsMap: Record<string, string> = {};
+    (settingsData || []).forEach((row: any) => {
+      settingsMap[row.key] = row.value;
+    });
+
+    const siteUrl = data?.siteUrl || settingsMap.daily_sms_site_url || "https://bestdatagh.shop";
+    const whatsappUrl = data?.whatsappUrl || settingsMap.daily_sms_whatsapp_link || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
+    const supportPhone = data?.supportPhone || settingsMap.support_phone || settingsMap.daily_sms_support_number || "0551234567";
+
+    const defaultMsg = `🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData. Site: ${siteUrl} | WhatsApp: ${whatsappUrl} | Support: ${supportPhone}`;
+    const smsText = data?.customMessage || settingsMap.daily_sms_custom_message || defaultMsg;
+
+    const formattedMessage = smsText
+      .replace(/\{site_url\}/g, siteUrl)
+      .replace(/\{whatsapp_url\}/g, whatsappUrl)
+      .replace(/\{support_phone\}/g, supportPhone);
+
+    const audienceChoice = data?.audience || "agents";
+    let phoneNumbers: string[] = [];
+
+    if (audienceChoice === "agents") {
+      const { data: agents } = await supabaseAdmin.from("agent_applications").select("phone").eq("status", "approved");
+      phoneNumbers = (agents || []).map((a) => a.phone);
+    } else {
+      const { data: orderItems } = await supabaseAdmin.from("order_items").select("recipient_phone").limit(500);
+      phoneNumbers = Array.from(new Set((orderItems || []).map((o) => o.recipient_phone).filter(Boolean)));
+    }
+
+    if (phoneNumbers.length === 0) {
+      phoneNumbers = [supportPhone];
+    }
+
+    let successCount = 0;
+    for (const phone of phoneNumbers.slice(0, 50)) {
+      try {
+        await sendTxtConnectSms(phone, formattedMessage);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed We Are Live SMS to ${phone}:`, err);
+      }
+    }
+
+    await (supabaseAdmin as any).from("admin_audit_logs").insert({
+      admin_id: context.userId,
+      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      action: "TRIGGERED_WE_ARE_LIVE_SMS",
+      target_type: "broadcast",
+      details: { audience: audienceChoice, totalCount: phoneNumbers.length, successCount, formattedMessage },
+    });
+
+    return { ok: true, sentCount: successCount, totalCount: phoneNumbers.length, messageText: formattedMessage };
+  });
+
+export const adminSaveDailySmsSchedule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    enabled?: boolean;
+    slot7am?: boolean;
+    slot9am?: boolean;
+    siteUrl?: string;
+    whatsappUrl?: string;
+    supportPhone?: string;
+    customTemplate?: string;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const entries: [string, string][] = [
+      ["daily_sms_enabled", String(data.enabled ?? true)],
+      ["daily_sms_7am_enabled", String(data.slot7am ?? true)],
+      ["daily_sms_9am_enabled", String(data.slot9am ?? true)],
+      ["daily_sms_site_url", data.siteUrl || "https://bestdatagh.shop"],
+      ["daily_sms_whatsapp_link", data.whatsappUrl || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E"],
+      ["daily_sms_support_number", data.supportPhone || "0551234567"],
+      ["daily_sms_custom_message", data.customTemplate || "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData. Site: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}"],
+    ];
+
+    for (const [key, value] of entries) {
+      await (supabaseAdmin as any).from("site_settings").upsert({ key, value }, { onConflict: "key" });
+    }
+
+    return { ok: true, message: "Daily morning SMS broadcast schedule updated successfully!" };
   });
 
 /* ============ 3. FRAUD SECURITY HUB ============ */

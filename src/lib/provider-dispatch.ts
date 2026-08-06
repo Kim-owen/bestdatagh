@@ -135,6 +135,23 @@ export async function dispatchDataBundle(params: DispatchParams): Promise<Dispat
 }
 
 /**
+ * Helper to normalize raw provider order status strings
+ */
+export function normalizeProviderStatus(stStr: string): "completed" | "processing" | "failed" | "pending" {
+  const st = (stStr || "").toLowerCase().trim();
+  if (st === "completed" || st === "delivered" || st === "successful" || st === "success" || st === "fulfilled") {
+    return "completed";
+  }
+  if (st === "failed" || st === "cancelled" || st === "rejected" || st === "declined" || st === "refunded" || st === "error") {
+    return "failed";
+  }
+  if (st === "pending" || st === "waiting" || st === "queued") {
+    return "pending";
+  }
+  return "processing";
+}
+
+/**
  * Unified Provider Order Status Checker
  */
 export async function queryProviderOrderStatus(reference: string): Promise<{
@@ -146,18 +163,15 @@ export async function queryProviderOrderStatus(reference: string): Promise<{
   const dmKey = getDataMartApiKey();
   const swiftKey = getSwiftDataApiKey();
 
-  // Try DataMart
+  // Try DataMart first
   if (dmKey) {
     try {
       const dmRes = await getDataMartOrderStatus(reference);
-      if (dmRes && dmRes.status === "success" && dmRes.data) {
-        const st = (dmRes.data.orderStatus || "").toLowerCase();
-        let status: "completed" | "processing" | "failed" | "pending" = "processing";
-        if (st === "completed" || st === "delivered") status = "completed";
-        else if (st === "failed") status = "failed";
-        else if (st === "pending" || st === "waiting") status = "pending";
-
-        return { found: true, provider: "datamart", status, raw: dmRes.data };
+      if (dmRes && (dmRes.status === "success" || dmRes.data)) {
+        const rawObj = dmRes.data || dmRes;
+        const stStr = String(rawObj.orderStatus || rawObj.status || rawObj.delivery_status || "");
+        const status = normalizeProviderStatus(stStr);
+        return { found: true, provider: "datamart", status, raw: rawObj };
       }
     } catch {
       // Not on DataMart
@@ -168,13 +182,11 @@ export async function queryProviderOrderStatus(reference: string): Promise<{
   if (swiftKey) {
     try {
       const swiftRes = await getSwiftDataOrder(reference);
-      if (swiftRes && swiftRes.order) {
-        const st = (swiftRes.order.status || "").toLowerCase();
-        let status: "completed" | "processing" | "failed" | "pending" = "processing";
-        if (st === "completed" || st === "delivered") status = "completed";
-        else if (st === "failed") status = "failed";
-
-        return { found: true, provider: "swiftdata", status, raw: swiftRes.order };
+      if (swiftRes && (swiftRes.order || swiftRes.success)) {
+        const rawObj = swiftRes.order || swiftRes;
+        const stStr = String(rawObj.status || rawObj.delivery_status || rawObj.orderStatus || "");
+        const status = normalizeProviderStatus(stStr);
+        return { found: true, provider: "swiftdata", status, raw: rawObj };
       }
     } catch {
       // Not on SwiftData

@@ -6,6 +6,8 @@ import {
   adminUpdateOrderStatus,
   adminRetryOrder,
   adminCheckSwiftDataOrderStatus,
+  adminSyncAllProviderOrders,
+  adminVerifyProviderGateway,
 } from "@/lib/admin.functions";
 import { useState } from "react";
 import {
@@ -21,6 +23,7 @@ import {
   Copy,
   ExternalLink,
   Filter,
+  ShieldCheck,
 } from "lucide-react";
 
 import { TableRowSkeleton, StatCardSkeleton } from "@/components/ui/skeleton";
@@ -34,6 +37,8 @@ function OrdersPage() {
   const upd = useServerFn(adminUpdateOrderStatus);
   const retry = useServerFn(adminRetryOrder);
   const checkSwiftData = useServerFn(adminCheckSwiftDataOrderStatus);
+  const syncAllOrdersFn = useServerFn(adminSyncAllProviderOrders);
+  const verifyGatewayFn = useServerFn(adminVerifyProviderGateway);
 
   const qc = useQueryClient();
 
@@ -42,6 +47,7 @@ function OrdersPage() {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("all");
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [checkingRef, setCheckingRef] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
@@ -110,6 +116,33 @@ function OrdersPage() {
     }
   };
 
+  const handleSyncAllGateways = async () => {
+    setIsSyncingAll(true);
+    setActionNotice(null);
+    try {
+      const res = await syncAllOrdersFn();
+      if (res.ok) {
+        setActionNotice({
+          type: "success",
+          text: `✓ Batch Gateway Sync Complete: Scanned ${res.totalChecked} pending orders (${res.updatedToDelivered} delivered, ${res.updatedToFailed} failed, ${res.unchanged} unchanged).`,
+        });
+        qc.invalidateQueries({ queryKey: ["adminOrders"] });
+      } else {
+        setActionNotice({
+          type: "error",
+          text: `Batch sync error: ${(res as any).message || "Failed to sync"}`,
+        });
+      }
+    } catch (e: any) {
+      setActionNotice({
+        type: "error",
+        text: `Sync error: ${e.message}`,
+      });
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
   const copyRef = (ref: string) => {
     navigator.clipboard.writeText(ref);
     setCopiedRef(ref);
@@ -159,13 +192,24 @@ function OrdersPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-xs font-bold text-white hover:bg-white/10 transition-all self-start md:self-auto"
-        >
-          <RefreshCcw className={`h-4 w-4 text-amber-400 ${isFetching ? "animate-spin" : ""}`} />
-          <span>{isFetching ? "Syncing..." : "Refresh Orders"}</span>
-        </button>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            onClick={handleSyncAllGateways}
+            disabled={isSyncingAll}
+            className="inline-flex items-center gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-5 py-3 text-xs font-black text-amber-300 hover:bg-amber-500/20 transition-all shadow-md disabled:opacity-50"
+          >
+            <ShieldCheck className={`h-4 w-4 text-amber-400 ${isSyncingAll ? "animate-spin" : ""}`} />
+            <span>{isSyncingAll ? "Verifying..." : "Verify & Sync All Gateways"}</span>
+          </button>
+
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-xs font-bold text-white hover:bg-white/10 transition-all"
+          >
+            <RefreshCcw className={`h-4 w-4 text-amber-400 ${isFetching ? "animate-spin" : ""}`} />
+            <span>{isFetching ? "Syncing..." : "Refresh Orders"}</span>
+          </button>
+        </div>
       </div>
 
       {/* Action Notice Alert */}

@@ -186,6 +186,63 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
     repairedItems.push(`Reconciliation error: ${recErr.message}`);
   }
 
+  // 5. Morning Broadcast Scheduler (7:00 AM & 9:00 AM GMT)
+  try {
+    const { data: settings } = await supa.from("site_settings").select("key, value");
+    const sMap: Record<string, string> = {};
+    (settings || []).forEach((row: any) => {
+      sMap[row.key] = row.value;
+    });
+
+    const isEnabled = sMap.daily_sms_enabled !== "false";
+    const slot7amEnabled = sMap.daily_sms_7am_enabled !== "false";
+    const slot9amEnabled = sMap.daily_sms_9am_enabled !== "false";
+
+    if (isEnabled) {
+      const now = new Date();
+      const currentHour = now.getUTCHours();
+      const todayStr = now.toISOString().split("T")[0];
+
+      let targetSlot: "7am" | "9am" | null = null;
+      if (currentHour === 7 && slot7amEnabled && sMap.daily_sms_last_sent_7am !== todayStr) {
+        targetSlot = "7am";
+      } else if (currentHour === 9 && slot9amEnabled && sMap.daily_sms_last_sent_9am !== todayStr) {
+        targetSlot = "9am";
+      }
+
+      if (targetSlot) {
+        const siteUrl = sMap.daily_sms_site_url || "https://bestdatagh.shop";
+        const whatsappUrl = sMap.daily_sms_whatsapp_link || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
+        const supportPhone = sMap.support_phone || sMap.daily_sms_support_number || "0551234567";
+        const customTemplate = sMap.daily_sms_custom_message || "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData. Site: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}";
+
+        const formattedMsg = customTemplate
+          .replace(/\{site_url\}/g, siteUrl)
+          .replace(/\{whatsapp_url\}/g, whatsappUrl)
+          .replace(/\{support_phone\}/g, supportPhone);
+
+        const { sendTxtConnectSms } = await import("@/lib/otp.functions");
+        const { data: agents } = await supa.from("agent_applications").select("phone").eq("status", "approved");
+        const phones = (agents || []).map((a: any) => a.phone).filter(Boolean);
+
+        let sentCount = 0;
+        for (const ph of phones.slice(0, 50)) {
+          try {
+            await sendTxtConnectSms(ph, formattedMsg);
+            sentCount++;
+          } catch {}
+        }
+
+        const keyToUpdate = targetSlot === "7am" ? "daily_sms_last_sent_7am" : "daily_sms_last_sent_9am";
+        await supa.from("site_settings").upsert({ key: keyToUpdate, value: todayStr }, { onConflict: "key" });
+
+        repairedItems.push(`Automated Morning Broadcast Dispatched (${targetSlot.toUpperCase()} GMT): Sent to ${sentCount} recipients.`);
+      }
+    }
+  } catch (smsErr: any) {
+    repairedItems.push(`Morning SMS scheduler warning: ${smsErr.message}`);
+  }
+
   return {
     timestamp,
     healthy: dbStatus === "OPERATIONAL" && bundleCount > 0,

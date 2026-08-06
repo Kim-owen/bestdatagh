@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { adminGetSiteSettings, adminSaveSiteSettings } from "@/lib/admin.functions";
+import { adminGetSiteSettings, adminSaveSiteSettings, adminVerifyProviderGateway } from "@/lib/admin.functions";
 import { useState, useEffect } from "react";
 import { Settings, ShieldCheck, Key, Phone, Mail, CreditCard, ToggleLeft, ToggleRight, Save, CheckCircle2, AlertCircle } from "lucide-react";
 
@@ -13,6 +13,7 @@ function AdminSettingsPage() {
   const queryClient = useQueryClient();
   const getSettings = useServerFn(adminGetSiteSettings);
   const saveSettings = useServerFn(adminSaveSiteSettings);
+  const verifyGatewayFn = useServerFn(adminVerifyProviderGateway);
 
   const { data, isLoading } = useQuery({
     queryKey: ["adminSettings"],
@@ -31,9 +32,32 @@ function AdminSettingsPage() {
     txtconnect_sender_id: "BestData",
     checker_price_waec: "18.00",
     checker_price_bece: "18.00",
+    daily_sms_whatsapp_link: "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E",
+    daily_sms_site_url: "https://bestdatagh.shop",
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
+
+  const handleVerifyGateway = async () => {
+    setIsVerifying(true);
+    setVerifyNotice(null);
+    try {
+      const res = await verifyGatewayFn();
+      if (res.ok) {
+        setVerifyNotice(
+          `✓ Provider Gateway Check (${res.totalTimeMs}ms): DataMart Balance: GH₵ ${(res.dataMart?.balance ?? 0).toFixed(2)} (${res.dataMart?.message}) | SwiftData Balance: GH₵ ${(res.swiftData?.balance ?? 0).toFixed(2)} (${res.swiftData?.message})`
+        );
+      } else {
+        setVerifyNotice(`Gateway verification failed: ${(res as any).message || "Unknown error"}`);
+      }
+    } catch (err: any) {
+      setVerifyNotice(`Verification error: ${err.message || err}`);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   useEffect(() => {
     if (data && Object.keys(data).length > 0) {
@@ -110,6 +134,26 @@ function AdminSettingsPage() {
               />
             </div>
             <div>
+              <label className="font-bold text-foreground block mb-1">WhatsApp Channel Link</label>
+              <input
+                type="text"
+                value={form.daily_sms_whatsapp_link || ""}
+                onChange={(e) => setForm({ ...form, daily_sms_whatsapp_link: e.target.value })}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-primary outline-none"
+                placeholder="https://chat.whatsapp.com/..."
+              />
+            </div>
+            <div>
+              <label className="font-bold text-foreground block mb-1">Public Site URL</label>
+              <input
+                type="text"
+                value={form.daily_sms_site_url || ""}
+                onChange={(e) => setForm({ ...form, daily_sms_site_url: e.target.value })}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-primary outline-none"
+                placeholder="https://bestdatagh.shop"
+              />
+            </div>
+            <div>
               <label className="font-bold text-foreground block mb-1">Maintenance Mode</label>
               <button
                 type="button"
@@ -157,9 +201,27 @@ function AdminSettingsPage() {
 
         {/* Section 3: Payment & SMS Gateway Credentials */}
         <div className="rounded-3xl border border-border/80 bg-card p-6 space-y-4 shadow-sm">
-          <h2 className="text-sm font-black uppercase tracking-wider text-primary flex items-center gap-2">
-            <Key className="h-4 w-4" /> Gateway Credentials (API Keys)
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-wider text-primary flex items-center gap-2">
+              <Key className="h-4 w-4" /> Gateway Credentials (API Keys)
+            </h2>
+            <button
+              type="button"
+              onClick={handleVerifyGateway}
+              disabled={isVerifying}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20 text-xs font-bold transition-all disabled:opacity-50"
+            >
+              <ShieldCheck className={`h-3.5 w-3.5 ${isVerifying ? "animate-spin" : ""}`} />
+              <span>{isVerifying ? "Verifying..." : "Verify Gateways"}</span>
+            </button>
+          </div>
+
+          {verifyNotice && (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>{verifyNotice}</span>
+            </div>
+          )}
 
           <div className="space-y-4 text-xs">
             <div>
