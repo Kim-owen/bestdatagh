@@ -7,10 +7,10 @@ import { useState } from "react";
 export const Route = createFileRoute("/support")({
   head: () => ({
     meta: [
-      { title: "Support — Bestdata" },
-      { name: "description", content: "Get help from the Bestdata team: AI assistant, live chat, and email support." },
-      { property: "og:title", content: "Support — Bestdata" },
-      { property: "og:description", content: "AI assistant, live chat, and email support for Bestdata customers." },
+      { title: "Support — GigMart" },
+      { name: "description", content: "Get help from the GigMart team: AI assistant, live chat, and email support." },
+      { property: "og:title", content: "Support — GigMart" },
+      { property: "og:description", content: "AI assistant, live chat, and email support for GigMart customers." },
       { property: "og:url", content: "/support" },
     ],
     links: [{ rel: "canonical", href: "/support" }],
@@ -36,7 +36,7 @@ function SupportPage() {
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             {[
               { icon: MessageSquare, title: "AI Chat Assistant", desc: "Instant answers about orders, deposits and bundles.", cta: "Start chat", href: "#chat" },
-              { icon: Mail, title: "Email Support", desc: "Write to us and we'll get back within a few hours.", cta: "support@bestdata.com", href: "mailto:support@bestdata.com" },
+              { icon: Mail, title: "Email Support", desc: "Write to us and we'll get back within a few hours.", cta: "support@gigmart.shop", href: "mailto:support@gigmart.shop" },
               { icon: LifeBuoy, title: "Order Help", desc: "Bundle hasn't arrived? We'll investigate and refund if needed.", cta: "Track an order", href: "/track-order" },
             ].map((c) => {
               const Icon = c.icon;

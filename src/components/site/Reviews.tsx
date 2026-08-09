@@ -126,7 +126,7 @@ export function Reviews({ targetType, targetId = "site", heading = "Reviews", su
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Share your experience with Bestdata…"
+          placeholder="Share your experience with GigMart…"
           maxLength={1000}
           rows={4}
           className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"

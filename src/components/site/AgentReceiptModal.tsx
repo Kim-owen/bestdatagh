@@ -26,7 +26,7 @@ export function AgentReceiptModal({
     timeStyle: "short",
   });
 
-  const waText = `*BESTDATA OFFICIAL RECEIPT*\n` +
+  const waText = `*GIGMART OFFICIAL RECEIPT*\n` +
     `--------------------------------\n` +
     `🧾 *Ref:* ${order.reference}\n` +
     `📅 *Date:* ${dateStr}\n` +
@@ -57,7 +57,7 @@ export function AgentReceiptModal({
             <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-[10px] font-black uppercase text-emerald-400">
               <ShieldCheck className="h-3 w-3" /> Official Sales Receipt
             </div>
-            <h3 className="text-xl font-black font-display tracking-tight text-white mt-1">BESTDATA GH</h3>
+            <h3 className="text-xl font-black font-display tracking-tight text-white mt-1">GIGMART GH</h3>
             <p className="text-xs text-slate-400">Transaction & Delivery Summary</p>
           </div>
           <button

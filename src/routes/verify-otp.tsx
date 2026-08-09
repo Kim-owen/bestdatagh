@@ -14,7 +14,7 @@ export const Route = createFileRoute("/verify-otp")({
   }),
   head: () => ({
     meta: [
-      { title: "Paystack OTP Verification — Bestdata" },
+      { title: "Paystack OTP Verification — GigMart" },
       { name: "description", content: "Verify your Paystack Mobile Money OTP code to authorize payment." },
     ],
   }),
@@ -111,7 +111,7 @@ function VerifyOtpPage() {
               </div>
               <h1 className="text-2xl font-black text-white font-display">New Phone Verification</h1>
               <p className="text-xs text-slate-400">
-                To protect against fraud, first-time buyers on Bestdata verify their number via 6-digit SMS OTP.
+                To protect against fraud, first-time buyers on GigMart verify their number via 6-digit SMS OTP.
               </p>
             </div>
 

@@ -205,7 +205,7 @@ function AdminSlideshowPage() {
           </button>
 
           <button
-            onClick={() => handleApplyPreset("/backgrounds/mtn-sphere-bg.jpg", "Bestdata 3D Sphere", "⚡ INSTANT DELIVERY")}
+            onClick={() => handleApplyPreset("/backgrounds/mtn-sphere-bg.jpg", "GigMart 3D Sphere", "⚡ INSTANT DELIVERY")}
             className="flex items-center gap-2 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-3.5 py-2 text-xs font-bold text-yellow-500 hover:bg-yellow-500/20 transition-all"
           >
             <ImagePlus className="h-4 w-4" /> MTN 3D Yellow Sphere Theme

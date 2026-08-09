@@ -25,9 +25,9 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/agents")({
   validateSearch: (search) => searchSchema.parse(search),
   head: () => ({ meta: [
-    { title: "Agent Store — Resell Data Bundles | Bestdata" },
-    { name: "description", content: "Join Bestdata's agent program. Get up to 10% off wholesale data pricing, an agent-only storefront and bulk tools to grow your reselling business in Ghana." },
-    { property: "og:title", content: "Become a Bestdata Agent" },
+    { title: "Agent Store — Resell Data Bundles | GigMart" },
+    { name: "description", content: "Join GigMart's agent program. Get up to 10% off wholesale data pricing, an agent-only storefront and bulk tools to grow your reselling business in Ghana." },
+    { property: "og:title", content: "Become a GigMart Agent" },
     { property: "og:description", content: "Wholesale data bundle pricing for verified resellers in Ghana." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
@@ -98,13 +98,13 @@ function Hero({ isSignedIn, isAgent, status }: { isSignedIn: boolean; isAgent: b
           {/* Left Hero Text Content */}
           <div className="lg:col-span-7 space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 backdrop-blur px-3.5 py-1.5 text-xs font-bold text-white/90">
-              <Store className="h-3.5 w-3.5 text-[hsl(48_100%_60%)]" /> Bestdata Wholesale Agent Program
+              <Store className="h-3.5 w-3.5 text-[hsl(48_100%_60%)]" /> GigMart Wholesale Agent Program
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight leading-[1.1]">
               Resell data at <span className="text-[hsl(48_100%_60%)] font-black">wholesale prices</span>.
             </h1>
             <p className="text-sm md:text-base text-white/75 leading-relaxed max-w-xl">
-              Approved Bestdata agents get up to {AGENT_DISCOUNT_PCT}% off every bundle, a dedicated storefront, and priority automated delivery — perfect for shop owners, mobile-money vendors, and community resellers across Ghana.
+              Approved GigMart agents get up to {AGENT_DISCOUNT_PCT}% off every bundle, a dedicated storefront, and priority automated delivery — perfect for shop owners, mobile-money vendors, and community resellers across Ghana.
             </p>
 
             <div className="flex flex-wrap gap-3.5 pt-2">
@@ -412,7 +412,7 @@ function ApplyPanel({ status }: { status?: string }) {
 
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/10 border border-amber-400/20 px-3.5 py-1 text-xs font-black text-amber-400 mb-2">
-            <Sparkles className="h-3.5 w-3.5" /> BestData Wholesale Partner Account
+            <Sparkles className="h-3.5 w-3.5" /> GigMart Wholesale Partner Account
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-white font-display">Reseller & Mentor Application</h2>
           <p className="mt-1 text-xs md:text-sm text-slate-400">
@@ -519,7 +519,7 @@ function ApplyPanel({ status }: { status?: string }) {
                 onChange={(e) => setF({ ...f, payWithWallet: e.target.checked })}
                 className="h-4 w-4 accent-amber-400"
               />
-              <span>Deduct from my BestData Wallet (Instant Activation)</span>
+              <span>Deduct from my GigMart Wallet (Instant Activation)</span>
             </label>
           </div>
 
@@ -630,7 +630,7 @@ function Perks() {
   return (
     <section className="border-t border-border bg-muted/30">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6 py-14">
-        <h3 className="text-center text-2xl font-extrabold tracking-tight">Why agents choose Bestdata</h3>
+        <h3 className="text-center text-2xl font-extrabold tracking-tight">Why agents choose GigMart</h3>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {items.map((i) => {
             const Icon = i.icon;
@@ -691,7 +691,7 @@ function DedicatedAgentCustomerStorefront({
                     <CheckCircle2 className="h-3 w-3" /> Verified Reseller
                   </span>
                 </div>
-                <p className="text-[11px] font-bold text-muted-foreground">Authorized Bestdata Wholesale Partner</p>
+                <p className="text-[11px] font-bold text-muted-foreground">Authorized GigMart Wholesale Partner</p>
               </div>
             </div>
 
@@ -830,7 +830,7 @@ function DedicatedAgentCustomerStorefront({
       {/* Dedicated Footer */}
       <footer className="border-t border-border/80 bg-card py-8 px-4 text-center text-xs font-bold text-muted-foreground">
         <div className="mx-auto max-w-[1280px] space-y-2">
-          <p>© {new Date().getFullYear()} {formattedRefName} — Powered by Bestdata Ghana</p>
+          <p>© {new Date().getFullYear()} {formattedRefName} — Powered by GigMart Ghana</p>
           <p className="text-[11px] text-muted-foreground/70">100% Encrypted Payments via Paystack · MTN MoMo · Telecel Cash · AT Money</p>
         </div>
       </footer>

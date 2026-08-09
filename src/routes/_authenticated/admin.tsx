@@ -162,10 +162,10 @@ function AdminShell() {
           <div className="flex items-center justify-between pb-4 border-b border-border/50">
             <Link to="/" className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-xl gold-gradient grid place-items-center font-black text-primary-foreground text-sm shadow-md">
-                BD
+                GM
               </div>
               <div>
-                <div className="text-sm font-black tracking-tight font-display">BestData Admin</div>
+                <div className="text-sm font-black tracking-tight font-display">GigMart Admin</div>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-primary">Pro Management</div>
               </div>
             </Link>

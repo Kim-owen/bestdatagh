@@ -227,7 +227,7 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
             amountGhs: Number(withdrawal.amount_ghs),
             recipientCode,
             reference: `WD-${withdrawal.id.slice(0, 8)}-${Date.now().toString().slice(-4)}`,
-            reason: `Agent Commission Payout - Bestdata`,
+            reason: `Agent Commission Payout - GigMart`,
           });
 
           patch.status = "paid";
@@ -242,7 +242,7 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
           const { sendTxtConnectSms } = await import("./otp.functions");
           await sendTxtConnectSms(
             withdrawal.destination,
-            `Bestdata Payout Alert: Your withdrawal of GH₵ ${Number(withdrawal.amount_ghs).toFixed(2)} has been approved & transferred to your ${withdrawal.method} MoMo line (${withdrawal.destination}). Thank you!`
+            `GigMart Payout Alert: Your withdrawal of GH₵ ${Number(withdrawal.amount_ghs).toFixed(2)} has been approved & transferred to your ${withdrawal.method} MoMo line (${withdrawal.destination}). Thank you!`
           ).catch((e) => console.warn("Payout SMS notification warning:", e.message));
         }
       } catch (err: any) {
@@ -290,7 +290,7 @@ export const adminUpdateWithdrawal = createServerFn({ method: "POST" })
         const { sendTxtConnectSms } = await import("./otp.functions");
         await sendTxtConnectSms(
           withdrawal.destination,
-          `Bestdata Notice: Your withdrawal request of GH₵ ${refundAmt.toFixed(2)} was refunded back to your Bestdata Wallet balance.`
+          `GigMart Notice: Your withdrawal request of GH₵ ${refundAmt.toFixed(2)} was refunded back to your GigMart Wallet balance.`
         ).catch((e) => console.warn("Refund SMS warning:", e.message));
       }
     }

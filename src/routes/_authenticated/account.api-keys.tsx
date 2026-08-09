@@ -8,7 +8,7 @@ import { Footer } from "@/components/site/Footer";
 import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/account/api-keys")({
-  head: () => ({ meta: [{ title: "API Keys — Bestdata" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "API Keys — GigMart" }, { name: "robots", content: "noindex" }] }),
   component: MyKeys,
 });
 

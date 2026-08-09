@@ -28,7 +28,7 @@ import {
 export const Route = createFileRoute("/_authenticated/account/transactions")({
   head: () => ({
     meta: [
-      { title: "Wallet & Transaction History — Bestdata" },
+      { title: "Wallet & Transaction History — GigMart" },
       { name: "description", content: "View complete wallet deposit history, purchases, and statement records." },
       { name: "robots", content: "noindex" },
     ],
@@ -119,7 +119,7 @@ function AccountTransactionsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Bestdata_Statement_${Date.now()}.csv`);
+    link.setAttribute("download", `GigMart_Statement_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

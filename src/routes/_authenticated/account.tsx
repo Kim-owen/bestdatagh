@@ -19,8 +19,8 @@ import {
 
 export const Route = createFileRoute("/_authenticated/account")({
   head: () => ({ meta: [
-    { title: "My Account & Instant Data — Bestdata" },
-    { name: "description", content: "Manage your Bestdata profile, wallet and instant data purchases." },
+    { title: "My Account & Instant Data — GigMart" },
+    { name: "description", content: "Manage your GigMart profile, wallet and instant data purchases." },
     { name: "robots", content: "noindex" },
   ] }),
   component: AccountPage,
@@ -338,7 +338,7 @@ function AccountPage() {
               {!isAgent && (
                 <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3.5 space-y-2">
                   <div className="flex items-center gap-2 text-xs font-black text-amber-400">
-                    <Store className="h-4 w-4" /> BestData Agent Program
+                    <Store className="h-4 w-4" /> GigMart Agent Program
                   </div>
                   <p className="text-[11px] text-slate-300">
                     Want up to 10% off data bundle prices & your own custom store?

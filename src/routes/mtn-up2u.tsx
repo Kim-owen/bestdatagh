@@ -49,15 +49,15 @@ const FAQS = [
     a: "Yes! Simply enter the recipient's MTN phone number during checkout, and the UP2U data bundle will be instantly delivered directly to their line."
   },
   {
-    q: "What makes BestData the best site for MTN UP2U in Ghana?",
-    a: "BestData offers Ghana's lowest wholesale prices, 24/7 automated instant delivery, live order tracking with status updates, secure Paystack protection, and dedicated customer support."
+    q: "What makes GigMart the best site for MTN UP2U in Ghana?",
+    a: "GigMart offers Ghana's lowest wholesale prices, 24/7 automated instant delivery, live order tracking with status updates, secure Paystack protection, and dedicated customer support."
   }
 ];
 
 export const Route = createFileRoute("/mtn-up2u")({
   head: () => {
-    const canonicalUrl = "https://www.bestdatagh.shop/mtn-up2u";
-    const title = "MTN UP2U Data Packages Ghana — Buy Cheap MTN Yello Data 2026 | BestData";
+    const canonicalUrl = "https://www.gigmart.shop/mtn-up2u";
+    const title = "MTN UP2U Data Packages Ghana — Buy Cheap MTN Yello Data 2026 | GigMart";
     const description = "Buy cheap MTN UP2U data packages online in Ghana. Instant 5-second automated delivery, 90-day non-expiry validity, 1GB to 100GB packages via MTN MoMo.";
 
     const schemaOrgJSONLD = {

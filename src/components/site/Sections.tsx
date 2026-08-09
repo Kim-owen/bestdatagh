@@ -99,7 +99,7 @@ export function WhySection() {
   return (
     <section className="py-16 md:py-24 bg-card/30 border-y border-border/40">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
-        <Reveal><SectionHeading eyebrow="Platform Advantages" title="Why Users Trust Bestdata" subtitle="Experience seamless, high-speed data delivery designed for mobile users and resellers" /></Reveal>
+        <Reveal><SectionHeading eyebrow="Platform Advantages" title="Why Users Trust GigMart" subtitle="Experience seamless, high-speed data delivery designed for mobile users and resellers" /></Reveal>
         <div className="mx-auto mt-12 grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {WHY.map((w, i) => {
             const Icon = w.icon;
@@ -193,7 +193,7 @@ export function InfoSection() {
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">Buy Affordable Data Bundles in Ghana</h2>
           <p className="mt-4 text-sm md:text-base text-muted-foreground">
-            Bestdata is Ghana's trusted platform for buying MTN data bundles, Telecel data bundles, and AirtelTigo data bundles online.
+            GigMart is Ghana's trusted platform for buying MTN data bundles, Telecel data bundles, and AirtelTigo data bundles online.
             Enjoy fast delivery, secure Paystack payments via Mobile Money, and affordable prices on all data packages.
           </p>
         </div>
@@ -294,7 +294,7 @@ export function SupportCTA() {
             <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> AI Support: 9 AM – 9 PM</span>
               <span>·</span>
-              <a href="mailto:support@bestdata.com" className="inline-flex items-center gap-1 hover:text-primary"><Mail className="h-3.5 w-3.5" /> support@bestdata.com</a>
+              <a href="mailto:support@gigmart.shop" className="inline-flex items-center gap-1 hover:text-primary"><Mail className="h-3.5 w-3.5" /> support@gigmart.shop</a>
             </div>
           </div>
         </Reveal>

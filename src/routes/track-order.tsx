@@ -16,9 +16,9 @@ import { DeliveryProgressTracker } from "@/components/site/DeliveryProgressTrack
 export const Route = createFileRoute("/track-order")({
   head: () => ({
     meta: [
-      { title: "Smart Order Tracker & Receipts — Bestdata" },
+      { title: "Smart Order Tracker & Receipts — GigMart" },
       { name: "description", content: "Track your data orders by phone number or reference ID. Print, copy or share official receipts on WhatsApp." },
-      { property: "og:title", content: "Smart Order Tracker — Bestdata" },
+      { property: "og:title", content: "Smart Order Tracker — GigMart" },
       { property: "og:description", content: "Track data purchases instantly." },
       { property: "og:url", content: "/track-order" },
     ],
@@ -49,7 +49,7 @@ function TrackOrder() {
       .map((it: any) => `• ${it.network} ${it.size_label} -> ${it.recipient_phone} (GH₵ ${Number(it.price_ghs || 0).toFixed(2)})`)
       .join("\n");
 
-    const msg = `🧾 BESTDATA GHANA RECEIPT\n` +
+    const msg = `🧾 GIGMART GHANA RECEIPT\n` +
       `-----------------------------------\n` +
       `Order Ref: ${ord.reference}\n` +
       `Date: ${new Date(ord.created_at).toLocaleString()}\n` +
@@ -57,7 +57,7 @@ function TrackOrder() {
       `Items:\n${itemStr}\n\n` +
       `Total Paid: GH₵ ${Number(ord.total_ghs || 0).toFixed(2)}\n` +
       `-----------------------------------\n` +
-      `BestData Ghana (bestdatagh.com)`;
+      `GigMart Ghana (gigmart.shop)`;
 
     navigator.clipboard.writeText(msg);
     setCopiedId(ord.id);
@@ -69,7 +69,7 @@ function TrackOrder() {
       .map((it: any) => `• ${it.network} ${it.size_label} -> ${it.recipient_phone} (GH₵ ${Number(it.price_ghs || 0).toFixed(2)})`)
       .join("\n");
 
-    const msg = `🧾 *BESTDATA GHANA - OFFICIAL RECEIPT*\n` +
+    const msg = `🧾 *GIGMART GHANA - OFFICIAL RECEIPT*\n` +
       `-----------------------------------\n` +
       `*Order Ref:* ${ord.reference}\n` +
       `*Date:* ${new Date(ord.created_at).toLocaleString()}\n` +
@@ -77,7 +77,7 @@ function TrackOrder() {
       `*Purchased Items:*\n${itemStr}\n\n` +
       `*Total Paid:* GH₵ ${Number(ord.total_ghs || 0).toFixed(2)}\n` +
       `-----------------------------------\n` +
-      `Thank you for choosing BestData Ghana! (bestdatagh.com)`;
+      `Thank you for choosing GigMart Ghana! (gigmart.shop)`;
 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
   };
@@ -102,7 +102,7 @@ function TrackOrder() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Receipt #${ord.reference} — BestData Ghana</title>
+          <title>Receipt #${ord.reference} — GigMart Ghana</title>
           <style>
             body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; color: #1e293b; }
             .header { text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 25px; }
@@ -116,7 +116,7 @@ function TrackOrder() {
         </head>
         <body>
           <div class="header">
-            <div class="logo">BESTDATA GHANA</div>
+            <div class="logo">GIGMART GHANA</div>
             <p style="margin: 4px 0; font-size: 12px; color: #64748b;">Official Data Bundle Transaction Receipt</p>
             <div className="badge">${ord.status}</div>
           </div>
@@ -149,7 +149,7 @@ function TrackOrder() {
           </div>
 
           <div class="footer">
-            BestData Ghana • Support: 0244 000 000 • bestdatagh.com<br>
+            GigMart Ghana • Support: 0244 000 000 • gigmart.shop<br>
             Printed on ${new Date().toLocaleString()}
           </div>
           <script>

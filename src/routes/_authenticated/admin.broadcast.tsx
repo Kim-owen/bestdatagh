@@ -14,7 +14,7 @@ const NOTIFICATION_TEMPLATES = [
     id: "we_are_live",
     title: "🚀 We Are Live Announcement",
     badge: "Official Live",
-    content: "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData Ghana. Buy online: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}",
+    content: "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on GigMart Ghana. Buy online: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}",
   },
   {
     id: "fast_delivery",
@@ -32,7 +32,7 @@ const NOTIFICATION_TEMPLATES = [
     id: "maintenance",
     title: "⚠️ Provider Gateway Maintenance",
     badge: "Maintenance",
-    content: "⚠️ BestData Notice: Provider gateway undergoing brief maintenance. Normal automated dispatch resumes shortly. Support: {support_phone}",
+    content: "⚠️ GigMart Notice: Provider gateway undergoing brief maintenance. Normal automated dispatch resumes shortly. Support: {support_phone}",
   },
   {
     id: "weekend_promo",
@@ -53,7 +53,7 @@ function AdminBroadcastPage() {
   const [result, setResult] = useState<any>(null);
 
   // Links & Schedule Configuration State
-  const [siteUrl, setSiteUrl] = useState("https://bestdatagh.shop");
+  const [siteUrl, setSiteUrl] = useState("https://gigmart.shop");
   const [whatsappUrl, setWhatsappUrl] = useState("https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E");
   const [supportPhone, setSupportPhone] = useState("0551234567");
   const [scheduleEnabled, setScheduleEnabled] = useState(true);
@@ -347,7 +347,7 @@ function AdminBroadcastPage() {
           </div>
           <textarea
             rows={5}
-            placeholder="e.g. BestData Notice: MTN network maintenance tonight from 12am to 2am. Automated delivery will resume at 2:05am."
+            placeholder="e.g. GigMart Notice: MTN network maintenance tonight from 12am to 2am. Automated delivery will resume at 2:05am."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             className="w-full rounded-2xl border border-border bg-background p-4 text-xs font-medium outline-none focus:ring-2 focus:ring-primary"

@@ -30,7 +30,7 @@ import { GoldCoinSpinner } from "@/components/site/GoldCoinSpinner";
 /** BrandLoadingSpinner renders the 3D Spinning Gold Coin Loader */
 export function BrandLoadingSpinner({
   size = "md",
-  label = "Loading BestData…",
+  label = "Loading GigMart…",
 }: {
   size?: "sm" | "md" | "lg";
   label?: string;
@@ -43,7 +43,7 @@ export function BrandLoadingSpinner({
 }
 
 /** Full-Page Glassmorphic Loading Screen */
-export function PageLoader({ label = "Connecting to BestData…" }: { label?: string }) {
+export function PageLoader({ label = "Connecting to GigMart…" }: { label?: string }) {
   return (
     <div className="min-h-screen bg-background/90 backdrop-blur-md flex items-center justify-center p-4">
       <div className="rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl p-8 shadow-2xl flex flex-col items-center text-center space-y-4 max-w-xs w-full">

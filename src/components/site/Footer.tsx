@@ -71,7 +71,7 @@ export function Footer() {
           <div>
             <h4 className="mb-3 text-[11px] font-bold uppercase tracking-widest text-primary">Support & Security</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="mailto:support@bestdata.com" className="font-semibold text-foreground/75 hover:text-primary transition-colors">support@bestdata.com</a></li>
+              <li><a href="mailto:support@gigmart.shop" className="font-semibold text-foreground/75 hover:text-primary transition-colors">support@gigmart.shop</a></li>
               <li><Link to="/support" className="font-semibold text-foreground/75 hover:text-primary transition-colors">24/7 Support Desk</Link></li>
               <li className="text-muted-foreground pt-1 leading-relaxed">Secured with 256-bit SSL encryption via Paystack gateway.</li>
             </ul>
@@ -80,7 +80,7 @@ export function Footer() {
 
         <div className="mt-12 border-t border-border/60 pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">© 2026 Bestdata Ghana. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">© 2026 GigMart Ghana. All rights reserved.</p>
             <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
               <span className="rounded-md border border-border px-2 py-0.5 font-bold">MTN MoMo</span>
               <span className="rounded-md border border-border px-2 py-0.5 font-bold">Telecel Cash</span>

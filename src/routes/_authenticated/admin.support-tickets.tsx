@@ -69,7 +69,7 @@ function AdminSupportDeskPage() {
                     </td>
                     <td className="px-6 py-4 flex items-center gap-2">
                       <a
-                        href={`https://wa.me/${t.phone.replace(/^0/, "233")}?text=${encodeURIComponent(`Hi ${t.name}, BestData support here regarding: ${t.subject}`)}`}
+                        href={`https://wa.me/${t.phone.replace(/^0/, "233")}?text=${encodeURIComponent(`Hi ${t.name}, GigMart support here regarding: ${t.subject}`)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[11px] font-bold text-emerald-400 hover:bg-emerald-500/20"

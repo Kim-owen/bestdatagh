@@ -18,10 +18,10 @@ export const Route = createFileRoute("/auth")({
   }),
   head: () => ({
     meta: [
-      { title: "Sign In or Create Account — Bestdata" },
-      { name: "description", content: "Log in or create a free Bestdata account for wallet, history and priority support." },
-      { property: "og:title", content: "Sign In — Bestdata" },
-      { property: "og:description", content: "Log in or create a free Bestdata account." },
+      { title: "Sign In or Create Account — GigMart" },
+      { name: "description", content: "Log in or create a free GigMart account for wallet, history and priority support." },
+      { property: "og:title", content: "Sign In — GigMart" },
+      { property: "og:description", content: "Log in or create a free GigMart account." },
       { name: "robots", content: "noindex" },
     ],
     links: [{ rel: "canonical", href: "/auth" }],

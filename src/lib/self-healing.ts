@@ -211,10 +211,10 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
       }
 
       if (targetSlot) {
-        const siteUrl = sMap.daily_sms_site_url || "https://bestdatagh.shop";
+        const siteUrl = sMap.daily_sms_site_url || "https://gigmart.shop";
         const whatsappUrl = sMap.daily_sms_whatsapp_link || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
         const supportPhone = sMap.support_phone || sMap.daily_sms_support_number || "0551234567";
-        const customTemplate = sMap.daily_sms_custom_message || "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData. Site: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}";
+        const customTemplate = sMap.daily_sms_custom_message || "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on GigMart. Site: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}";
 
         const formattedMsg = customTemplate
           .replace(/\{site_url\}/g, siteUrl)

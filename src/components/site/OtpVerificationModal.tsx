@@ -95,7 +95,7 @@ export function OtpVerificationModal({ open, phone, onOpenChange, onVerified }: 
             First-Time Buyer Verification
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-            Welcome to Bestdata! Security is our priority. Please enter the 6-digit verification code sent to your phone.
+            Welcome to GigMart! Security is our priority. Please enter the 6-digit verification code sent to your phone.
           </DialogDescription>
         </DialogHeader>
 

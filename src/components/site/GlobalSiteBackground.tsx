@@ -24,7 +24,7 @@ export function GlobalSiteBackground() {
     },
     {
       id: "mtn-sphere-slide",
-      title: "Bestdata Ghana Hub",
+      title: "GigMart Ghana Hub",
       subtitle: "Automated MoMo Dispatch & Agent Portal",
       tag: "⚡ INSTANT DELIVERY",
       mediaType: "image" as const,

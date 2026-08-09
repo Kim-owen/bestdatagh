@@ -22,7 +22,7 @@ import { useServerFn } from "@tanstack/react-start";
 export const Route = createFileRoute("/_authenticated/agent")({
   head: () => ({
     meta: [
-      { title: "Agent Portal — Bestdata" },
+      { title: "Agent Portal — GigMart" },
       { name: "description", content: "Agent portal workspace: overview, storefront branding, retail pricing, CRM, and payouts." },
       { name: "robots", content: "noindex" },
     ],
@@ -183,7 +183,7 @@ function AgentDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `bestdata_agent_orders_${Date.now()}.csv`);
+    link.setAttribute("download", `gigmart_agent_orders_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1034,10 +1034,10 @@ function AgentShareAndBrandingSuite() {
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [activeMediaTheme, setActiveMediaTheme] = useState("cyber-gold");
-  const [customNotice, setCustomNotice] = useState("⚡ Welcome to my official Bestdata agent store! Enjoy discounted MTN, Telecel & AT bundles delivered instantly.");
+  const [customNotice, setCustomNotice] = useState("⚡ Welcome to my official GigMart agent store! Enjoy discounted MTN, Telecel & AT bundles delivered instantly.");
   const [savedNotice, setSavedNotice] = useState(false);
 
-  const rawUrl = typeof window !== "undefined" ? `${window.location.origin}/agents` : "https://bestdata.gh/agents";
+  const rawUrl = typeof window !== "undefined" ? `${window.location.origin}/agents` : "https://gigmart.shop/agents";
   const shareUrl = `${rawUrl}?store=agent-pro`;
 
   function copyLink() {
@@ -1047,7 +1047,7 @@ function AgentShareAndBrandingSuite() {
   }
 
   function shareWhatsApp() {
-    const text = encodeURIComponent(`Buy cheap MTN, Telecel & AirtelTigo data bundles directly from my official Bestdata agent store! ⚡ Fast delivery.\n\n👇 Click here to order:\n${shareUrl}`);
+    const text = encodeURIComponent(`Buy cheap MTN, Telecel & AirtelTigo data bundles directly from my official GigMart agent store! ⚡ Fast delivery.\n\n👇 Click here to order:\n${shareUrl}`);
     window.open(`https://wa.me/?text=${text}`, "_blank");
   }
 

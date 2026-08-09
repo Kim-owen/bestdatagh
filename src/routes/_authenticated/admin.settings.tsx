@@ -21,19 +21,19 @@ function AdminSettingsPage() {
   });
 
   const [form, setForm] = useState<Record<string, string>>({
-    site_name: "BestData Ghana",
+    site_name: "GigMart Ghana",
     support_phone: "0551234567",
-    support_email: "support@bestdata.gh",
+    support_email: "support@gigmart.shop",
     momo_agent_number: "0240000000",
-    momo_agent_name: "BestData Financials",
+    momo_agent_name: "GigMart Financials",
     maintenance_mode: "false",
     paystack_secret_key: "",
     txtconnect_api_key: "",
-    txtconnect_sender_id: "BestData",
+    txtconnect_sender_id: "GigMart",
     checker_price_waec: "18.00",
     checker_price_bece: "18.00",
     daily_sms_whatsapp_link: "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E",
-    daily_sms_site_url: "https://bestdatagh.shop",
+    daily_sms_site_url: "https://gigmart.shop",
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -150,7 +150,7 @@ function AdminSettingsPage() {
                 value={form.daily_sms_site_url || ""}
                 onChange={(e) => setForm({ ...form, daily_sms_site_url: e.target.value })}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-mono font-medium focus:ring-2 focus:ring-primary outline-none"
-                placeholder="https://bestdatagh.shop"
+                placeholder="https://gigmart.shop"
               />
             </div>
             <div>

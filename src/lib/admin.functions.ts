@@ -293,7 +293,7 @@ export const adminSendUserNotification = createServerFn({ method: "POST" })
       const { data: prof } = await supabaseAdmin.from("profiles").select("phone").eq("id", data.userId).maybeSingle();
       if (prof?.phone) {
         const { sendTxtConnectSms } = await import("@/lib/otp.functions");
-        await sendTxtConnectSms(prof.phone, `[BestData Notification] ${data.title}: ${data.body}`).catch(() => {});
+        await sendTxtConnectSms(prof.phone, `[GigMart Notification] ${data.title}: ${data.body}`).catch(() => {});
         smsSent = true;
       }
     }
@@ -520,7 +520,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
 
           await (supabaseAdmin as any).from("admin_audit_logs").insert({
             admin_id: context.userId,
-            admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+            admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
             action: "PREVENTED_DUPLICATE_RETRY",
             target_type: "order",
             target_id: order.id,
@@ -583,7 +583,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     // Audit log
     await (supabaseAdmin as any).from("admin_audit_logs").insert({
       admin_id: context.userId,
-      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
       action: "RETRY_ORDER_FULFILLMENT",
       target_type: "order",
       target_id: order.id,
@@ -637,7 +637,7 @@ export const adminCheckSwiftDataOrderStatus = createServerFn({ method: "POST" })
 
           await (supabaseAdmin as any).from("admin_audit_logs").insert({
             admin_id: context.userId,
-            admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+            admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
             action: "VERIFY_GATEWAY_DELIVERY_STATUS",
             target_type: "order",
             target_id: order.id,
@@ -913,7 +913,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlideItem[] = [
   },
   {
     id: "mtn-sphere-slide",
-    title: "Bestdata Ghana Hub",
+    title: "GigMart Ghana Hub",
     subtitle: "Automated MoMo Dispatch & Agent Portal",
     tag: "⚡ INSTANT DELIVERY",
     mediaType: "image",
@@ -1046,7 +1046,7 @@ export const adminSendBroadcastSms = createServerFn({ method: "POST" })
     // Log action
     await (supabaseAdmin as any).from("admin_audit_logs").insert({
       admin_id: context.userId,
-      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
       action: "BROADCAST_SMS_SENT",
       target_type: "broadcast",
       details: { audience: data.audience, totalCount: phoneNumbers.length, successCount },
@@ -1070,11 +1070,11 @@ export const adminTriggerWeAreLiveSms = createServerFn({ method: "POST" })
       settingsMap[row.key] = row.value;
     });
 
-    const siteUrl = data?.siteUrl || settingsMap.daily_sms_site_url || "https://bestdatagh.shop";
+    const siteUrl = data?.siteUrl || settingsMap.daily_sms_site_url || "https://gigmart.shop";
     const whatsappUrl = data?.whatsappUrl || settingsMap.daily_sms_whatsapp_link || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E";
     const supportPhone = data?.supportPhone || settingsMap.support_phone || settingsMap.daily_sms_support_number || "0551234567";
 
-    const defaultMsg = `🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData. Site: ${siteUrl} | WhatsApp: ${whatsappUrl} | Support: ${supportPhone}`;
+    const defaultMsg = `🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on GigMart. Site: ${siteUrl} | WhatsApp: ${whatsappUrl} | Support: ${supportPhone}`;
     const smsText = data?.customMessage || settingsMap.daily_sms_custom_message || defaultMsg;
 
     const formattedMessage = smsText
@@ -1109,7 +1109,7 @@ export const adminTriggerWeAreLiveSms = createServerFn({ method: "POST" })
 
     await (supabaseAdmin as any).from("admin_audit_logs").insert({
       admin_id: context.userId,
-      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
       action: "TRIGGERED_WE_ARE_LIVE_SMS",
       target_type: "broadcast",
       details: { audience: audienceChoice, totalCount: phoneNumbers.length, successCount, formattedMessage },
@@ -1137,10 +1137,10 @@ export const adminSaveDailySmsSchedule = createServerFn({ method: "POST" })
       ["daily_sms_enabled", String(data.enabled ?? true)],
       ["daily_sms_7am_enabled", String(data.slot7am ?? true)],
       ["daily_sms_9am_enabled", String(data.slot9am ?? true)],
-      ["daily_sms_site_url", data.siteUrl || "https://bestdatagh.shop"],
+      ["daily_sms_site_url", data.siteUrl || "https://gigmart.shop"],
       ["daily_sms_whatsapp_link", data.whatsappUrl || "https://whatsapp.com/channel/0029Vb87LlELdQebZ0K7n51E"],
       ["daily_sms_support_number", data.supportPhone || "0551234567"],
-      ["daily_sms_custom_message", data.customTemplate || "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on BestData. Site: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}"],
+      ["daily_sms_custom_message", data.customTemplate || "🚀 WE ARE LIVE! Order instant MTN, Telecel & AT data bundles on GigMart. Site: {site_url} | WhatsApp: {whatsapp_url} | Support: {support_phone}"],
     ];
 
     for (const [key, value] of entries) {
@@ -1424,7 +1424,7 @@ export const adminAdjustUserWallet = createServerFn({ method: "POST" })
     // Audit log
     await (supabaseAdmin as any).from("admin_audit_logs").insert({
       admin_id: context.userId,
-      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
       action: `WALLET_${data.type.toUpperCase()}`,
       target_type: "user_wallet",
       target_id: data.userId,
@@ -1484,7 +1484,7 @@ export const adminRefundOrderToWallet = createServerFn({ method: "POST" })
     // Audit log
     await (supabaseAdmin as any).from("admin_audit_logs").insert({
       admin_id: context.userId,
-      admin_email: context.claims?.email || `admin-${context.userId}@bestdatagh.com`,
+      admin_email: context.claims?.email || `admin-${context.userId}@gigmart.shop`,
       action: "ORDER_REFUND_WALLET",
       target_type: "order",
       target_id: data.orderId,

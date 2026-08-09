@@ -56,7 +56,7 @@ function AdminReportsPage() {
             <p className="text-xs text-muted-foreground">Export all order references, phone numbers, networks, amounts paid, and dispatch timestamps.</p>
           </div>
           <button
-            onClick={() => downloadCsv("BestData_Orders_Report", report?.orders || [])}
+            onClick={() => downloadCsv("GigMart_Orders_Report", report?.orders || [])}
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-2 rounded-2xl gold-gradient py-3 text-xs font-black text-primary-foreground shadow-md hover:scale-[1.02] active:scale-95 transition-all"
           >
@@ -74,7 +74,7 @@ function AdminReportsPage() {
             <p className="text-xs text-muted-foreground">Export verified reseller agents, contact phones, regions, monthly volume estimates, and approval status.</p>
           </div>
           <button
-            onClick={() => downloadCsv("BestData_Agents_Roster", report?.agents || [])}
+            onClick={() => downloadCsv("GigMart_Agents_Roster", report?.agents || [])}
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-background py-3 text-xs font-bold hover:bg-muted transition-all"
           >
@@ -92,7 +92,7 @@ function AdminReportsPage() {
             <p className="text-xs text-muted-foreground">Export reseller developer key prefixes, creation dates, user IDs, and active status.</p>
           </div>
           <button
-            onClick={() => downloadCsv("BestData_APIKeys_Audit", report?.apiKeys || [])}
+            onClick={() => downloadCsv("GigMart_APIKeys_Audit", report?.apiKeys || [])}
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-background py-3 text-xs font-bold hover:bg-muted transition-all"
           >
