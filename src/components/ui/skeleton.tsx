@@ -4,7 +4,7 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
   return (
     <div
       className={cn(
-        "animate-pulse rounded-2xl bg-slate-800/60 border border-white/5 relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent",
+        "animate-pulse rounded-2xl bg-muted border border-border/60 relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-foreground/5 before:to-transparent",
         className
       )}
       {...props}
@@ -17,7 +17,7 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
  */
 export function BundleCardSkeleton() {
   return (
-    <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 space-y-4 shadow-xl backdrop-blur-xl">
+    <div className="rounded-3xl border border-border bg-card p-5 space-y-4 shadow-card backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <Skeleton className="h-9 w-9 rounded-2xl" />
@@ -29,7 +29,7 @@ export function BundleCardSkeleton() {
         <Skeleton className="h-8 w-28 rounded-xl" />
         <Skeleton className="h-4 w-36 rounded-lg" />
       </div>
-      <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+      <div className="pt-2 border-t border-border/60 flex items-center justify-between">
         <Skeleton className="h-6 w-24 rounded-lg" />
         <Skeleton className="h-9 w-24 rounded-2xl" />
       </div>
@@ -42,7 +42,7 @@ export function BundleCardSkeleton() {
  */
 export function TableRowSkeleton({ columns = 5 }: { columns?: number }) {
   return (
-    <tr className="border-b border-white/5">
+    <tr className="border-b border-border/60">
       {Array.from({ length: columns }).map((_, i) => (
         <td key={i} className="p-4">
           <div className="space-y-2">
@@ -60,7 +60,7 @@ export function TableRowSkeleton({ columns = 5 }: { columns?: number }) {
  */
 export function StatCardSkeleton() {
   return (
-    <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 space-y-3 backdrop-blur-xl">
+    <div className="rounded-3xl border border-border bg-card p-5 space-y-3 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <Skeleton className="h-4 w-28 rounded-md" />
         <Skeleton className="h-4 w-4 rounded-full" />

@@ -18,7 +18,7 @@ export const getResultCheckerProducts = createServerFn({ method: "GET" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: configs } = await (supabaseAdmin as any)
-        .from("site_settings")
+        .from("system_configs")
         .select("key, value")
         .in("key", ["checker_price_waec", "checker_price_bece"]);
 
@@ -30,7 +30,7 @@ export const getResultCheckerProducts = createServerFn({ method: "GET" })
         if (bVal && !isNaN(bVal)) becePrice = bVal;
       }
     } catch (e: any) {
-      console.warn("[ResultCheckers] Could not fetch custom prices from site_settings:", e.message);
+      console.warn("[ResultCheckers] Could not fetch custom prices from system_configs:", e.message);
     }
 
     const dmKey = getDataMartApiKey();

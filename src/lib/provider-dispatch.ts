@@ -18,13 +18,13 @@ export interface DispatchResult {
 }
 
 /**
- * Reads admin preferred active data provider setting from site_settings ("datamart" | "swiftdata")
+ * Reads admin preferred active data provider setting from system_configs ("datamart" | "swiftdata")
  */
 export async function getActiveProviderPreference(): Promise<"datamart" | "swiftdata"> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await (supabaseAdmin as any)
-      .from("site_settings")
+      .from("system_configs")
       .select("value")
       .eq("key", "active_data_provider")
       .maybeSingle();

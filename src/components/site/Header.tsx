@@ -13,6 +13,7 @@ import { getMyWallet } from "@/lib/wallet.functions";
 import { WalletTopUpModal } from "./WalletModal";
 import { NotificationBell } from "./NotificationBell";
 import { InactivityTimer } from "./InactivityTimer";
+import { Logo } from "./Logo";
 
 export function getRoleBasedNav(isAdmin: boolean, isAgent: boolean, isSignedIn: boolean) {
   if (isAdmin) {
@@ -70,23 +71,6 @@ function useTheme() {
     setDark(next);
   };
   return { dark, toggle };
-}
-
-export function Logo({ className = "" }: { className?: string }) {
-  return (
-    <Link to="/" className={`flex items-center gap-3 group ${className}`}>
-      <div className="relative overflow-hidden grid h-10 w-10 place-items-center rounded-2xl bg-slate-900 p-0.5 border border-emerald-500/40 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)] group-hover:scale-105 transition-all duration-300">
-        <img src="/logo.png" alt="GigMart Logo" className="h-full w-full object-cover rounded-xl" />
-        <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-background animate-pulse" />
-      </div>
-      <div className="flex flex-col">
-        <span className="text-xl font-black tracking-tight leading-none font-display text-foreground group-hover:text-emerald-400 transition-colors">
-          GigMart<span className="bg-amber-400 text-slate-950 px-1 py-0.5 rounded-md text-[10px] font-black ml-1">GH</span>
-        </span>
-        <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 leading-none mt-1">Ghana Hub</span>
-      </div>
-    </Link>
-  );
 }
 
 export function Header() {

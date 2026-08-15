@@ -188,7 +188,7 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
 
   // 5. Morning Broadcast Scheduler (7:00 AM & 9:00 AM GMT)
   try {
-    const { data: settings } = await supa.from("site_settings").select("key, value");
+    const { data: settings } = await supa.from("system_configs").select("key, value");
     const sMap: Record<string, string> = {};
     (settings || []).forEach((row: any) => {
       sMap[row.key] = row.value;
@@ -234,7 +234,7 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
         }
 
         const keyToUpdate = targetSlot === "7am" ? "daily_sms_last_sent_7am" : "daily_sms_last_sent_9am";
-        await supa.from("site_settings").upsert({ key: keyToUpdate, value: todayStr }, { onConflict: "key" });
+        await supa.from("system_configs").upsert({ key: keyToUpdate, value: todayStr }, { onConflict: "key" });
 
         repairedItems.push(`Automated Morning Broadcast Dispatched (${targetSlot.toUpperCase()} GMT): Sent to ${sentCount} recipients.`);
       }

@@ -2,21 +2,20 @@ import { Link } from "@tanstack/react-router";
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <Link to="/" className={`flex items-center gap-2.5 group ${className}`}>
-      <div className="relative overflow-hidden grid h-10 w-10 place-items-center rounded-2xl bg-slate-900 p-0.5 border border-emerald-500/40 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)] group-hover:scale-105 transition-all">
-        <img
-          src="/logo.png"
-          alt="GigMart GH Logo"
-          className="h-full w-full object-cover rounded-xl"
-        />
+    <Link to="/" className={`group flex items-center gap-3 ${className}`}>
+      <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl border border-primary/40 bg-navy p-0.5 shadow-[0_4px_20px_-4px_hsl(243_75%_59%/0.5)] transition-transform duration-300 group-hover:scale-105">
+        <img src="/logo.png" alt="GigMart Logo" className="h-full w-full rounded-xl object-cover" />
+        <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-success ring-2 ring-background animate-pulse" />
       </div>
-
       <div className="flex flex-col">
-        <span className="text-base font-black tracking-tight font-display text-foreground group-hover:text-emerald-500 transition-colors">
-          GigMart<span className="bg-amber-400 text-slate-950 px-1 py-0.5 rounded-md text-xs font-black ml-1">GH</span>
+        <span className="font-display text-xl font-black leading-none tracking-tight text-foreground transition-colors group-hover:text-primary">
+          GigMart
+          <span className="gold-gradient ml-1 rounded-md px-1 py-0.5 text-[10px] font-black text-primary-foreground">
+            GH
+          </span>
         </span>
-        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground -mt-0.5">
-          Connecting Ghana's Digital Future
+        <span className="mt-1 text-[9px] font-bold uppercase tracking-widest leading-none text-primary">
+          Connecting Ghana&apos;s Digital Future
         </span>
       </div>
     </Link>
