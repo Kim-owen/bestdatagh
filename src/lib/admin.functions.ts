@@ -864,7 +864,7 @@ export const adminGetSiteSettings = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await (supabaseAdmin as any).from("site_settings").select("*");
+    const { data, error } = await (supabaseAdmin as any).from("system_configs").select("*");
     if (error) return {};
     const settings: Record<string, string> = {};
     (data || []).forEach((row: any) => {
@@ -883,7 +883,7 @@ export const adminSaveSiteSettings = createServerFn({ method: "POST" })
     const entries = Object.entries(payload);
     for (const [key, value] of entries) {
       if (key) {
-        await (supabaseAdmin as any).from("site_settings").upsert({ key, value: String(value) }, { onConflict: "key" });
+        await (supabaseAdmin as any).from("system_configs").upsert({ key, value: String(value) }, { onConflict: "key" });
       }
     }
     return { ok: true };
@@ -1064,7 +1064,7 @@ export const adminTriggerWeAreLiveSms = createServerFn({ method: "POST" })
     const { sendTxtConnectSms } = await import("@/lib/otp.functions");
 
     // Fetch defaults from site settings if not explicitly provided
-    const { data: settingsData } = await (supabaseAdmin as any).from("site_settings").select("key, value");
+    const { data: settingsData } = await (supabaseAdmin as any).from("system_configs").select("key, value");
     const settingsMap: Record<string, string> = {};
     (settingsData || []).forEach((row: any) => {
       settingsMap[row.key] = row.value;
@@ -1144,7 +1144,7 @@ export const adminSaveDailySmsSchedule = createServerFn({ method: "POST" })
     ];
 
     for (const [key, value] of entries) {
-      await (supabaseAdmin as any).from("site_settings").upsert({ key, value }, { onConflict: "key" });
+      await (supabaseAdmin as any).from("system_configs").upsert({ key, value }, { onConflict: "key" });
     }
 
     return { ok: true, message: "Daily morning SMS broadcast schedule updated successfully!" };
@@ -1609,7 +1609,7 @@ export const adminSetActiveDataProvider = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await (supabaseAdmin as any)
-      .from("site_settings")
+      .from("system_configs")
       .upsert({ key: "active_data_provider", value: data.provider }, { onConflict: "key" });
 
     if (error) throw new Error(error.message);

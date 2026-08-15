@@ -50,6 +50,10 @@ function BundlesPage() {
       setSyncStatusMsg(`Active fulfillment provider switched to ${res.activeProvider === "datamart" ? "DataMart API" : "SwiftData API"}`);
       setTimeout(() => setSyncStatusMsg(null), 6000);
     },
+    onError: (err: any) => {
+      setSyncStatusMsg(`Failed to switch provider: ${err?.message || "Unknown error"}`);
+      setTimeout(() => setSyncStatusMsg(null), 8000);
+    },
   });
 
   const { data: storeBundles, isLoading: loadingStore } = useQuery({
