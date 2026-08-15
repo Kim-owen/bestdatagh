@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 const TXTCONNECT_API_KEY = process.env.TXTCONNECT_API_KEY || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
-const TXTCONNECT_SENDER_ID = process.env.TXTCONNECT_SENDER_ID || "BestData";
+const TXTCONNECT_SENDER_ID = process.env.TXTCONNECT_SENDER_ID || "Gigmart";
 
 // In-memory fallback OTP store in case Supabase table `phone_verifications` is missing
 const inMemoryOtpStore = new Map<string, { otpCode: string; expiresAt: number; verifiedAt?: string }>();
