@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: ghana-data-hub
+    env: node
+    buildCommand: npm install && vite build && npx nitro build --preset render
+    startCommand: node .output/server/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: 20.x
