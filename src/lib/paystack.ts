@@ -1,17 +1,8 @@
 import crypto from "node:crypto";
 
-const defaultSecretKey = ["sk_live_", "986376935c2c370b", "a9930144b7bc6a75", "5d43dc7e"].join("");
-const defaultPublicKey = ["pk_live_", "74ed2ba7f110bcec", "6ca98f9d270ff1bd", "025b24c3"].join("");
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
-const PAYSTACK_SECRET_KEY =
-  process.env.PAYSTACK_SECRET_KEY ||
-  process.env.VITE_PAYSTACK_SECRET_KEY ||
-  defaultSecretKey;
-
-export const PAYSTACK_PUBLIC_KEY =
-  process.env.VITE_PAYSTACK_PUBLIC_KEY ||
-  process.env.PAYSTACK_PUBLIC_KEY ||
-  defaultPublicKey;
+export const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || "";
 
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 

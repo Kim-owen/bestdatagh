@@ -110,11 +110,6 @@ function RootShell({ children }: { children: ReactNode }) {
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'){document.documentElement.classList.add('dark');}}catch(e){document.documentElement.classList.add('dark');}})();`,
           }}
         />
-        <script
-          src="https://api.datamartgh.shop/delivery-tracker.js"
-          data-api-key="a2654417e41cd6408c14f538af4c3565c15e5bf58f36ead5ffab1b5d75b88f56"
-          async
-        />
         <HeadContent />
       </head>
       <body suppressHydrationWarning>

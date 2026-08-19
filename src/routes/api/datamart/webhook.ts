@@ -11,7 +11,7 @@ export const Route = createFileRoute("/api/datamart/webhook")({
         try {
           const rawBody = await request.text();
           const sig = request.headers.get("x-datamart-signature");
-          const secret = process.env.DATAMART_WEBHOOK_SECRET || "4272be57f2310c050aee1119b11fdecc893ca6b61029830d1d96511f74c6ea40";
+          const secret = process.env.DATAMART_WEBHOOK_SECRET || "";
 
           // Verify HMAC-SHA256 Signature if secret is configured
           if (secret && sig) {

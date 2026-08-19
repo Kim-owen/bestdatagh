@@ -110,7 +110,7 @@ export async function sendTransactionalEmail(params: EmailParams): Promise<boole
   const html = buildHtmlTemplate(params);
 
   // Option A: Resend API (3,000 free emails/mo)
-  const resendApiKey = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY;
+  const resendApiKey = process.env.RESEND_API_KEY;
   if (resendApiKey) {
     try {
       const fromAddress = process.env.RESEND_FROM_EMAIL || "Bestdata Hub <onboarding@resend.dev>";

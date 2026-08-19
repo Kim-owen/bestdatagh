@@ -1,5 +1,3 @@
-const defaultSwiftDataKey = ["sk_live_", "8287bd0fea81423b", "a46250f3d7a6fa41"].join("");
-
 const BASE_URL_RAW = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
 const SWIFTDATA_BASE_URL = BASE_URL_RAW.replace(/\/v1\/api$/, "").replace(/\/api$/, "");
 
@@ -9,7 +7,7 @@ function getEndpoint(path: string): string {
 }
 
 export function getSwiftDataApiKey(): string {
-  return process.env.SWIFTDATA_API_KEY || defaultSwiftDataKey;
+  return process.env.SWIFTDATA_API_KEY || "";
 }
 
 const SWIFTDATA_API_KEY = getSwiftDataApiKey();

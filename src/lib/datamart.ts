@@ -3,11 +3,10 @@
  * Base URL: https://api.datamartgh.shop
  */
 
-const DEFAULT_DATAMART_KEY = "a2654417e41cd6408c14f538af4c3565c15e5bf58f36ead5ffab1b5d75b88f56";
 const DATAMART_BASE_URL = process.env.DATAMART_BASE_URL || "https://api.datamartgh.shop/api";
 
 export function getDataMartApiKey(): string {
-  return process.env.DATAMART_API_KEY || DEFAULT_DATAMART_KEY;
+  return process.env.DATAMART_API_KEY || "";
 }
 
 export function getDataMartSecret(): string | undefined {
