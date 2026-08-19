@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { getSwiftDataBalance, getSwiftDataPackages, buySwiftDataBundle, mapToSwiftDataNetwork, parseSizeGb } from "@/lib/swiftdata";
-import { getDataMartBalance, getDataMartApiKey } from "@/lib/datamart";
 import { dispatchDataBundle } from "@/lib/provider-dispatch";
 import { clearBundleCache } from "@/lib/public-bundles.functions";
 import { sendTransactionalEmail } from "@/lib/email.functions";
@@ -108,16 +107,9 @@ export async function auditAndHealSystem(): Promise<HealingReport> {
 
   // 3. Audit Provider API & Balance + Low Balance Alert
   try {
-    if (getDataMartApiKey()) {
-      const dmBal = await getDataMartBalance();
-      if (dmBal && dmBal.status === "success") {
-        providerBalanceGhs = dmBal.balance;
-      }
-    } else {
-      const balRes = await getSwiftDataBalance();
-      if (balRes && balRes.success) {
-        providerBalanceGhs = Number(balRes.balance || 0);
-      }
+    const balRes = await getSwiftDataBalance();
+    if (balRes && (balRes.success || typeof balRes.balance === "number")) {
+      providerBalanceGhs = Number(balRes.balance || 0);
     }
 
     // Low Balance Alert: Trigger email notification if provider balance < GH₵ 50

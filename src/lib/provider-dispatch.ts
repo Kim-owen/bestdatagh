@@ -1,4 +1,3 @@
-import { getDataMartApiKey, mapToDataMartNetwork, buyDataMartBundle, getDataMartOrderStatus } from "@/lib/datamart";
 import { getSwiftDataApiKey, mapToSwiftDataNetwork, buySwiftDataBundle, getSwiftDataOrder, parseSizeGb } from "@/lib/swiftdata";
 
 export interface DispatchParams {
@@ -10,7 +9,7 @@ export interface DispatchParams {
 
 export interface DispatchResult {
   success: boolean;
-  provider: "datamart" | "swiftdata" | "none";
+  provider: "swiftdata" | "none";
   status: "completed" | "processing" | "failed";
   orderRef: string;
   message?: string;
@@ -18,120 +17,70 @@ export interface DispatchResult {
 }
 
 /**
- * Reads admin preferred active data provider setting from system_configs ("datamart" | "swiftdata")
+ * Active data provider setting (SwiftData API Gateway)
  */
-export async function getActiveProviderPreference(): Promise<"datamart" | "swiftdata"> {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await (supabaseAdmin as any)
-      .from("system_configs")
-      .select("value")
-      .eq("key", "active_data_provider")
-      .maybeSingle();
-
-    if (data && data.value) {
-      const val = String(data.value).toLowerCase();
-      if (val === "swiftdata" || val === "datamart") return val as "datamart" | "swiftdata";
-    }
-  } catch {
-    // Fallback to default
-  }
-  return "datamart";
+export async function getActiveProviderPreference(): Promise<"swiftdata"> {
+  return "swiftdata";
 }
 
 /**
- * Unified Automated Bundle Dispatcher
- * Priority: Based on Admin active_data_provider setting, with automatic failover to secondary provider.
+ * Unified Automated Bundle Dispatcher (SwiftData API)
  */
 export async function dispatchDataBundle(params: DispatchParams): Promise<DispatchResult> {
   const cleanPhone = params.phone.replace(/\s+/g, "");
   const sizeGb = parseSizeGb(params.sizeLabel);
-  const dmKey = getDataMartApiKey();
   const swiftKey = getSwiftDataApiKey();
 
-  const preferredProvider = await getActiveProviderPreference();
-  let lastError = "";
-
-  // Helper A: Execute DataMart
-  const tryDataMart = async (): Promise<DispatchResult | null> => {
-    if (!dmKey) return null;
-    try {
-      const dmNet = mapToDataMartNetwork(params.network, params.sizeLabel);
-      const dmRes = await buyDataMartBundle({
-        phone: cleanPhone,
-        network: dmNet,
-        capacityGb: sizeGb,
-        reference: params.reference,
-      });
-
-      if (dmRes && dmRes.status === "success") {
-        const orderStatus = (dmRes.data?.orderStatus || "completed").toLowerCase();
-        const isCompleted = orderStatus === "completed" || orderStatus === "delivered";
-        return {
-          success: true,
-          provider: "datamart",
-          status: isCompleted ? "completed" : "processing",
-          orderRef: dmRes.data?.orderReference || params.reference,
-          rawResponse: dmRes,
-        };
-      }
-    } catch (err: any) {
-      lastError = err.message || "DataMart purchase failed";
-      console.warn(`[ProviderDispatch] DataMart dispatch failed for ref ${params.reference}: ${lastError}.`);
-    }
-    return null;
-  };
-
-  // Helper B: Execute SwiftData
-  const trySwiftData = async (): Promise<DispatchResult | null> => {
-    if (!swiftKey) return null;
-    try {
-      const swiftNet = mapToSwiftDataNetwork(params.network, params.sizeLabel);
-      const swiftRes = await buySwiftDataBundle({
-        phone: cleanPhone,
-        network: swiftNet,
-        sizeGb,
-        reference: params.reference,
-      });
-
-      if (swiftRes && (swiftRes.success || swiftRes.status === "completed" || swiftRes.status === "processing")) {
-        const orderStatus = (swiftRes.order?.status || swiftRes.status || "completed").toLowerCase();
-        const isCompleted = orderStatus === "completed" || orderStatus === "delivered";
-        return {
-          success: true,
-          provider: "swiftdata",
-          status: isCompleted ? "completed" : "processing",
-          orderRef: swiftRes.order?.reference || params.reference,
-          rawResponse: swiftRes,
-        };
-      }
-    } catch (err: any) {
-      lastError = err.message || "SwiftData purchase failed";
-      console.warn(`[ProviderDispatch] SwiftData dispatch failed for ref ${params.reference}: ${lastError}`);
-    }
-    return null;
-  };
-
-  // Route based on preferred provider setting
-  if (preferredProvider === "swiftdata") {
-    const swiftResult = await trySwiftData();
-    if (swiftResult) return swiftResult;
-    const dmResult = await tryDataMart();
-    if (dmResult) return dmResult;
-  } else {
-    const dmResult = await tryDataMart();
-    if (dmResult) return dmResult;
-    const swiftResult = await trySwiftData();
-    if (swiftResult) return swiftResult;
+  if (!swiftKey) {
+    return {
+      success: false,
+      provider: "none",
+      status: "failed",
+      orderRef: params.reference,
+      message: "SwiftData API key is not configured.",
+    };
   }
 
-  return {
-    success: false,
-    provider: "none",
-    status: "failed",
-    orderRef: params.reference,
-    message: lastError || "No active provider API key configured or all providers failed",
-  };
+  try {
+    const swiftNet = mapToSwiftDataNetwork(params.network, params.sizeLabel);
+    const swiftRes = await buySwiftDataBundle({
+      phone: cleanPhone,
+      network: swiftNet,
+      sizeGb,
+      reference: params.reference,
+    });
+
+    if (swiftRes && (swiftRes.success || swiftRes.status === "completed" || swiftRes.status === "processing")) {
+      const orderStatus = (swiftRes.order?.status || swiftRes.status || "completed").toLowerCase();
+      const isCompleted = orderStatus === "completed" || orderStatus === "delivered";
+      return {
+        success: true,
+        provider: "swiftdata",
+        status: isCompleted ? "completed" : "processing",
+        orderRef: swiftRes.order?.reference || params.reference,
+        rawResponse: swiftRes,
+      };
+    }
+
+    return {
+      success: false,
+      provider: "swiftdata",
+      status: "failed",
+      orderRef: params.reference,
+      message: swiftRes?.error || "SwiftData returned unexpected response",
+      rawResponse: swiftRes,
+    };
+  } catch (err: any) {
+    const errorMsg = err.message || "SwiftData dispatch failed";
+    console.error(`[ProviderDispatch] SwiftData dispatch failed for ref ${params.reference}:`, errorMsg);
+    return {
+      success: false,
+      provider: "swiftdata",
+      status: "failed",
+      orderRef: params.reference,
+      message: errorMsg,
+    };
+  }
 }
 
 /**
@@ -152,33 +101,16 @@ export function normalizeProviderStatus(stStr: string): "completed" | "processin
 }
 
 /**
- * Unified Provider Order Status Checker
+ * Provider Order Status Checker via SwiftData API
  */
 export async function queryProviderOrderStatus(reference: string): Promise<{
   found: boolean;
-  provider: "datamart" | "swiftdata" | "none";
+  provider: "swiftdata" | "none";
   status: "completed" | "processing" | "failed" | "pending";
   raw?: any;
 }> {
-  const dmKey = getDataMartApiKey();
   const swiftKey = getSwiftDataApiKey();
 
-  // Try DataMart first
-  if (dmKey) {
-    try {
-      const dmRes = await getDataMartOrderStatus(reference);
-      if (dmRes && (dmRes.status === "success" || dmRes.data)) {
-        const rawObj = dmRes.data || dmRes;
-        const stStr = String(rawObj.orderStatus || rawObj.status || rawObj.delivery_status || "");
-        const status = normalizeProviderStatus(stStr);
-        return { found: true, provider: "datamart", status, raw: rawObj };
-      }
-    } catch {
-      // Not on DataMart
-    }
-  }
-
-  // Try SwiftData
   if (swiftKey) {
     try {
       const swiftRes = await getSwiftDataOrder(reference);
@@ -189,7 +121,7 @@ export async function queryProviderOrderStatus(reference: string): Promise<{
         return { found: true, provider: "swiftdata", status, raw: rawObj };
       }
     } catch {
-      // Not on SwiftData
+      // Order not yet found on SwiftData
     }
   }
 

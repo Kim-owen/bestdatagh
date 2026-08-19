@@ -659,21 +659,9 @@ export const adminVerifyProviderGateway = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
-    const { getDataMartBalance, getDataMartApiKey } = await import("@/lib/datamart");
     const { getSwiftDataBalance, getSwiftDataApiKey } = await import("@/lib/swiftdata");
-    const { getActiveProviderPreference } = await import("@/lib/provider-dispatch");
 
-    const activePreference = await getActiveProviderPreference();
     const startTime = Date.now();
-
-    let dataMart = {
-      configured: false,
-      healthy: false,
-      balance: 0,
-      currency: "GHS",
-      latencyMs: 0,
-      message: "API Key not configured",
-    };
 
     let swiftData = {
       configured: false,
@@ -683,28 +671,6 @@ export const adminVerifyProviderGateway = createServerFn({ method: "POST" })
       latencyMs: 0,
       message: "API Key not configured",
     };
-
-    // Check DataMart Gateway
-    const dmKey = getDataMartApiKey();
-    if (dmKey) {
-      dataMart.configured = true;
-      const dmStart = Date.now();
-      try {
-        const dmBal = await getDataMartBalance();
-        dataMart.latencyMs = Date.now() - dmStart;
-        if (dmBal && (dmBal.status === "success" || typeof dmBal.balance === "number")) {
-          dataMart.healthy = true;
-          dataMart.balance = Number(dmBal.balance || 0);
-          dataMart.currency = dmBal.currency || "GHS";
-          dataMart.message = "DataMart Gateway Operational";
-        } else {
-          dataMart.message = (dmBal as any)?.message || "DataMart API error";
-        }
-      } catch (e: any) {
-        dataMart.latencyMs = Date.now() - dmStart;
-        dataMart.message = e.message || "Failed to reach DataMart endpoint";
-      }
-    }
 
     // Check SwiftData Gateway
     const swiftKey = getSwiftDataApiKey();
@@ -729,14 +695,12 @@ export const adminVerifyProviderGateway = createServerFn({ method: "POST" })
     }
 
     const totalTimeMs = Date.now() - startTime;
-    const overallHealthy = activePreference === "swiftdata" ? swiftData.healthy : dataMart.healthy;
 
     return {
       ok: true,
-      activePreference,
-      overallHealthy,
+      activePreference: "swiftdata",
+      overallHealthy: swiftData.healthy,
       totalTimeMs,
-      dataMart,
       swiftData,
       timestamp: new Date().toISOString(),
     };
@@ -1604,73 +1568,27 @@ export const adminCheckLedgerIntegrity = createServerFn({ method: "GET" })
 
 export const adminSetActiveDataProvider = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { provider: "datamart" | "swiftdata" }) => d)
+  .validator((d: { provider: "swiftdata" }) => d)
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await (supabaseAdmin as any)
       .from("system_configs")
-      .upsert({ key: "active_data_provider", value: data.provider }, { onConflict: "key" });
+      .upsert({ key: "active_data_provider", value: "swiftdata" }, { onConflict: "key" });
 
     if (error) throw new Error(error.message);
-    return { ok: true, activeProvider: data.provider };
+    return { ok: true, activeProvider: "swiftdata" };
   });
 
 export const adminGetProviderPackages = createServerFn({ method: "GET" })
   .handler(async () => {
     const { getSwiftDataPackages, getSwiftDataBalance } = await import("@/lib/swiftdata");
-    const { getDataMartBalance, getDataMartPackages, getDataMartApiKey } = await import("@/lib/datamart");
-    const { getActiveProviderPreference } = await import("@/lib/provider-dispatch");
 
-    const preferredProviderKey = await getActiveProviderPreference();
-    let balanceGhs = 0;
-    let datamartBalanceGhs = 0;
     let swiftdataBalanceGhs = 0;
     let isHealthy = false;
     let rawPackages: any[] = [];
     let networks: any[] = [];
-    let activeProvider = preferredProviderKey === "swiftdata" ? "SwiftData API" : "DataMart API";
 
-    const dmKey = getDataMartApiKey();
-    if (dmKey) {
-      try {
-        const dmBal = await getDataMartBalance();
-        if (dmBal && typeof dmBal.balance === "number") {
-          datamartBalanceGhs = dmBal.balance;
-        }
-      } catch (e: any) {
-        console.warn("Failed to fetch DataMart balance:", e.message);
-      }
-
-      try {
-        const dmPackagesRes = await getDataMartPackages();
-        if (dmPackagesRes && dmPackagesRes.data) {
-          const list: any[] = [];
-          Object.entries(dmPackagesRes.data).forEach(([net, pkgs]: [string, any]) => {
-            if (Array.isArray(pkgs)) {
-              pkgs.forEach((p) => {
-                list.push({
-                  id: `dm_${net}_${p.capacity}`,
-                  network: net.toLowerCase().includes("yello") ? "yello" : net.toLowerCase().includes("telecel") ? "telecel" : "at_ishare",
-                  size_gb: p.capacity,
-                  size_label: `${p.capacity}GB`,
-                  price_ghs: p.price,
-                  validity: "Non-Expiry",
-                });
-              });
-            }
-          });
-          if (list.length > 0 && preferredProviderKey === "datamart") {
-            rawPackages = list;
-            isHealthy = true;
-          }
-        }
-      } catch (e: any) {
-        console.warn("Failed to fetch DataMart packages:", e.message);
-      }
-    }
-
-    // Check SwiftData
     try {
       const bRes = await getSwiftDataBalance();
       if (bRes && typeof bRes.balance === "number") {
@@ -1684,26 +1602,22 @@ export const adminGetProviderPackages = createServerFn({ method: "GET" })
       const pRes = await getSwiftDataPackages();
       if (pRes && pRes.packages) {
         networks = pRes.networks || [];
-        if (rawPackages.length === 0 || preferredProviderKey === "swiftdata") {
-          rawPackages = pRes.packages;
-          isHealthy = true;
-        }
+        rawPackages = pRes.packages;
+        isHealthy = true;
       }
     } catch (e: any) {
       console.warn("Failed to fetch SwiftData packages:", e.message);
     }
 
-    balanceGhs = preferredProviderKey === "swiftdata" ? swiftdataBalanceGhs : datamartBalanceGhs;
-    if (rawPackages.length > 0 || balanceGhs > 0) {
+    if (rawPackages.length > 0 || swiftdataBalanceGhs > 0) {
       isHealthy = true;
     }
 
     return {
-      balanceGhs,
-      datamartBalanceGhs,
+      balanceGhs: swiftdataBalanceGhs,
       swiftdataBalanceGhs,
-      activeProvider,
-      selectedProviderKey: preferredProviderKey,
+      activeProvider: "SwiftData API",
+      selectedProviderKey: "swiftdata",
       isHealthy,
       networks,
       packages: rawPackages,
@@ -1713,57 +1627,25 @@ export const adminGetProviderPackages = createServerFn({ method: "GET" })
 export const adminSyncProviderPackages = createServerFn({ method: "POST" })
   .handler(async () => {
     const { getSwiftDataPackages } = await import("@/lib/swiftdata");
-    const { getDataMartPackages, getDataMartApiKey } = await import("@/lib/datamart");
     const { clearBundleCache } = await import("@/lib/public-bundles.functions");
 
-    let packagesToSync: any[] = [];
-    const dmKey = getDataMartApiKey();
-
-    if (dmKey) {
-      try {
-        const dmRes = await getDataMartPackages();
-        if (dmRes && dmRes.data) {
-          Object.entries(dmRes.data).forEach(([netKey, pkgs]: [string, any]) => {
-            if (Array.isArray(pkgs)) {
-              pkgs.forEach((p) => {
-                let netName = "MTN";
-                if (netKey.toUpperCase().includes("TELECEL")) netName = "Telecel";
-                else if (netKey.toUpperCase().includes("AT")) netName = "AirtelTigo";
-
-                packagesToSync.push({
-                  network: netName,
-                  size_gb: p.capacity,
-                  size_label: `${p.capacity}GB`,
-                  price_ghs: p.price,
-                  validity: "Non-Expiry",
-                });
-              });
-            }
-          });
-        }
-      } catch (dmErr: any) {
-        console.warn("DataMart sync error, falling back to SwiftData:", dmErr.message);
-      }
+    const pRes = await getSwiftDataPackages();
+    if (!pRes || !pRes.packages || !Array.isArray(pRes.packages) || pRes.packages.length === 0) {
+      throw new Error("No packages returned from SwiftData API");
     }
 
-    if (packagesToSync.length === 0) {
-      const pRes = await getSwiftDataPackages();
-      if (!pRes || !pRes.packages || !Array.isArray(pRes.packages)) {
-        throw new Error("No packages returned from provider API");
-      }
-      packagesToSync = pRes.packages.map((pkg: any) => {
-        let netName = "MTN";
-        if (pkg.network === "telecel") netName = "Telecel";
-        else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
-        return {
-          network: netName,
-          size_gb: pkg.size_gb || 1,
-          size_label: pkg.size_label || `${pkg.size_gb || 1}GB`,
-          price_ghs: Number(pkg.price ?? pkg.price_ghs ?? 0),
-          validity: pkg.validity || "Non-Expiry",
-        };
-      });
-    }
+    const packagesToSync = pRes.packages.map((pkg: any) => {
+      let netName = "MTN";
+      if (pkg.network === "telecel") netName = "Telecel";
+      else if (pkg.network === "at_ishare" || pkg.network === "at_bigtime") netName = "AirtelTigo";
+      return {
+        network: netName,
+        size_gb: pkg.size_gb || 1,
+        size_label: pkg.size_label || `${pkg.size_gb || 1}GB`,
+        price_ghs: Number(pkg.price ?? pkg.price_ghs ?? 0),
+        validity: pkg.validity || "Non-Expiry",
+      };
+    });
 
     const url = "https://vtdccqchhsbujknbpqku.supabase.co";
     const serviceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZGNjcWNoaHNidWprbmJwcWt1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDc1MzI0NCwiZXhwIjoyMTAwMzI5MjQ0fQ._5MtVAhM-4RmuIKPrSETGv227ZfPJFGkYi7roju7z-o";
@@ -1773,51 +1655,47 @@ export const adminSyncProviderPackages = createServerFn({ method: "POST" })
     const existingMap = new Map((existingBundles || []).map((b: any) => [`${b.network.toLowerCase()}_${b.size_label.toLowerCase()}`, b]));
 
     let syncedCount = 0;
-    await Promise.all(
-      packagesToSync.map(async (pkg: any) => {
-        const netName = pkg.network;
-        const sizeGb = pkg.size_gb || 1;
-        const sizeLabel = pkg.size_label || `${sizeGb}GB`;
-        const sizeMb = Math.round(sizeGb * 1024);
-        const exactProviderPrice = Number(pkg.price_ghs || 0);
+    let addedCount = 0;
+    let updatedCount = 0;
 
-        const key = `${netName.toLowerCase()}_${sizeLabel.toLowerCase()}`;
-        const existing = existingMap.get(key);
+    for (const pkg of packagesToSync) {
+      const key = `${pkg.network.toLowerCase()}_${pkg.size_label.toLowerCase()}`;
+      const existing = existingMap.get(key);
 
-        if (existing) {
-          const updateData: any = {
+      const sizeMb = Math.round((pkg.size_gb || 1) * 1024);
+      const retailPrice = pkg.price_ghs;
+      const agentPrice = Number((retailPrice * 0.95).toFixed(2));
+
+      if (existing) {
+        await supa
+          .from("bundles")
+          .update({
+            price_ghs: retailPrice,
+            agent_price_ghs: agentPrice,
             size_mb: sizeMb,
             validity: pkg.validity || "Non-Expiry",
             active: true,
-          };
-          // Preserve custom admin prices: Only update price if unconfigured/zero
-          if (!existing.price_ghs || Number(existing.price_ghs) <= 0) {
-            updateData.price_ghs = exactProviderPrice;
-          }
-          await supa
-            .from("bundles")
-            .update(updateData)
-            .eq("id", existing.id);
-        } else {
-          await supa
-            .from("bundles")
-            .insert({
-              network: netName,
-              size_label: sizeLabel,
-              size_mb: sizeMb,
-              price_ghs: exactProviderPrice,
-              validity: pkg.validity || "Non-Expiry",
-              popular: sizeGb === 1 || sizeGb === 2 || sizeGb === 5,
-              active: true,
-              sort_order: sizeMb,
-            });
-        }
-        syncedCount++;
-      })
-    );
+          })
+          .eq("id", existing.id);
+        updatedCount++;
+      } else {
+        await supa.from("bundles").insert({
+          network: pkg.network,
+          size_label: pkg.size_label,
+          size_mb: sizeMb,
+          price_ghs: retailPrice,
+          agent_price_ghs: agentPrice,
+          validity: pkg.validity || "Non-Expiry",
+          active: true,
+          sort_order: sizeMb,
+        });
+        addedCount++;
+      }
+      syncedCount++;
+    }
 
     clearBundleCache();
-    return { ok: true, syncedCount };
+    return { ok: true, syncedCount, addedCount, updatedCount, provider: "SwiftData API" };
   });
 
 export const adminResetUserPassword = createServerFn({ method: "POST" })

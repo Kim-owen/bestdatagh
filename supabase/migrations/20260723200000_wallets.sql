@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.wallets (
 
 ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own wallet" ON public.wallets;
 CREATE POLICY "Users can view own wallet"
     ON public.wallets FOR SELECT
     USING (auth.uid() = user_id);
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.wallet_transactions (
 
 ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own wallet transactions" ON public.wallet_transactions;
 CREATE POLICY "Users can view own wallet transactions"
     ON public.wallet_transactions FOR SELECT
     USING (auth.uid() = user_id);

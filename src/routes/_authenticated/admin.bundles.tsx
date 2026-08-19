@@ -223,12 +223,12 @@ function BundlesPage() {
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-amber-400 font-bold uppercase tracking-widest mb-1">
-            <Zap className="h-4 w-4" /> Provider API Integration (DataMart / SwiftData)
+          <div className="flex items-center gap-2 text-xs text-sky-400 font-bold uppercase tracking-widest mb-1">
+            <Zap className="h-4 w-4" /> SwiftData API Reseller Integration
           </div>
           <h1 className="text-3xl font-black text-white font-display">Data Bundle Packages</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Sync packages in real-time from DataMart / SwiftData API or instantly add, edit & hide retail prices.
+            Sync packages in real-time from SwiftData API Gateway or customize retail & agent discount prices.
           </p>
         </div>
 
@@ -260,13 +260,13 @@ function BundlesPage() {
       )}
 
       {/* Interactive Active Provider Selector & Gateway Verification Banner */}
-      <div className="rounded-3xl border border-amber-500/20 bg-slate-900/80 p-5 backdrop-blur-xl shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="rounded-3xl border border-sky-500/20 bg-slate-900/80 p-5 backdrop-blur-xl shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
-            <Zap className="h-4 w-4" /> Active Data Dispatch Gateway
+          <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wider">
+            <Zap className="h-4 w-4" /> Active Data Gateway: SwiftData API Reseller
           </div>
           <p className="text-xs text-slate-300">
-            Select which API provider gateway handles instant automated bundle dispatches, or verify active gateway health:
+            All instant data bundle dispatches and wholesale orders are routed directly through SwiftData Gateway.
           </p>
         </div>
 
@@ -277,7 +277,7 @@ function BundlesPage() {
             className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 text-xs font-black transition-all shadow-md disabled:opacity-50"
           >
             <ShieldCheck className={`h-4 w-4 text-amber-400 ${isVerifyingGateway ? "animate-spin" : ""}`} />
-            <span>{isVerifyingGateway ? "Verifying..." : "Verify Provider Gateway"}</span>
+            <span>{isVerifyingGateway ? "Verifying..." : "Verify Gateway Status"}</span>
           </button>
 
           <button
@@ -289,32 +289,9 @@ function BundlesPage() {
             <span>{isSyncingOrders ? "Syncing..." : "Sync Delivery Statuses"}</span>
           </button>
 
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-white/10 w-full sm:w-auto">
-            <button
-              onClick={() => switchProviderMutation.mutate("datamart")}
-              disabled={switchProviderMutation.isPending}
-              className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
-                ((providerInfo as any)?.selectedProviderKey || "datamart") === "datamart"
-                  ? "bg-amber-400 text-slate-950 shadow-md"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${((providerInfo as any)?.selectedProviderKey || "datamart") === "datamart" ? "bg-slate-950" : "bg-slate-500"}`} />
-              DataMart API
-            </button>
-
-            <button
-              onClick={() => switchProviderMutation.mutate("swiftdata")}
-              disabled={switchProviderMutation.isPending}
-              className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
-                (providerInfo as any)?.selectedProviderKey === "swiftdata"
-                  ? "bg-amber-400 text-slate-950 shadow-md"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${(providerInfo as any)?.selectedProviderKey === "swiftdata" ? "bg-slate-950" : "bg-slate-500"}`} />
-              SwiftData API
-            </button>
+          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>SwiftData API Active</span>
           </div>
         </div>
       </div>
@@ -832,40 +809,27 @@ function BundlesPage() {
                 </div>
               </div>
 
-              {/* DataMart Gateway Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-2">
-                <div className="flex items-center justify-between font-sans">
-                  <span className="font-bold text-slate-200 flex items-center gap-2">
-                    <Server className="h-4 w-4 text-amber-400" /> DataMart API Provider
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    gatewayReport.dataMart?.healthy ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                  }`}>
-                    {gatewayReport.dataMart?.healthy ? "Healthy" : "Unreachable"}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-300">
-                  <div>Balance: <span className="text-amber-400 font-bold">GH₵ {(gatewayReport.dataMart?.balance ?? 0).toFixed(2)}</span></div>
-                  <div>Latency: <span className="text-sky-400 font-bold">{gatewayReport.dataMart?.latencyMs ?? 0}ms</span></div>
-                </div>
-                <div className="text-[11px] text-slate-400 font-sans">{gatewayReport.dataMart?.message}</div>
-              </div>
-
               {/* SwiftData Gateway Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-2">
+              <div className="p-5 rounded-2xl bg-slate-950 border border-sky-500/20 space-y-3">
                 <div className="flex items-center justify-between font-sans">
-                  <span className="font-bold text-slate-200 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-sky-400" /> SwiftData API Reseller
+                  <span className="font-bold text-white flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-sky-400" /> SwiftData API Reseller Gateway
                   </span>
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
                     gatewayReport.swiftData?.healthy ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                   }`}>
-                    {gatewayReport.swiftData?.healthy ? "Healthy" : "Unreachable"}
+                    {gatewayReport.swiftData?.healthy ? "Operational" : "Unreachable"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-300">
-                  <div>Balance: <span className="text-amber-400 font-bold">GH₵ {(gatewayReport.swiftData?.balance ?? 0).toFixed(2)}</span></div>
-                  <div>Latency: <span className="text-sky-400 font-bold">{gatewayReport.swiftData?.latencyMs ?? 0}ms</span></div>
+                <div className="grid grid-cols-2 gap-3 text-slate-300">
+                  <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
+                    <div className="text-[10px] uppercase text-slate-400">API Balance</div>
+                    <div className="text-amber-400 font-black text-sm">GH₵ {(gatewayReport.swiftData?.balance ?? 0).toFixed(2)}</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
+                    <div className="text-[10px] uppercase text-slate-400">Response Latency</div>
+                    <div className="text-sky-400 font-black text-sm">{gatewayReport.swiftData?.latencyMs ?? 0}ms</div>
+                  </div>
                 </div>
                 <div className="text-[11px] text-slate-400 font-sans">{gatewayReport.swiftData?.message}</div>
               </div>

@@ -1,16 +1,21 @@
 const BASE_URL_RAW = process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api";
-const SWIFTDATA_BASE_URL = BASE_URL_RAW.replace(/\/v1\/api$/, "").replace(/\/api$/, "");
 
 function getEndpoint(path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${SWIFTDATA_BASE_URL}/functions/v1/api${cleanPath}`;
+  let base = (process.env.SWIFTDATA_BASE_URL || "https://ihrvvniomtoofrjkmalb.supabase.co/functions/v1/api/v1").trim().replace(/\/+$/, "");
+  if (!base.endsWith("/v1")) {
+    base = `${base}/v1`;
+  }
+  return `${base}${cleanPath}`;
 }
 
 export function getSwiftDataApiKey(): string {
-  return process.env.SWIFTDATA_API_KEY || "";
+  const key = process.env.SWIFTDATA_API_KEY;
+  if (!key) {
+    throw new Error("SWIFTDATA_API_KEY is not configured in environment variables.");
+  }
+  return key;
 }
-
-const SWIFTDATA_API_KEY = getSwiftDataApiKey();
 
 export type SwiftDataNetwork = "yello" | "at_ishare" | "at_bigtime" | "telecel";
 
@@ -55,7 +60,7 @@ export async function buySwiftDataBundle(params: {
   const res = await fetch(getEndpoint("/buy-data"), {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -78,7 +83,7 @@ export async function getSwiftDataOrder(reference: string) {
   const res = await fetch(getEndpoint(`/orders/${encodeURIComponent(reference)}`), {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
     },
   });
 
@@ -94,7 +99,7 @@ export async function listSwiftDataOrders(limit = 50, offset = 0) {
   const res = await fetch(getEndpoint(`/orders?limit=${limit}&offset=${offset}`), {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
     },
   });
 
@@ -110,7 +115,7 @@ export async function getSwiftDataBalance() {
   const res = await fetch(getEndpoint("/balance"), {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
     },
   });
 
@@ -127,7 +132,7 @@ export async function verifySwiftDataNumber(phone: string) {
   const res = await fetch(getEndpoint("/verify-number"), {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ phone: cleanPhone }),
@@ -141,23 +146,143 @@ export async function verifySwiftDataNumber(phone: string) {
   return data;
 }
 
-export async function getSwiftDataHealth() {
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/health`, {
+export async function verifySwiftDataNumbersBulk(phones: string[]) {
+  const cleanPhones = phones.map((p) => p.replace(/\s+/g, ""));
+  const res = await fetch(getEndpoint("/verify-number/bulk"), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ phones: cleanPhones }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to verify phone numbers in bulk");
+  }
+
+  return data;
+}
+
+export async function listSwiftDataUtilityProducts(type?: "airtime" | "ecg" | "tv") {
+  const query = type ? `?type=${encodeURIComponent(type)}` : "";
+  const res = await fetch(getEndpoint(`/utility-products${query}`), {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to fetch utility products");
+  }
+
+  return data;
+}
+
+export async function buySwiftDataAirtime(params: {
+  phone: string;
+  provider_code: "MTN" | "TELECEL" | "AIRTELTIGO" | string;
+  amount: number;
+  reference?: string;
+}) {
+  const cleanPhone = params.phone.replace(/\s+/g, "");
+  const res = await fetch(getEndpoint("/buy-airtime"), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      phone: cleanPhone,
+      provider_code: params.provider_code,
+      amount: params.amount,
+      reference: params.reference,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Airtime purchase failed");
+  }
+
+  return data;
+}
+
+export async function buySwiftDataECG(params: {
+  meter: string;
+  provider_code?: string;
+  amount: number;
+  account_name?: string;
+}) {
+  const res = await fetch(getEndpoint("/buy-ecg"), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      meter: params.meter.trim(),
+      provider_code: params.provider_code || "ecg2",
+      amount: params.amount,
+      account_name: params.account_name || "Customer",
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "ECG bill payment failed");
+  }
+
+  return data;
+}
+
+export async function buySwiftDataTV(params: {
+  smartcard: string;
+  provider_code: "DSTV" | "GOTV" | "STARTIMES" | string;
+  amount: number;
+  account_name?: string;
+}) {
+  const res = await fetch(getEndpoint("/buy-tv"), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      smartcard: params.smartcard.trim(),
+      provider_code: params.provider_code,
+      amount: params.amount,
+      account_name: params.account_name || "Customer",
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "TV subscription payment failed");
+  }
+
+  return data;
+}
+
+export async function getSwiftDataHealth() {
+  const res = await fetch(getEndpoint("/health"), {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
     },
   });
   return await res.json();
 }
 
 export async function getSwiftDataPackages() {
-  const res = await fetch(`${SWIFTDATA_BASE_URL}/v1/packages`, {
+  const res = await fetch(getEndpoint("/packages"), {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${SWIFTDATA_API_KEY}`,
+      "Authorization": `Bearer ${getSwiftDataApiKey()}`,
     },
   });
   return await res.json();
 }
-

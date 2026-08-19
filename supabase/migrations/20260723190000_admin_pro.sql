@@ -19,7 +19,7 @@ CREATE POLICY "Admins can view audit logs"
     USING (
         EXISTS (
             SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin')
+            WHERE user_id = auth.uid() AND role::text IN ('admin', 'super_admin')
         )
     );
 
@@ -42,5 +42,6 @@ ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own support tickets"
     ON public.support_tickets FOR SELECT
     USING (auth.uid() = user_id OR EXISTS (
-        SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin')
+        SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text IN ('admin', 'super_admin')
     ));
+
